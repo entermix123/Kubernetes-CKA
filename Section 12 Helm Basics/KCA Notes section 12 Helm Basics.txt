@@ -1,0 +1,1108 @@
+CONTENT
+
+Section 12 258. What is Helm
+Section 12 259. Installation and Configuration
+Section 12 260. Lab: Installing Helm
+Section 12 261. A quick note about Helm2 vs Helm3
+Section 12 262. Helm Components
+Section 12 263. Helm Charts
+Section 12 264. Working with Helm Basics
+Section 12 265. Customizing Chart Parameters
+Section 12 266. Practive Test - Deploy a chart with Helm
+Section 12 267. Lifecycle management with Helm
+Section 12 268. Practive Test - Upgrading a Helm Chart
+
+
+
+============================
+Section 12 258. What is Helm
+============================
+
+Helm is package manager for Kubernetes
+
+Example for useing Helm
+	terminal --> helm install wordpress
+
+# result: alues.yaml file is created with all settings of wordpress application.
+
+We can the edit the values.yaml file and upgrade the wordpress application
+	terminal --> helm upgrade wprdpress
+
+If we make a mistake we can rollback versions
+	terminal --> helm rollback wordpress
+
+We can uninstall app with one command
+	terminal --> helm uninstall wordpress
+
+# heml keep track of all files used by each app so it knows what to remove
+
+HELM allows us to treat kubernetes apps as apps and not as set of objects that we need to manage manually one by one. This is great ease!
+
+
+
+
+
+==============================================
+Section 12 259. Installation and Configuration
+==============================================
+
+For installing HELM we need
+	- Working Kubernetes Cluster
+	- Installed and configured kubectl util
+
+Isntall HELM on Linux system
+	terminal --> sudo snap install helm --classic
+
+For apt based systems
+	terminal --> curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+sudo apt-get install apt-transport-https --yes
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+sudo apt-get update
+sudo apt-get install helm
+
+For pkg systems
+	terminal --> pkg install helm
+
+
+
+
+====================================
+Section 12 260. Lab: Installing Helm
+====================================
+
+1. You must have Kubernetes installed for a successful and properly secured use of Helm.
+----------------------------------------------------------------------------------------
+Refer the documentation to check the prerequisites. The Documentation tab is available at the top right panel.
+
+
+- choose 'True' as answer
+
+
+
+2. Install the helm package on the controlplane node.
+-----------------------------------------------------
+If unsure how to install the helm tool, feel free to refer to the documentation. The Documentation tab is available at the top right panel.
+
+Note: Make sure to complete the installation process before moving to the next questions.
+
+Show system OS
+	terminal --> cat /etc/*-release
+
+# result:
+------------------------------------------------
+DISTRIB_ID=Ubuntu					# we are using Ubuntu OS
+DISTRIB_RELEASE=22.04
+DISTRIB_CODENAME=jammy
+DISTRIB_DESCRIPTION="Ubuntu 22.04.5 LTS"
+PRETTY_NAME="Ubuntu 22.04.5 LTS"
+NAME="Ubuntu"
+VERSION_ID="22.04"
+VERSION="22.04.5 LTS (Jammy Jellyfish)"
+VERSION_CODENAME=jammy
+ID=ubuntu
+ID_LIKE=debian
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+UBUNTU_CODENAME=jammy
+------------------------------------------------
+
+Helm Documentation Installation for Ubuntu 
+	- https://helm.sh/docs/intro/install/#from-apt-debianubuntu
+
+Install Helm
+	terminal --> curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+sudo apt-get install apt-transport-https --yes
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+sudo apt-get update
+sudo apt-get install helm
+
+
+- click 'Check' button
+
+
+3. Awesome 💪!! Now that you have Helm installed ✨ identify the Helm version in the cluster.
+----------------------------------------------------------------------------------------------
+
+Show helm commands
+	terminal --> helm --help
+
+Show Helm version 
+	terminal --> helm version
+
+# result: version.BuildInfo{Version:"v3.17.0", GitCommit:"301108edc7ac2a8ba79e4ebf5701b0b6ce6a31e4", GitTreeState:"clean", GoVersion:"go1.23.4"}
+
+- choose '3.17.0' as answer
+
+
+
+
+4. Which environment variable can be used to indicate whether or not Helm is running in Debug mode?
+---------------------------------------------------------------------------------------------------
+Use the help mode of the helm command to look for this information.
+
+Show helm commands
+	terminal --> helm --help
+	or
+	terminal --> helm --help | grep mode
+
+# result: | $HELM_DEBUG                        | indicate whether or not Helm is running in Debug mode  
+
+
+
+
+5. What is a command line flag that can be used to enable verbose output?
+-------------------------------------------------------------------------
+
+Show help commands for verbosity
+	terminal --> helm --help | grep verbose
+
+# result:       --debug                           enable verbose output
+
+- choose '--debug' as answer
+
+
+
+6. Which of the following is not a valid subcommand to use with helm get command?
+---------------------------------------------------------------------------------
+
+Show helm commands
+	terminal --> helm --help
+
+TEst commands
+	terminal --> helm get --help
+
+# result:
+------------------------------------------------------
+Available Commands:
+  all         download all information for a named release
+  hooks       download all hooks for a named release
+  manifest    download the manifest for a named release
+  metadata    This command fetches metadata for a given release
+  notes       download the notes for a named release
+  values      download the values file for a named release
+------------------------------------------------------
+
+- choose 'output' as answer
+
+
+
+
+7. That's all for now. That was a quick introduction to the helm command line utility. Feel free to explore the helm command line utility further. We will learn more about these commands throughout the remainder of this course.
+-------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+=================================================
+Section 12 261. A quick note about Helm2 vs Helm3
+=================================================
+
+Tiller - middle-man shell object between helmctl and kubernetes system
+3-way-strategic Merge Patch - Apps Revision Manager (app snapshot feature - upgrade / rollback)
+	- Helm2 compare current version withthe previous. But if image is set with kubectl, the image is not recognized by Helm2
+	- Helm3 recognize kubectl image objects and compare them to the live state of the image and make nessecary changes
+
+
+Helm 2					Helm 3		
+--------------------------------------------------------
+Tiller					removed Tiller	
+No 3-way-strategic Merge Patch		3-way-strategic Merge Patch	
+
+
+
+
+
+===============================
+Section 12 262. Helm Components
+===============================
+
+Helm components
+	- helm cli - command line utility 
+	- charts - collection of files and instructions needed for installing applications
+	- release - sibngle installation of applications using a helm chart
+	- revision - snapshot of application
+		- in a release we can have multiple revisions
+		- every time change is made - upgrade, config change or change of image, new release is created
+	- chart reposistory - there are public repositories with charts we can use
+	- metadata - data about data - what our helm uses as files, configs and repos
+		- helm saves the metadata as secrets on the kubernetes cluster
+
+
+
+We will use 2 kinds of applications to explain the components and how they work together
+	- sinple web app (nginx) for concepts in the simplest form
+	- wordpress app for real life usage
+
+
+
+Nginx app
+---------
+
+We have a service file, a deployment file as templates and a values file as variables.
+
+service.yaml
+-----------------------------------------
+apiVersion: v1
+kind: service
+metadata:
+  name: hello-world
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: hello-world
+-----------------------------------------
+
+
+
+deployment.yaml
+-----------------------------------------
+apiVersion: v1
+kind: Deployment
+metadata:
+  name: hello-world
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: hello-world
+    spec:
+      containers:
+	- name: nginx
+	  image: "{{ .Values.image.repository }}"
+	  ports:
+	    - name: http
+	      containerPort: 80
+	      protocol: TCP
+-----------------------------------------
+
+
+values.yaml
+-----------------------------------------
+replicaCount: 1
+
+image:
+  repository: nginx
+-----------------------------------------
+
+
+
+Wordpress app
+-------------
+
+Files
+-----------------------------------------
+wordpress
+  ci
+  templates
+	_help.tpl
+	config-secret.yaml
+	deployment.yaml
+	externaldb-secrets.yaml
+	extra-list.yaml
+	hpa.yaml
+	httpd-configmap.yaml
+	ingress.yaml
+	metrics-svc.yaml
+	NOTES.txt
+	pdb.yaml
+	postinit-configmap.yaml
+	pvc.yaml
+	secrets.yaml
+	servicemonitor.yaml
+	svc.yaml
+	tls-secrets.yaml
+...
+-----------------------------------------
+
+
+deployment.yaml
+-----------------------------------------
+apiVersion: {{ include "common.capabilities.deployment.apiVersion" . }}
+kind: Deployment
+metadata:
+  name: {{ include "common.names.fullname" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels: {{- include "common.labels.standard" . | nindent 4 }}
+    {{- if .Values.commonLabels }}
+    {{- include "common.tplvalues.render" ( dict "value" .Values.commonLabels "context" $ ) }}
+    {{- end }}
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations...
+spec:
+  selector:
+    matchLabels: {{- include "common.labels.MatchLabels" > | nindent 6 }}
+  {{- if .Values.updateStrategy }}
+  strategy: {{- toYaml  .Values.updateStrategy | nindent 4 }}
+  {{- end }}
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+-----------------------------------------
+
+
+
+When a chart is applied to our cluster, a release is created. This is made because we can set different entities with same chat-name in different releases. This releases are used for the different environments - dev, prod, etc.
+
+Aplly chart
+	terminal --> helm install [release-name][chart-name]
+	terminal --> helm install my-site bitnami/wordpress	
+
+	# helm				- common helm command
+	# install			- used action
+	# my-site			- release name
+	# bitnami/wordpress		- chart name
+
+
+
+Some of the famous repositories - ArtifactHub.io (https://artifacthub.io/)
+	- Appscode
+	- TrueCharts
+	- Bitnami
+	- Community Operators
+
+We can search in all reositories from one central hub (helm hub) - ArtifactHub.io (https://artifacthub.io/)
+
+
+
+
+
+
+
+===========================
+Section 12 263. Helm Charts
+===========================
+
+
+service.yaml
+-----------------------------------------
+apiVersion: v1
+kind: service
+metadata:
+  name: hello-world
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: hello-world
+-----------------------------------------
+
+
+deployment.yaml
+-----------------------------------------
+apiVersion: v1
+kind: Deployment
+metadata:
+  name: hello-world
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: hello-world
+    spec:
+      containers:
+	- name: nginx
+	  image: "{{ .Values.image.repository }}"
+	  ports:
+	    - name: http
+	      containerPort: 80
+	      protocol: TCP
+-----------------------------------------
+
+service.yaml and deployment.yaml are templates. The only file we need to change in order to change someting is values.yaml.
+
+
+values.yaml
+-----------------------------------------
+replicaCount: 1
+
+image:
+  repository: nginx
+-----------------------------------------
+
+
+
+We have chert definition file that heml uses to deploy applications. Below you can see simple chart file with few properites.
+
+Chart.yaml
+-----------------------------------------
+apiVersion: v2
+appVersion: "1.16.0"
+name: hello-world
+description: A web application
+
+type: application
+-----------------------------------------
+
+
+Install charts
+	terminal --> helm install hello-world
+
+
+
+
+Detailed chart desription:
+
+Chert.yaml
+-----------------------------------------
+apiVersion: v2					# HELM 2 - v1;  HELM 3 - v2
+appVersion: 5.8.1				# app that is inside this app (in this example - wordpress), info only
+version: 12.1.27				# version of the chart itself
+name: wordpress								# chart name
+description: Web publishing platform for building blogs and websites.
+type: application							# application/library
+
+dependencies:
+  - condition: mariadb.enabled
+    name: mariadb
+    repository: https://charts.bitnami.com/bitnamo
+    version: 9.x.x
+    <code hidden>
+
+keywords:
+  - application
+  - blog
+  - wordpress
+
+maintainers:
+  - email: containers@bitnami.com
+    name: Bitnami
+home: https://github.com/bitnami/charts/tree/master/bitnami/wordpress
+icon: https://bitnami.com/assets/stacks/wordpress/img/wordpress-stack-220x234.png
+-----------------------------------------
+
+
+Directory structure
+
+hellow-world-chart
+	templates		# templates directory
+	values.yaml
+	chart.yaml
+	LICENSE
+	READMR.md
+	charts			# Dependency Charts directory
+	
+
+
+
+
+
+
+========================================
+Section 12 264. Working with Helm Basics
+========================================
+
+Show helm help commands
+	terminal --> helm --help
+
+Show help subcommands for 'repo' command
+	terminal --> helm repo --help
+
+Show help sub-subcommand for 'repo update' command
+	terminal --> helm repo update --help
+
+
+Deploy wordpress application
+----------------------------
+
+Search for 'wordpress' charts on https://artifacthub.io/.
+	- Choose one with the official or verified publisher batch
+	- https://artifacthub.io/packages/helm/bitnami/wordpress
+
+
+We can search also from helm CLI
+	terminal --> helm search hub wordpress
+
+	# helm				- common helm command
+	# search			- action
+	# hub				- location
+	# wordpress			- chart name
+
+
+We can also work with chart repo. This way helm can locally find the repo and use it.
+
+Add chart repo locally
+	terminal --> helm repo add bitnami https://charts.bitnami.com/bitnami
+
+Install the chart
+	terminal --> helm install my-release bitnami/wordpress
+
+	# helm 				- common helm command
+	# install			- action
+	# my-release			- name the new release
+	# bitnami/wordpress		- repo name
+
+
+List existing releases
+	terminal --> helm list
+
+Delete application (release) with all its components
+	terminal --> helm uninstall my-release
+
+
+List existing repositories
+	terminal --> helm repo list
+
+Update existing local repositories - fetch from remote
+	terminal --> helm repo update
+
+
+
+
+
+============================================
+Section 12 265. Customizing Chart Parameters
+============================================
+
+We can modify the values in the values.yaml file
+
+values.yaml
+-----------------------------------------
+image:
+  registry: docker.io
+  repository: bitnami/wordpress
+  tag: 5.8.2-debian-10-r0
+
+## @param wordpressUsername WordPress username
+##
+wordpressUsername: user
+## @param wordpressPassword WordPress user
+password
+## Defaults to a random 10-character alphanumeric string if not set
+##
+wordpressPassword: ""
+## @param existingSecret
+##
+existingSecret: ""
+## @param wordpressEmail WordPress user email
+##
+wordpressEmail: user@example.com
+## @param wordpressFirstName WordPress user first name
+##
+## @param wordpressBlogName Blog name
+##
+wordpressBlogName: User's Blog!
+-----------------------------------------
+
+Install the application
+	terminal --> helm install my-release bitnami/workpress
+
+The command above pulls the chart and install it instantly without giving us option to modiy parameters.
+
+To modify parameters we need to add '--set' parameter in the command
+
+Install the application with modified params
+	terminal --> helm install --set wordpressBlogName="Helm Tutorials" --set wordpressEmail="john@example.com" my-release bitnami/workpress
+
+
+
+
+We can also create a cutom values file - custom-values.yaml. 
+
+custom-values.yaml
+-----------------------------------------
+wordpressBlogName: Helm Tutorials
+wordpressEmail: john@example.com
+-----------------------------------------
+
+Install the application with custom values
+	terminal --> helm install --values custom-values.yaml my-release bitnami/workpress
+
+This command will pick the values from the custom-calues.yaml file and overwrite them in the values.yaml file.
+
+
+
+We can modify the build in values.yaml file itself in two steps
+
+Step 1 options - pull the chart
+	- pull compressed chart
+		terminal --> helm pull bitnami/wordpress
+	- pull and uncompress chart
+		terminal --> helm pull --untar bitnami/wordpress
+
+		# this will craete directory 'wordpress' with all files inside
+
+
+We can modify any files (mainly values.yaml file) in the created directory and the install it
+	- modify local files
+		terminal --> vi filename.yaml
+	- install the modified local chart
+		terminal --> helm install my-release ./wordpress
+
+
+
+
+
+========================================================
+Section 12 266. Practive Test - Deploy a chart with Helm
+========================================================
+
+1. The helm package that contains all of the resource definitions necessary to run an application, tool, or service inside of a Kubernetes cluster is known as a …
+-------------------------------------------------------------------------------------------------
+
+- choose 'chart' as answer
+
+
+
+2. We cannot install the same chart multiple times on the same Kubernetes Cluster.
+----------------------------------------------------------------------------------
+
+We can install same chart in different releases
+
+- choose 'false' as answer
+
+
+
+3. Which command is used to search for a wordpress helm chart package from the Artifact Hub?
+--------------------------------------------------------------------------------------------
+
+- choose 'helm search hub wordpress' as answer
+
+
+
+4. Search for a consul helm chart package from the Artifact Hub and identify the APP VERSION for the Official HashiCorp Consul Chart.
+--------------------------------------------------------------------------------------------
+
+Search for the consul
+	terminal --> helm search hub consul | grep "Official HashiCorp Consul Chart"
+
+# result:
+https://artifacthub.io/packages/helm/warjiang/c...      1.3.0           1.17.0          Official HashiCorp Consul Chart                   
+https://artifacthub.io/packages/helm/wenerme/co...      1.6.2           1.20.2          Official HashiCorp Consul Chart                   
+https://artifacthub.io/packages/helm/hashicorp/...      1.6.2           1.20.2          Official HashiCorp Consul Chart                   
+https://artifacthub.io/packages/helm/wener/consul       1.6.2           1.20.2          Official HashiCorp Consul Chart 
+
+- choose '1.20.2' as answer
+
+
+
+5. Add bitnami helm chart repository in the controlplane node.
+--------------------------------------------------------------
+The url for bitnami repository is https://charts.bitnami.com/bitnami
+
+Show helm repo help commands
+	terminal --> helm repo add --help
+
+Add the repo
+	terminal --> helm repo add bitnami https://charts.bitnami.com/bitnami
+
+	# helm 					- common helm command
+	# repo add				- add repo
+	# bitnami 				- name of the repo
+	# https://charts.bitnami.com/bitnami	- repo URL
+
+- click 'Check; button
+
+
+
+6. Which command is used to search for the wordpress package from the newly added bitnami repository?
+-----------------------------------------------------------------------------------------------------
+
+- choose 'helm search repo wordpress' as answer
+
+
+
+7. How many helm chart repositories are there in the controlplane node now?
+---------------------------------------------------------------------------
+We have added a few helm chart repositories in the controlplane node now.
+
+Show helm repo help command
+	terminal --> helm repo --help
+
+List repositories
+	terminal --> helm repo list
+
+# result:
+NAME            URL                                                 
+bitnami         https://charts.bitnami.com/bitnami                  
+puppet          https://puppetlabs.github.io/puppetserver-helm-chart
+hashicorp       https://helm.releases.hashicorp.com    
+
+- choose '3' as answer
+
+
+
+8. Deploy the Apache application on the cluster using the apache from the bitnami repository.
+---------------------------------------------------------------------------------------------
+Set the release Name to: amaze-surf
+
+Deploy repo
+	terminal --> helm install amaze-surf bitnami/apache
+
+
+- click 'Check' button
+
+
+
+9. What version of apache did we just install on the cluster using the helm chart?
+----------------------------------------------------------------------------------
+
+Show helm help commands
+	terminal --> helm --help
+
+List charts
+	terminal --> helm list
+
+# result:
+NAME            NAMESPACE       REVISION        UPDATED                                 STATUS          CHART           APP VERSION
+amaze-surf      default         1               2025-02-06 11:12:04.035470022 +0000 UTC deployed        apache-11.3.2   2.4.63 
+
+- choose '2.4.63' as answer
+
+
+
+10. How many releases of nginx charts can you see installed in the cluster now?
+-------------------------------------------------------------------------------
+Note: We just installed some charts
+
+Show helm help commands
+	terminal --> helm --help
+
+List nginx charts
+	terminal --> helm list | grep nginx
+
+# result:
+crazy-web       default         1               2025-02-06 11:14:57.965805418 +0000 UTC deployed        nginx-18.3.6    1.27.4     
+happy-browse    default         1               2025-02-06 11:14:52.181302069 +0000 UTC deployed        nginx-18.3.6    1.27.4  
+
+- choose '2' as answer
+
+
+11. Uninstall the nginx chart release happy-browse from the cluster.
+--------------------------------------------------------------------
+
+List nginx charts
+	terminal --> helm list | grep nginx
+
+# result:
+crazy-web       default         1               2025-02-06 11:14:57.965805418 +0000 UTC deployed        nginx-18.3.6    1.27.4     
+happy-browse    default         1               2025-02-06 11:14:52.181302069 +0000 UTC deployed        nginx-18.3.6    1.27.4  
+
+Uninstall 'happy-browse' chart
+	terminal --> helm uninstall happy-browse
+
+- click 'Check' button
+
+
+12. Remove the Hashicorp helm repository from the cluster.
+----------------------------------------------------------
+
+Show helm repo help commands
+	terminal --> helm repo --help
+
+List repos
+	terminal --> helm repo list
+
+# result:
+NAME            URL                                                 
+bitnami         https://charts.bitnami.com/bitnami                  
+puppet          https://puppetlabs.github.io/puppetserver-helm-chart
+hashicorp       https://helm.releases.hashicorp.com   
+
+Remove the 'hashicorp' repo 
+	terminal --> helm repo remove hashicorp
+
+- click 'Check' button
+
+
+
+
+
+
+==============================================
+Section 12 267. Lifecycle management with Helm
+==============================================
+
+Lifecycle is every time a chart is pulled and installed, a release is created. This chart can be managed (upgraded, downgraded etc.) without affect other releases of the same chart.
+
+
+Example:
+
+Install older version of nginx - revision 1 is created
+	terminal --> helm install nginx-release bitnami/nginx --version 7.1.0
+
+	# helm 					- common helm command
+	# install				- action
+	# nginx-release 			- name the created reslease
+	# bitnami/nginx --version 7.1.0		- set repo/image and version
+
+
+If we have to upgrade the nginx imgae we need to find the version
+	- list pods
+		terminal --> k get pods
+
+		# result: nginx-release-564535543-435453xz43
+
+	- describe pod to find the nginx version
+		terminal --> k describe pod nginx-release-564535543-435453xz43
+
+		# the image of the nginx must appear with current version
+
+
+Upgrade the release - revision 2 is created
+	terminal --> helm upgrade nginx-release bitnami/nginx
+
+We want to see if the upgrade is successful
+	- list pods
+		terminal --> k get pods
+
+		# result: nginx-release-564535543-435453xz43
+
+	- describe pod to find the nginx version
+		terminal --> k describe pod nginx-release-564535543-435453xz43
+
+		# the image of the nginx must appear with newer version
+
+
+We can list the releases
+	terminal --> helm list
+
+	# the result will contain 'REVISION' in it. 
+
+
+Nuber of the current release do not give us enought information.
+
+Show detailed information about specific release
+	terminal --> helm history nginx-release
+
+
+We can perfor a rollback ti specific revision
+	terminal --> helm rollback nginx-release 1
+
+	# helm 					- common helm command
+	# rollback				- action
+	# nginx-release 			- name of the reslease
+	# 1					- set the nuber of the revision you want to rollback to
+
+	# This will not exactly go back to revision one, but create a new revision - 3 with similar config like revision 1
+
+
+IF we need to upgrade more safiticated image/application, we need to set a parameters (permission params like dbs, passwords etc.) in the upgrade command also
+
+When rollback is performed, persistent DB data will not be managed. It will stau the same before the rollback was performed (latest state of the DB)
+
+There are specific actions for saving DB data before chart upgrade and DB data restorations -  Chart hooks
+
+
+
+
+
+======================================================
+Section 12 268. Practive Test - Upgrading a Helm Chart
+======================================================
+
+1. Add bitnami helm chart repository to the cluster.
+----------------------------------------------------
+Note: - Make sure to add the bitnami chart to the cluster before moving to the next questions.
+
+Show helm repo help commands
+	terminal --> helm repo add --help
+
+Add bitnami repo in the cluster
+	terminal --> helm repo add bitnami https://charts.bitnami.com/bitnami
+
+- click 'Check' button
+
+
+
+2. How many releases of nginx can you see in the cluster now?
+-------------------------------------------------------------
+
+List releases of nginx
+	terminal --> helm list
+
+# result:
+NAME            NAMESPACE       REVISION        UPDATED                                 STATUS         CHART           APP VERSION
+dazzling-web    default         3               2025-02-06 12:09:39.380592678 +0000 UTC deployed       nginx-12.0.4    1.22.0  
+
+- choose '1' as answer
+
+
+
+3. How many revisions of nginx exists in the cluster?
+-----------------------------------------------------
+
+List releases of nginx
+	terminal --> helm list
+
+# result:
+NAME            NAMESPACE       REVISION        UPDATED                                 STATUS         CHART           APP VERSION
+dazzling-web    default         3               2025-02-06 12:09:39.380592678 +0000 UTC deployed       nginx-12.0.4    1.22.0  
+
+- choose '3' as answer
+
+
+
+4. Which version of nginx is currently running in the cluster?
+--------------------------------------------------------------
+
+
+List pods
+	terminal --> kubectl get pods
+
+# result:
+NAME                                  READY   STATUS    RESTARTS   AGE
+dazzling-web-nginx-65fd75c87f-4825s   1/1     Running   0          2m51s
+
+
+Show pod details
+	terminal --> kubectl describe pod dazzling-web-nginx-65fd75c87f-4825s
+
+
+# result:
+-----------------------------------------------
+...
+Containers:
+  nginx:
+    Container ID:   containerd://d15411b9f90ae4bc74f8ffd5ac10617104eee87686275ae3e8dd493ce5e7ce8d
+    Image:          docker.io/bitnami/nginx:1.22.0-debian-11-r3			# this is the version
+...
+-----------------------------------------------
+
+- choose '1.22.0' as answer
+
+
+
+5. The DevOps team has decided to upgrade the nginx to version 1.23 in the bitnami repository.
+----------------------------------------------------------------------------------------------
+Make sure that the nginx version running in the cluster is 1.23.x.
+
+Update the repo
+	terminal --> help repo update
+
+List revisions
+	terminal --> helm list 
+
+# result:
+NAME            NAMESPACE       REVISION        UPDATED                                 STATUS         CHART           APP VERSION
+dazzling-web    default         3               2025-02-06 12:09:39.380592678 +0000 UTC deployed       nginx-12.0.4    1.22.0   
+
+
+Loist nginx versions with supported immage versions
+	terminal --> helm search repo bitnami/nginx --versions
+
+	# result:
+NAME                                    CHART VERSION   APP VERSION     DESCRIPTION 
+bitnami/nginx                           13.0.0          1.23.0          NGINX Open Source is a web server that can be a...
+
+
+Upgrade nginx to version 1.23
+	terminal --> helm upgrade dazzling-web bitnami/nginx --version 13.0.0 --set image.tag=1.23
+
+# result:
+--------------------------------------------------------------
+Release "dazzling-web" has been upgraded. Happy Helming!
+NAME: dazzling-web
+LAST DEPLOYED: Thu Feb  6 12:28:57 2025
+NAMESPACE: default
+STATUS: deployed
+REVISION: 4
+TEST SUITE: None
+NOTES:
+CHART NAME: nginx
+CHART VERSION: 13.0.0
+APP VERSION: 1.23.0
+
+** Please be patient while the chart is being deployed **
+NGINX can be accessed through the following DNS name from within your cluster:
+
+    dazzling-web-nginx.default.svc.cluster.local (port 80)
+
+To access NGINX from outside the cluster, follow the steps below:
+
+1. Get the NGINX URL by running these commands:
+
+  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+        Watch the status with: 'kubectl get svc --namespace default -w dazzling-web-nginx'
+
+    export SERVICE_PORT=$(kubectl get --namespace default -o jsonpath="{.spec.ports[0].port}" services dazzling-web-nginx)
+    export SERVICE_IP=$(kubectl get svc --namespace default dazzling-web-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+    echo "http://${SERVICE_IP}:${SERVICE_PORT}"
+WARNING: Rolling tag detected (bitnami/nginx:1.23), please note that it is strongly recommended to avoid using rolling tags in a production environment.
++info https://docs.bitnami.com/containers/how-to/understand-rolling-tags-containers/
+--------------------------------------------------------------
+
+- click 'Check' button
+
+
+
+
+6. To which version is the nginx currently upgraded?
+----------------------------------------------------
+
+List pods
+	terminal --> kubectl get pods
+
+# result:
+NAME                                  READY   STATUS    RESTARTS   AGE
+dazzling-web-nginx-5ff79fc5dd-kxxlr   1/1     Running   0          2m20s
+
+
+Show pod detsils
+	terminal --> kubectl describe pod dazzling-web-nginx-5ff79fc5dd-kxxlr
+
+# result:
+--------------------------------------
+Containers:
+  nginx:
+    Container ID:   containerd://b901a4f9d5c524726dd16b5b7b01340ad81888d4590dff9764ac328169a75691
+    Image:          docker.io/bitnami/nginx:1.23		# this is the version
+--------------------------------------
+
+- choose '1.23.0' as answer
+
+
+
+7. Oops!.. There seems to be a minor issue in the website and the DevOps Team is asked to rollback the nginx to previous version!
+---------------------------------------------------------------------------------------------------------------------------------
+Please rollback the nginx to previous version.
+
+List revisions
+	terminal --> helm list
+
+# result:
+NAME            NAMESPACE       REVISION        UPDATED                                 STATUS         CHART           APP VERSION
+dazzling-web    default         4               2025-02-06 12:28:57.476176583 +0000 UTC deployed       nginx-13.0.0    1.23.0 
+
+
+Show revision details
+	terminal --> helm history dazzling-web
+
+# result:
+REVISION        UPDATED                         STATUS          CHART           APP VERSION     DESCRIPTION     
+1               Thu Feb  6 12:09:28 2025        superseded      nginx-12.0.4    1.22.0          Install complete
+2               Thu Feb  6 12:09:33 2025        superseded      nginx-12.0.5    1.22.0          Upgrade complete
+3               Thu Feb  6 12:09:39 2025        superseded      nginx-12.0.4    1.22.0          Upgrade complete
+4               Thu Feb  6 12:28:57 2025        deployed        nginx-13.0.0    1.23.0          Upgrade complete
+
+
+Rollback to revision 3
+	terminal --> helm rollback dazzling-web 3
+
+- click 'Check' button
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

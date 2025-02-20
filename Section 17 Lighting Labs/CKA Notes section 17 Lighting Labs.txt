@@ -1,0 +1,655 @@
+CONTENT
+Section 17 309. Lighting Labs Introduction
+Section 17 310. Lighting Lab 1
+
+==========================================
+Section 17 309. Lighting Labs Introduction
+==========================================
+
+Welcome to the KodeKloud CKA Lightning Labs!
+
+
+
+This section has been created to give you hands-on practice in solving questions of mixed difficulty in a short period of time.
+
+This environment is valid for 60 minutes, challenge yourself and try to complete all 5-8 questions within 30 minutes.
+
+You can toggle between the questions but make sure that you click on END EXAM before the timer runs out. To pass, you need to secure 80%.
+
+
+Good Luck!!!
+
+
+
+Disclaimer:
+
+Please note that this exam is not a replica of the actual exam
+
+Please note that the questions in these exams are not the same as in the actual exam
+
+Please note that the interface is not the same as in the actual exam
+
+Please note that the scoring system may not be the same as in the actual exam
+
+Please note that the difficulty level may not be the same as in the actual exam
+
+
+
+
+
+==============================
+Section 17 310. Lighting Lab 1
+==============================
+
+
+1. Upgrade the current version of kubernetes from 1.30.0 to 1.31.0 exactly using the kubeadm utility. Make sure that the upgrade is carried out one node at a time starting with the controlplane node. To minimize downtime, the deployment gold-nginx should be rescheduled on an alternate node before upgrading each node.
+--------------------------------------------------------------------------------------------------------------------------------
+Upgrade controlplane node first and drain node node01 before upgrading it. Pods for gold-nginx should run on the controlplane node subsequently.
+
+
+This demo will show upgrade from v1.30.0 to v1.30.1 fowllowing the kubernetes documentation - https://kubernetes.io/docs/home/
+
+Upgrading kubeadm cluster documentation - https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/
+	- different instructions for every minor version upgrade are provided (almost identical)
+
+Step 1 - Update package repository
+----------------------------------
+We must make sure our system uses the correct package repository and update it if necessary.
+	- in the isntruction for the specific version we can find link for changing the package repository in the 'Changing the package repository' section
+	- for this example - https://v1-31.docs.kubernetes.io/blog/2023/08/15/pkgs-k8s-io-introduction/
+
+Find OS information
+	terminal --> cat /etc/*release*
+	# this example uses Deabian/Ubuntu 20.04
+
+Find the commands for Ubuntu OS in the documentations 
+	- https://v1-31.docs.kubernetes.io/blog/2023/08/15/pkgs-k8s-io-introduction/#how-to-migrate-deb
+
+Modufy and execute the command with the specific minor version and set package repository for (in this case v1.31)
+	master node terminal --> echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+	# kubeadm should be one version above our target system upgrade version - v1.31
+
+Modufy and execute the command for Download the public signing key for the Kubernetes package repositories and set package repository for (in this case v1.31)
+	master node terminal --> curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+	master node terminal --> y
+
+	# kubeadm should be one version above our target system upgrade versio - v1.31
+
+
+Step 1.2 - Determine which version to upgrade to
+------------------------------------------------
+
+Info: https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#determine-which-version-to-upgrade-to
+
+Update apt on master node
+	terminal --> sudo apt update
+
+Show available minor update versions
+	terminal --> sudo apt-cache madison kubeadm
+
+	# save the version which we want to upgrade to: 1.31.0-1.1
+
+
+Step 2 - Upgrade controlplane nodes (master nodes)
+--------------------------------------------------
+Info : https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#upgrading-control-plane-nodes
+
+Upgrade kubeadm tool on the master node
+	# replace x in 1.28.x-* with the latest patch version - 1.31.0-1.1
+	terminal --> apt-mark unhold kubeadm && apt-get update && apt-get install -y kubeadm='1.31.0-1.1' && apt-mark hold kubeadm
+
+Verify the updated kubeadm tool
+	terminal --> kubeadm version
+
+	# in the result should be the version we upgraded to 'GItVersion:"1.31.0"'
+
+Verify the upgrade plan
+	terminal --> kubeadm upgrade plan
+
+	# in the result we can see the plan for the specific version we want to upgrade to
+	# we can take the command fot he upgrade
+
+Upgrade to the choosen version (in this case - 1.31.0)
+	terminal --> sudo kubeadm upgrade apply v1.31.0
+	terminal --> y
+
+INFO - not mandatory
+---------------------------------
+Manually upgrade your CNI provider plugin if needed.
+	Your Container Network Interface (CNI) provider may have its own upgrade instructions to follow. Check the addons page to 	find your CNI provider and see whether additional upgrade steps are required.
+
+	This step is not required on additional control plane nodes if the CNI provider runs as a DaemonSet
+
+Step 2 is repeated for all other controlplance nodes in the system with some small differences in the command. Use
+		terminal --> sudo kubeadm upgrade node
+	instead of
+		terminal --> sudo kubeadm upgrade apply 
+	Also calling kubeadm upgrade plan and upgrading the CNI provider plugin is no longer needed.
+---------------------------------
+
+
+Step 2.1 - Upgrade kubelet on the controlplane node (master node)
+-----------------------------------------------------------------
+
+Drane the controlplane node (masternode)
+Info: https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#drain-the-node
+	terminal --> kubectl drain controlplane --ignore-daemonsets
+
+Upgrade kubelet and kubectl
+Info: https://v1-30.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#upgrade-kubelet-and-kubectl
+	# replace x in 1.28.x-* with the latest patch version - 1.31.0-1.1
+	terminal --> sudo apt-mark unhold kubelet kubectl && \
+sudo apt-get update && sudo apt-get install -y kubelet='1.31.0-1.1' kubectl='1.31.0-1.1' && \
+sudo apt-mark hold kubelet kubectl
+
+Restart the kubelet
+	terminal --> sudo systemctl daemon-reload
+	terminal --> sudo systemctl restart kubelet
+
+Wait few minutes for kubelet to get started
+
+Uncordon controlplane (master) node
+Info: https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#uncordon-the-node
+	terminal --> kubectl uncordon controlplane
+
+Verify controlplane (master) node upgrade
+	terminal --> kubectl get nodes
+
+	# the controlplane should be version v1.31.0
+	# the satus of the controlplance node should be 'Ready'
+
+Step 2.1 is repeated for all other controlplane nodes in the system
+
+
+
+
+Upgrade worker nodes
+====================
+
+Info: https://v1-31.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#upgrade-worker-nodes
+
+Choose instructions fot the OS you are working on. In this case we use Linux
+	- https://v1-31.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/upgrading-linux-nodes/
+
+There is a step in the instruction that we need to chnage package manager repository, but we did that in Step 1
+	- check if update of the package manager is performed and if it is not, repeat the section for worker nodes in Step 1.1
+
+List nodes
+	terminal --> k get nodes
+
+Drain the worker node
+Info: https://v1-31.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/upgrading-linux-nodes/#drain-the-node
+	terminal --> kubectl drain node01 --ignore-daemonsets
+ 
+Connect to worker node
+	terminal --> ssh node01
+
+Step 1 - Update package repository
+----------------------------------
+We must make sure our system uses the correct package repository and update it if necessary.
+	- in the isntruction for the specific version we can find link for changing the package repository in the 'Changing the package repository' section
+	- for this example - https://v1-31.docs.kubernetes.io/blog/2023/08/15/pkgs-k8s-io-introduction/
+
+Find OS information
+	terminal --> cat /etc/*release*
+	# this example uses Deabian/Ubuntu 20.04
+
+Find the commands for Ubuntu OS in the documentations 
+	- https://v1-31.docs.kubernetes.io/blog/2023/08/15/pkgs-k8s-io-introduction/#how-to-migrate-deb
+
+Modufy and execute the command with the specific minor version and set package repository for (in this case v1.31)
+	master node terminal --> echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+	# kubeadm should be one version above our target system upgrade version - v1.31
+
+Modufy and execute the command for Download the public signing key for the Kubernetes package repositories and set package repository for (in this case v1.31)
+	master node terminal --> curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+	master node terminal --> y
+
+	# kubeadm should be one version above our target system upgrade versio - v1.31
+
+Upgrade kubeadm on node01
+Info: https://v1-31.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/upgrading-linux-nodes/#upgrade-kubeadm
+	# replace x in 1.28.x-* with the latest patch version - 1.31.0-1.1
+	node01 terminal --> apt-mark unhold kubeadm && apt-get update && apt-get install -y kubeadm='1.31.0-1.1' && apt-mark hold kubeadm
+
+Upgrades the local kubelet configuration
+Info: https://v1-31.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/upgrading-linux-nodes/#call-kubeadm-upgrade
+	node01 terminal --> sudo kubeadm upgrade node
+
+Upgrade kubelet and kubectl
+Info: https://v1-30.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#upgrade-kubelet-and-kubectl
+	# replace x in 1.28.x-* with the latest patch version - 1.31.0-1.1
+	node01 terminal --> sudo apt-mark unhold kubelet kubectl && \
+sudo apt-get update && sudo apt-get install -y kubelet='1.31.0-1.1' kubectl='1.31.0-1.1' && \
+sudo apt-mark hold kubelet kubectl
+
+Restart the kubelet
+	worker node terminal --> sudo systemctl daemon-reload
+	worker node terminal --> sudo systemctl restart kubelet
+
+Wait few minute for kubelet to restart
+
+Exit node01
+	node01 terminal --> exit
+
+Uncordon the worker node
+Info: https://v1-31.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#uncordon-the-node
+	terminal --> kubectl uncordon node01
+
+Verify worker node upgrade
+	terminal --> kubectl get nodes -o wide
+
+	# the satus of the node01 should be 'Ready'
+	# the node01 should be version v1.31.0
+	# gold-nginx pod should be on teh controlplane node
+
+
+
+
+2. Print the names of all deployments in the admin2406 namespace in the following format:
+-----------------------------------------------------------------------------------------
+DEPLOYMENT   CONTAINER_IMAGE   READY_REPLICAS   NAMESPACE
+
+<deployment name>   <container image used>   <ready replica count>   <Namespace>
+. The data should be sorted by the increasing order of the deployment name.
+
+
+Example:
+
+DEPLOYMENT   CONTAINER_IMAGE   READY_REPLICAS   NAMESPACE
+deploy0   nginx:alpine   1   admin2406
+Write the result to the file /opt/admin2406_data.
+
+
+Set the specific context (default namespace)
+	terminal --> kubectl config set-context --current --namespace=admin2406 
+
+	# Context "default" modified.
+
+Print data for deployments in json format
+	terminal --> k get deploy -o json
+
+
+Print the first two columns
+terminal --> kubectl get deploy -o=custom-columns=DEPLOYMENT:.metadata.name,CONTAINER_IMAGE:.spec.template.spec.containers[0].image,READY_REPLICAS:.status.readyReplicas,NAMESPACE:.metadata.namespace
+
+Save the result in the required file
+	terminal --> kubectl get deploy -o=custom-columns=DEPLOYMENT:.metadata.name,CONTAINER_IMAGE:.spec.template.spec.containers[0].image,READY_REPLICAS:.status.readyReplicas,NAMESPACE:.metadata.namespace > /opt/admin2406_data
+
+
+
+
+
+3. A kubeconfig file called admin.kubeconfig has been created in /root/CKA. There is something wrong with the configuration. Troubleshoot and fix it.
+----------------------------------------------------------------------------------------------------------------------------
+
+
+print the file 
+	terminal --> cat /root/CKA/admin.kubeconfig
+
+We have wrong port configured
+--------------------------------------------------
+...
+    server: https://controlplane:4380			# change the port to 6443
+...
+--------------------------------------------------
+
+Fix the port
+	terminal --> vi /root/CKA/admin.kubeconfig
+
+
+
+
+
+
+4. Create a new deployment called nginx-deploy, with image nginx:1.16 and 1 replica.
+Next, upgrade the deployment to version 1.17 using rolling update and add the annotation message
+Updated nginx image to 1.17.
+------------------------------------------------------------------------------------------------.
+
+List deployments
+	terminal --> k get deploy
+
+Create deployment definition file, but do not create the deployment
+	terminal --> kubectl create deployment nginx-deploy --image=nginx:1.16 --dry-run=client --replicas=1 -o yaml > nginx-deploy.yaml
+
+Create deployment using the created file
+	terminal --> kubectl apply -f nginx-deploy.yaml
+
+Show deployment upgrade status
+	terminal --> kubectl rollout status deployment/nginx-deploy
+
+Show revisions and history of rollout
+	terminal --> kubectl rollout history deployment/nginx-deploy
+
+Update deployemnts
+------------------
+Option 1
+	- edit the definition file and change the image version to 1.17
+	- apply the deployemnt
+		terminal --> kubectl apply -f deployment-definition.yaml			# recommended
+Option 2
+	- set the image of the deployment to version 1.17 with one line command (changes not saved to deployment definition file)
+	terminal --> kubectl set image deployment/nginx-deploy nginx=nginx:1.17		# not recommended, DO NOT update def file
+
+Show deployemnt status
+	terminal --> kubectl rollout status deployment/nginx-deploy
+
+Show deployment history
+	terminal --> kubectl rollout history deployment/nginx-deploy
+
+
+
+
+5. A new deployment called alpha-mysql has been deployed in the alpha namespace. However, the pods are not running. Troubleshoot and fix the issue. The deployment should make use of the persistent volume alpha-pv to be mounted at /var/lib/mysql and should use the environment variable MYSQL_ALLOW_EMPTY_PASSWORD=1 to make use of an empty root password.
+----------------------------------------------------------------------------------------------------------------------------
+Important: Do not alter the persistent volume.
+
+Set the specific context (default namespace)
+	terminal --> kubectl config set-context --current --namespace=alpha 
+
+List pods
+	terminal --> k get pods
+
+	# result:
+	NAME                           READY   STATUS    RESTARTS   AGE
+	alpha-mysql-78f449b485-8dndh   0/1     Pending   0          53s
+
+Show pod details
+	terminal --> k describe pod alpha-mysql-78f449b485-8dndh
+
+-----------------------------------------------------------
+Name:             alpha-mysql-78f449b485-8dndh
+Namespace:        alpha
+Priority:         0
+Service Account:  default
+Node:             <none>
+Labels:           app=alpha-mysql
+                  pod-template-hash=78f449b485
+Annotations:      <none>
+Status:           Pending
+IP:               
+IPs:              <none>
+Controlled By:    ReplicaSet/alpha-mysql-78f449b485
+Containers:
+  mysql:
+    Image:      mysql:5.6
+    Port:       3306/TCP
+    Host Port:  0/TCP
+    Environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD:  1
+    Mounts:
+      /var/lib/mysql from mysql-data (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-nxsdt (ro)
+Conditions:
+  Type           Status
+  PodScheduled   False 
+Volumes:
+  mysql-data:
+    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:  mysql-alpha-pvc
+    ReadOnly:   false
+  kube-api-access-nxsdt:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason            Age   From               Message
+  ----     ------            ----  ----               -------
+  Warning  FailedScheduling  77s   default-scheduler  0/2 nodes are available: persistentvolumeclaim "mysql-alpha-pvc" not found. preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling.
+-----------------------------------------------------------
+We can see the warning message connected with "mysql-alpha-pvc"
+
+
+List deployemnts
+	terminal --> k get deploy
+
+	# result:
+	NAME          READY   UP-TO-DATE   AVAILABLE   AGE
+	alpha-mysql   0/1     1            0           2m18s
+
+Show information about deployment
+	terminal --> k describe deploy alpha-mysql
+
+-----------------------------------------------------------
+Name:                   alpha-mysql
+Namespace:              alpha
+CreationTimestamp:      Wed, 19 Feb 2025 12:10:45 +0000
+Labels:                 app=alpha-mysql
+Annotations:            deployment.kubernetes.io/revision: 1
+Selector:               app=alpha-mysql
+Replicas:               1 desired | 1 updated | 1 total | 0 available | 1 unavailable
+StrategyType:           RollingUpdate
+MinReadySeconds:        0
+RollingUpdateStrategy:  25% max unavailable, 25% max surge
+Pod Template:
+  Labels:  app=alpha-mysql
+  Containers:
+   mysql:
+    Image:      mysql:5.6
+    Port:       3306/TCP
+    Host Port:  0/TCP
+    Environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD:  1
+    Mounts:
+      /var/lib/mysql from mysql-data (rw)
+  Volumes:
+   mysql-data:
+    Type:          PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:     mysql-alpha-pvc									# used pvc
+    ReadOnly:      false
+  Node-Selectors:  <none>
+  Tolerations:     <none>
+Conditions:
+  Type           Status  Reason
+  ----           ------  ------
+  Available      False   MinimumReplicasUnavailable
+  Progressing    False   ProgressDeadlineExceeded
+OldReplicaSets:  <none>
+NewReplicaSet:   alpha-mysql-78f449b485 (1/1 replicas created)
+Events:
+  Type    Reason             Age   From                   Message
+  ----    ------             ----  ----                   -------
+  Normal  ScalingReplicaSet  27m   deployment-controller  Scaled up replica set alpha-mysql-78f449b485 to 1
+-----------------------------------------------------------
+Everithing seems correct in the deployment
+
+
+List persistent volume claims
+	terminal --> k get pvc
+
+	# result:
+	NAME          STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+	alpha-claim   Pending                                      slow-storage   <unset>                 34m
+	
+	# pvc name do not match the name of the used by the deplyment pvc
+	# we have pending state
+
+Show details for the alpha-claim pvc
+	terminal --> k describe pvc alpha-claim
+
+-----------------------------------------------------------
+Name:          alpha-claim					# wrong name
+Namespace:     alpha
+StorageClass:  slow-storage					# wrong persistent volume class name
+Status:        Pending
+Volume:        
+Labels:        <none>
+Annotations:   <none>
+Finalizers:    [kubernetes.io/pvc-protection]
+Capacity:      
+Access Modes:  
+VolumeMode:    Filesystem
+Used By:       <none>
+Events:
+  Type     Reason              Age                  From                         Message
+  ----     ------              ----                 ----                         -------
+  Warning  ProvisioningFailed  31s (x142 over 35m)  persistentvolume-controller  storageclass.storage.k8s.io "slow-storage" not found
+-----------------------------------------------------------
+
+We will delete existing persistent volume claim and create new one with correct settings.
+We have to find details for used persistent volume and set it in the 
+
+
+Find details for persistent volumes (PVs)
+=========================================
+
+List persistent volumes
+	terminal --> k get pv
+
+# result:
+NAME       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM   STORAGECLASS   VOLUMEATTRIBUTESCLASS   REASON   AGE
+alpha-pv   1Gi        RWO            Retain           Available           slow           <unset>                          14m
+
+
+Show pv details
+	terminal --> kubectl get pv alpha-pv -o yaml
+
+alpha-pv
+-----------------------------------------------
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","kind":"PersistentVolume","metadata":{"annotations":{},"name":"alpha-pv"},"spec":{"accessModes":["ReadWriteOnce"],"capacity":{"storage":"1Gi"},"hostPath":{"path":"/opt/pv-1"},"storageClassName":"slow"}}
+  creationTimestamp: "2025-02-19T13:29:14Z"
+  finalizers:
+  - kubernetes.io/pv-protection
+  name: alpha-pv
+  resourceVersion: "4003"
+  uid: 859fd9ed-4325-4789-b874-0bd80d486a87
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 1Gi
+  hostPath:
+    path: /opt/pv-1				
+    type: ""
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: slow			# we must set this storage class name in the pvc
+  volumeMode: Filesystem
+status:
+  lastPhaseTransitionTime: "2025-02-19T13:29:14Z"
+  phase: Available
+-----------------------------------------------
+
+
+Create new persistent volume claim
+==================================
+
+Create new pvc named mysql-alpha-pvc
+	terminal --> vi mysql-alpha-pvc.yaml
+
+mysql-alpha-pvc.yaml
+-----------------------------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-alpha-pvc				# match the name used in the deployment
+  namespace: alpha
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  volumeName: alpha-pv				# match pv
+  storageClassName: slow			# match sorage class name in the pv
+-----------------------------------------------------------
+
+Apply the created pvc file
+	terminal --> k apply -f mysql-alpha-pvc.yaml
+
+Restart deployment
+	terminal --> kubectl rollout restart deployment alpha-mysql
+
+Wait few minutes for recreate the pods
+
+List pods
+	terminal --> k get pods
+
+
+
+
+6. Take the backup of ETCD at the location /opt/etcd-backup.db on the controlplane node.
+----------------------------------------------------------------------------------------
+
+Take snapshot and save it in the required folder
+	terminal --> ETCDCTL_API=3 etcdctl snapshot save /opt/etcd-backup.db \
+  --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/server.crt \
+  --key=/etc/kubernetes/pki/etcd/server.key
+
+
+--endpoints=https://127.0.0.1:2379 \		# endpoint to the etcd cluster
+--cacert=/etc/etcd/ca.crt \			# auth certification
+--ceert=/etc/kubernetes/pki/etcd/server.crt \	# etcd certificate
+--key-/etc/etcd/etcd-server.key			# key
+
+
+
+
+7. Create a pod called secret-1401 in the admin1401 namespace using the busybox image. The container within the pod should be called secret-admin and should sleep for 4800 seconds.
+-----------------------------------------------------------------------------------------------------------------------------
+The container should mount a read-only secret volume called secret-volume at the path /etc/secret-volume. The secret being mounted has already been created for you and is called dotfile-secret.
+
+
+Set the specific context (default namespace)
+	terminal --> kubectl config set-context --current --namespace=admin1401 
+
+Create pod definition file secret-admin.yaml
+	terminal --> vi secret-admin.yaml
+
+secret-admin.yaml
+----------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secret-1401
+  namespace: admin1401
+spec:
+  containers:
+  - name: secret-admin
+    image: busybox
+    command: ["sleep", "4800"]
+    volumeMounts:
+    - name: secret-volume
+      mountPath: /etc/secret-volume
+      readOnly: true
+  volumes:
+  - name: secret-volume
+    secret:
+      secretName: dotfile-secret
+----------------------------------------------
+
+Create pod
+	terminal --> k apply -f secret-admin.yaml
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

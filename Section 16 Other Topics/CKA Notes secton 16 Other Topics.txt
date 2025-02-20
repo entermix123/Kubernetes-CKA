@@ -1,0 +1,1454 @@
+CONTENT
+
+Section 16 305. Pre-Requisites - JSON PATH
+Section 16 306. Practice Test - JSON PATH
+Section 16 307. Advanced Kubectl Commands
+Section 16 308. Practice Test - Advanced Kubectl Commands
+
+
+==========================================
+Section 16 305. Pre-Requisites - JSON PATH
+==========================================
+
+In the upcoming lecture we will explore some advanced commands with kubectl utility. But that requires JSON PATH. If you are new to JSON PATH queries get introduced to it first by going through the lectures and practice tests available here.
+
+Free JSON Path Course - https://kodekloud.com/p/json-path-quiz
+
+
+Once you are comfortable head back here:
+
+I also have some JSON PATH exercises with Kubernetes Data Objects. Make sure you go through these:
+
+Info - https://mmumshad.github.io/json-path-quiz/index.html#!/?questions=questionskub1
+
+Info - https://mmumshad.github.io/json-path-quiz/index.html#!/?questions=questionskub2
+
+
+
+=========================================
+Section 16 306. Practice Test - JSON PATH
+=========================================
+
+Free JSON Path Course - https://kodekloud.com/p/json-path-quiz
+ 
+
+JSON Path used in Kubernetes
+----------------------------
+
+kubectl command are sent to kube-apiserver and the server returns data in JSON format to the user. Kubectl utility convert the data and present it to the user in human readable format.
+
+The user can gather custom inforamtion with kubectl json path and complex filtering and sorting functionalities and present it it in reuired format.
+
+
+In order to request data from api-server we need to go true 4 steps
+
+1. Identify the kubectl command
+	- kubectl get pods
+	- kubectl get nodes
+	- etc.
+
+2. Familiarize with JSON output
+	- kubectl get pods -o json
+	- kubectl get nodes -o json
+
+3. Form the JSON PATH query
+	- .items[0].spec.containers[0].image		# '$' is not mandatory, kubectl adds it
+
+4. Use the JSON PATH query with kubectl command
+	- kubectl get pods -o=jsonpath='{.items[0].spec.containers[0].image}'	# example
+
+
+Examples of ready to use queries
+================================
+Show nodes names in the query
+	terminal --> kubectl get nodes -o=jsonpath='{.items[*].metadata.name}'
+
+	# result: master node01
+
+Show hardware architecure of the nodes
+	terminal --> kubectl get nodes -o=jsonpath='{.items[*].status.nodeInfo.architecture}'
+
+	# result: amd64 amd64
+
+Show the count of CPUs on the nodes
+	terminal --> kubectl get nodes -o=jsonpath='{.items[*].status.capacity.cpu}'
+
+	# result: 4 4
+
+We can combine these commands in one complex command
+	terminal --> kubectl get nodes -o=jsonpath='{.items[*].metadata.name}{.items[*].status.capacity.cpu}'
+	
+	# result: master node01 4 4
+
+We can use some prettifying options 
+	- '{\n}' 		- new line
+	- '{\t}'		- tab
+
+	terminal --> kubectl get nodes -o=jsonpath='{.items[*].metadata.name}{\n}{.items[*].status.capacity.cpu}'
+
+	# result:
+	master	node01
+	4	4
+
+For different output format we can use loops for gathered from the api-server data - loop method
+
+Psevdo code:					Psevdo code in json path format
+----------------------------			----------------------------
+FOR EACH NODE					'{range .items[*]}
+
+  PRINT NODE NAME \t PRINT CPU COUNT \n		  {.metadata.name}{"\t"}{.status.capacity.cpu}{"\n"}
+
+END FOR						{end}'
+----------------------------			----------------------------
+
+Translated to:
+	terminal --> kubectl get nodes -o=jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.capacity.cpu}{"\n"}{end}'
+	
+	# result:
+	Node	CPU
+	master	4
+	node01	4
+
+We can customize the data using 'custom-columns' output option - easier and more cleaner that the loop method
+-------------------------------------------------------------------------------------------------------------
+	terminal --> kubectl get nodes -o=custom-columns=<COLUMN NAME>:<JSON PATH>
+Exapmle:
+	terminal --> kubectl get nodes -o=custom-columns=NODE:metadata.name, CPU:.status.capacity.cpu
+
+	# result:
+	NODE	CPU
+	master	4
+	node01	4
+
+
+We can set sorting options (--sort-by)				# SORTING
+--------------------------------------
+
+Sort result by node name 
+	terminal --> kubectl get nodes --sort-by=.metadataname
+
+	# result:
+	NAME	STATUS	ROLES	AGE	VERSION
+	master	Ready	master	5m	v1.11.3
+	node01	Ready	<none>	5m	v1.11.3
+
+Sort result by node capacity 
+	terminal --> kubectl get nodes --sort-by=.status.capacity.cpu
+
+	# result:
+	NAME	STATUS	ROLES	AGE	VERSION
+	master	Ready	master	5m	v1.11.3
+	node01	Ready	<none>	5m	v1.11.3
+
+
+
+Practice Test JSON PATH in Kubernetes
+=====================================
+
+1. In this lab, we provide you with a Kubernetes pod information file in JSON format. Try to build JSON path queries with CLI to extract information from JSON.
+---------------------------------------------------------------------------------------
+
+- click 'Ok' button
+
+
+2. In the given data, what is the data type of the root element?
+----------------------------------------------------------------
+
+-------------------------
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "name": "nginx-pod",
+    "namespace": "default"
+  },
+  "spec": {
+    "containers": [
+      {
+        "image": "nginx:alpine",
+        "name": "nginx"
+      }
+    ],
+    "nodeName": "node01"
+  }
+}
+-------------------------
+
+- choose 'Dictionaty' as answer
+
+
+
+3. How many properties/fields does the root object(dictionary) have?
+--------------------------------------------------------------------
+
+-------------------------
+{
+  "apiVersion": "v1",		# 1
+  "kind": "Pod",		# 2
+  "metadata": {			# 3
+    "name": "nginx-pod",
+    "namespace": "default"
+  },
+  "spec": {			# 4
+    "containers": [
+      {
+        "image": "nginx:alpine",
+        "name": "nginx"
+      }
+    ],
+    "nodeName": "node01"
+  }
+}
+-------------------------
+
+- choose '4' as answer
+
+
+
+
+4. In the given data, what is the data type of the root element?
+----------------------------------------------------------------
+
+-------------------------
+[				# list brackets
+  {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "metadata": {
+      "name": "web-pod-1",
+      "namespace": "default"
+    },
+    "spec": {
+      "containers": [
+        {
+          "image": "nginx:alpine",
+          "name": "nginx"
+        }
+      ],
+      "nodeName": "node01"
+    }
+  },
+  {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "metadata": {
+      "name": "web-pod-2",
+      "namespace": "default"
+    },
+    "spec": {
+      "containers": [
+        {
+          "image": "nginx:alpine",
+          "name": "nginx"
+        }
+      ],
+      "nodeName": "node02"
+    }
+  }
+]
+-------------------------
+
+- choose 'List' as answer
+
+
+
+
+5. How many items do the list have?
+-----------------------------------
+
+
+-------------------------
+[
+  {					# 1
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "metadata": {
+      "name": "web-pod-1",
+      "namespace": "default"
+    },
+    "spec": {
+      "containers": [
+        {
+          "image": "nginx:alpine",
+          "name": "nginx"
+        }
+      ],
+      "nodeName": "node01"
+    }
+  },
+  {					# 2
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "metadata": {
+      "name": "web-pod-2",
+      "namespace": "default"
+    },
+    "spec": {
+      "containers": [
+        {
+          "image": "nginx:alpine",
+          "name": "nginx"
+        }
+      ],
+      "nodeName": "node02"
+    }
+  }
+]
+-------------------------
+
+- choose '2' as answer
+
+
+
+
+5. What is the data type of the apiVersion field?
+-------------------------------------------------
+
+----------------------------
+{
+  "apiVersion": "v1",		# string
+  "kind": "Pod",
+  "metadata": {
+    "name": "nginx-pod",
+    "namespace": "default"
+  },
+  "spec": {
+    "containers": [
+      {
+        "image": "nginx:alpine",
+        "name": "nginx"
+      }
+    ],
+    "nodeName": "node01"
+  }
+}
+----------------------------
+
+- choose 'string' as answer
+
+
+
+6. What is the data type of the metadata field?
+-----------------------------------------------
+
+
+----------------------------
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {				# dictionary
+    "name": "nginx-pod",
+    "namespace": "default"
+  },
+  "spec": {
+    "containers": [
+      {
+        "image": "nginx:alpine",
+        "name": "nginx"
+      }
+    ],
+    "nodeName": "node01"
+  }
+}
+----------------------------
+
+- choose 'Dictionary' as answer
+
+
+
+
+8. Which of the below is the best description of the type of data in the containers field?
+------------------------------------------------------------------------------------------
+
+----------------------------
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "name": "nginx-pod",
+    "namespace": "default"
+  },
+  "spec": {
+    "containers": [			# list of dictionaries
+      {
+        "image": "nginx:alpine",
+        "name": "nginx"
+      }
+    ],
+    "nodeName": "node01"
+  }
+}
+----------------------------
+
+- choose 'List of Dictionaries' as answer
+
+
+
+
+9. Now let's get into some action with JSON PATH.
+-------------------------------------------------
+Develop a JSON PATH query to extract the kind of object. A file named input.json is provided in the terminal. Provide the file as input to the cat command
+for example, the command should be like this cat filename | jpath $.query
+
+Expected output should be like this
+--------------
+[
+  "Pod"
+]
+--------------
+
+save query command to filename answer9.sh under root directory.
+
+
+
+Print the input file
+	terminal --> cat input.json
+
+input.json
+--------------
+{
+  "apiVersion": "v1",
+  "kind": "Pod",			# we need this line only - $.kind
+  "metadata": {
+    "name": "nginx-pod",
+    "namespace": "default"
+  },
+  "spec": {
+    "containers": [
+      {
+        "image": "nginx:alpine",
+        "name": "nginx"
+      }
+    ],
+    "nodeName": "node01"
+  }
+}
+--------------
+
+
+Test the output
+	terminal --> cat input.json | jpath $.kind
+
+# result:
+--------------
+[
+  "Pod"
+]
+--------------
+
+Save the command in the required file
+	terminal --> echo 'cat input.json | jpath $.kind' > answer9.sh
+
+- click 'Check' button
+
+
+
+10. Develop a JSON PATH query to get the name of the POD.A file named input.json is provided in the terminal. Provide the file as input to the cat command
+for example, the command should be like this cat filename | jpath $.query
+---------------------------------------------------------------------------------------------------------------------
+Expected output should be like this
+--------------
+[
+  "nginx-pod"
+]
+--------------
+
+save query command to filename answer10.sh under root directory.
+
+
+Print the input file
+	terminal --> cat input.json
+
+input.json
+--------------
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "name": "nginx-pod",		# we need this line: $.metadata.name
+    "namespace": "default"
+  },
+  "spec": {
+    "containers": [
+      {
+        "image": "nginx:alpine",
+        "name": "nginx"
+      }
+    ],
+    "nodeName": "node01"
+  }
+}
+--------------
+
+
+Test the output
+	terminal --> cat input.json | jpath $.metadata.name
+
+# result:
+--------------
+[
+  "nginx-pod"
+]
+--------------
+
+Save the command in the required file
+	terminal --> echo 'cat input.json | jpath $.metadata.name' > answer10.sh
+
+- click 'Check' button
+
+
+
+
+11. Develop a JSON PATH query to get the name of the POD. A file named input.json is provided in the terminal. Provide the file as input to the cat command
+for example, the command should be like this cat filename | jpath $.query
+---------------------------------------------------------------------------------------------------------------------
+Expected output should be like this
+--------------
+[
+  "node01"
+]
+--------------
+Save query command to filename answer11.sh under root directory.
+
+
+Print the input file
+	terminal --> cat input.json
+
+input.json
+--------------
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "name": "nginx-pod",
+    "namespace": "default"
+  },
+  "spec": {
+    "containers": [
+      {
+        "image": "nginx:alpine",
+        "name": "nginx"
+      }
+    ],
+    "nodeName": "node01"			# we need this line: $.spec.nodeName
+  }
+}
+--------------
+
+
+Test the output
+	terminal --> cat input.json | jpath $.spec.nodeName
+
+# result:
+--------------
+[
+  "node01"
+]
+--------------
+
+Save the command in the required file
+	terminal --> echo 'cat input.json | jpath $.spec.nodeName' > answer11.sh
+
+- click 'Check' button
+
+
+
+
+12. Develop a JSON PATH query to get the name of the POD. A file named input.json is provided in the terminal. Provide the file as input to the cat command
+for example, the command should be like this cat filename | jpath $.query
+----------------------------------------------------------------------------------------------------------------
+Expected output should be like this
+
+--------------
+[
+  {
+    "image": "nginx:alpine",
+    "name": "nginx"
+  }
+]
+--------------
+
+Save query command to filename answer12.sh under root directory.
+
+Print the input file
+	terminal --> cat input.json
+
+input.json
+--------------
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "name": "nginx-pod",
+    "namespace": "default"
+  },
+  "spec": {
+    "containers": [
+      {
+        "image": "nginx:alpine",			# we need this line
+        "name": "nginx"					# and this line		- $.spec.containers[0]
+      }
+    ],
+    "nodeName": "node01"
+  }
+}
+--------------
+
+
+Test the output
+	terminal --> cat input.json | jpath $.spec.containers[0]
+
+# result:
+--------------
+[
+  {
+    "image": "nginx:alpine",
+    "name": "nginx"
+  }
+]
+--------------
+
+Save the command in the required file
+	terminal --> echo 'cat input.json | jpath $.spec.containers[0]' > answer12.sh
+
+- click 'Check' button
+
+
+
+
+13. Develop a JSON PATH query to get the image name under the containers section.
+---------------------------------------------------------------------------------
+A file named input.json is provided in the terminal. Provide the file as input to the cat command
+for example, the command should be like this cat filename | jpath $.query
+
+Expected output should be like this
+--------------
+[
+  "nginx:alpine"
+]
+--------------
+
+Save query command to filename answer13.sh under root directory.
+
+
+Print the input file
+	terminal --> cat input.json
+
+input.json
+--------------
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "name": "nginx-pod",
+    "namespace": "default"
+  },
+  "spec": {
+    "containers": [
+      {
+        "image": "nginx:alpine",		# we need this line only: $.spec.containers[0].image
+        "name": "nginx"
+      }
+    ],
+    "nodeName": "node01"
+  }
+}
+--------------
+
+
+Test the output
+	terminal --> cat input.json | jpath $.spec.containers[0].image
+
+# result:
+--------------
+[
+  "nginx:alpine"
+]
+--------------
+
+Save the command in the required file
+	terminal --> echo 'cat input.json | jpath $.spec.containers[0].image' > answer13.sh
+
+- click 'Check' button
+
+
+
+
+14. We now have POD status too. Develop a JSON PATH query to get the phase of the pod under the status section.
+---------------------------------------------------------------------------------------------------------------
+A file named k8status.json is provided in the terminal. Provide the file as input to the cat command
+for example, the command should be like this cat filename | jpath $.query
+
+Expected output should be like this
+--------------
+[
+  "Pending"
+]
+--------------
+
+Save query command to filename answer14.sh under root directory.
+
+
+Print the input file
+	terminal --> cat k8status.json
+
+k8status.json
+--------------
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "name": "nginx-pod",
+    "namespace": "default"
+  },
+  "spec": {
+    "containers": [
+      {
+        "image": "nginx:alpine",
+        "name": "nginx"
+      },
+      {
+        "image": "redis:alpine",
+        "name": "redis-container"
+      }
+    ],
+    "nodeName": "node01"
+  },
+  "status": {
+    "conditions": [
+      {
+        "lastProbeTime": null,
+        "lastTransitionTime": "2019-06-13T05:34:09Z",
+        "status": "True",
+        "type": "Initialized"
+      },
+      {
+        "lastProbeTime": null,
+        "lastTransitionTime": "2019-06-13T05:34:09Z",
+        "status": "True",
+        "type": "PodScheduled"
+      }
+    ],
+    "containerStatuses": [
+      {
+        "image": "nginx:alpine",
+        "name": "nginx",
+        "ready": false,
+        "restartCount": 4,
+        "state": {
+          "waiting": {
+            "reason": "ContainerCreating"
+          }
+        }
+      },
+      {
+        "image": "redis:alpine",
+        "name": "redis-container",
+        "ready": false,
+        "restartCount": 2,
+        "state": {
+          "waiting": {
+            "reason": "ContainerCreating"
+          }
+        }
+      }
+    ],
+    "hostIP": "172.17.0.75",
+    "phase": "Pending",				# we need this line only: $.status.phase
+    "qosClass": "BestEffort",
+    "startTime": "2019-06-13T05:34:09Z"
+  }
+}
+--------------
+
+
+Test the output
+	terminal --> cat k8status.json | jpath $.status.phase
+
+# result:
+--------------
+[
+  "Pending"
+]
+--------------
+
+Save the command in the required file
+	terminal --> echo 'cat k8status.json | jpath $.status.phase' > answer14.sh
+
+- click 'Check' button
+
+
+
+
+15. Develop a JSON PATH query to get the reason for the state of the container under the status section.
+--------------------------------------------------------------------------------------------------------
+A file named k8status.json is provided in the terminal. Provide the file as input to the cat command
+for example, the command should be like this cat filename | jpath $.query
+
+Expected output should be like this
+--------------
+[
+  "ContainerCreating"
+]
+--------------
+
+Print the input file
+	terminal --> cat k8status.json
+
+k8status.json
+--------------
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "name": "nginx-pod",
+    "namespace": "default"
+  },
+  "spec": {
+    "containers": [
+      {
+        "image": "nginx:alpine",
+        "name": "nginx"
+      },
+      {
+        "image": "redis:alpine",
+        "name": "redis-container"
+      }
+    ],
+    "nodeName": "node01"
+  },
+  "status": {
+    "conditions": [
+      {
+        "lastProbeTime": null,
+        "lastTransitionTime": "2019-06-13T05:34:09Z",
+        "status": "True",
+        "type": "Initialized"
+      },
+      {
+        "lastProbeTime": null,
+        "lastTransitionTime": "2019-06-13T05:34:09Z",
+        "status": "True",
+        "type": "PodScheduled"
+      }
+    ],
+    "containerStatuses": [
+      {
+        "image": "nginx:alpine",
+        "name": "nginx",
+        "ready": false,
+        "restartCount": 4,
+        "state": {
+          "waiting": {
+            "reason": "ContainerCreating"
+          }
+        }
+      },
+      {
+        "image": "redis:alpine",
+        "name": "redis-container",
+        "ready": false,
+        "restartCount": 2,
+        "state": {
+          "waiting": {
+            "reason": "ContainerCreating"		# we need this line: $.status.containerStatuses[1].state.waiting.reason
+          }
+        }
+      }
+    ],
+    "hostIP": "172.17.0.75",
+    "phase": "Pending",
+    "qosClass": "BestEffort",
+    "startTime": "2019-06-13T05:34:09Z"
+  }
+}
+--------------
+
+
+Test the output
+	terminal --> cat k8status.json | jpath $.status.containerStatuses[1].state.waiting.reason
+
+# result:
+--------------
+[
+  "ContainerCreating"
+]
+--------------
+
+Save the command in the required file
+	terminal --> echo 'cat k8status.json | jpath $.status.containerStatuses[1].state.waiting.reason' > answer15.sh
+
+- click 'Check' button
+
+
+
+
+16. Develop a JSON PATH query to get the restart count of the redis-container under the status section.
+-------------------------------------------------------------------------------------------------------
+A file named k8status.json is provided in the terminal. Provide the file as input to the cat command
+for example, the command should be like this cat filename | jpath $.query
+
+Expected output should be like this
+--------------
+[
+  2
+]
+--------------
+
+Save query command to filename answer16.sh under root directory.
+
+Print the input file
+	terminal --> cat k8status.json
+
+k8status.json
+--------------
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "name": "nginx-pod",
+    "namespace": "default"
+  },
+  "spec": {
+    "containers": [
+      {
+        "image": "nginx:alpine",
+        "name": "nginx"
+      },
+      {
+        "image": "redis:alpine",
+        "name": "redis-container"
+      }
+    ],
+    "nodeName": "node01"
+  },
+  "status": {
+    "conditions": [
+      {
+        "lastProbeTime": null,
+        "lastTransitionTime": "2019-06-13T05:34:09Z",
+        "status": "True",
+        "type": "Initialized"
+      },
+      {
+        "lastProbeTime": null,
+        "lastTransitionTime": "2019-06-13T05:34:09Z",
+        "status": "True",
+        "type": "PodScheduled"
+      }
+    ],
+    "containerStatuses": [
+      {
+        "image": "nginx:alpine",
+        "name": "nginx",
+        "ready": false,
+        "restartCount": 4,
+        "state": {
+          "waiting": {
+            "reason": "ContainerCreating"
+          }
+        }
+      },
+      {
+        "image": "redis:alpine",
+        "name": "redis-container",
+        "ready": false,
+        "restartCount": 2,			# we need this line only: $.status.containerStatuses[1].restartCount
+        "state": {
+          "waiting": {
+            "reason": "ContainerCreating"
+          }
+        }
+      }
+    ],
+    "hostIP": "172.17.0.75",
+    "phase": "Pending",
+    "qosClass": "BestEffort",
+    "startTime": "2019-06-13T05:34:09Z"
+  }
+}
+--------------
+
+
+Test the output
+	terminal --> cat k8status.json | jpath $.status.containerStatuses[1].restartCount
+
+# result:
+--------------
+[
+  2
+]
+--------------
+
+Save the command in the required file
+	terminal --> echo 'cat k8status.json | jpath $.status.containerStatuses[1].restartCount' > answer16.sh
+
+- click 'Check' button
+
+
+
+
+
+17. Develop a JSON PATH query to get all pod names.
+---------------------------------------------------
+A file podslist.json file is provided in the terminal.
+The expected output should be like this.
+
+--------------
+[
+  "web-pod-1",
+  "web-pod-2",
+  "web-pod-3",
+  "web-pod-4",
+  "db-pod-1"
+]
+--------------
+
+save query command to filename answer17.sh under root directory.
+
+
+Print the input file
+	terminal --> cat podslist.json
+
+podslist.json
+--------------
+[
+  {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "metadata": {
+      "name": "web-pod-1",		# we need this line
+      "namespace": "default"
+    },
+    "spec": {
+      "containers": [
+        {
+          "image": "nginx:alpine",
+          "name": "nginx"
+        }
+      ],
+      "nodeName": "node01"
+    }
+  },
+  {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "metadata": {
+      "name": "web-pod-2",		# this line
+      "namespace": "default"
+    },
+    "spec": {
+      "containers": [
+        {
+          "image": "nginx:alpine",
+          "name": "nginx"
+        }
+      ],
+      "nodeName": "node02"
+    }
+  },
+  {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "metadata": {
+      "name": "web-pod-3",		# this line
+      "namespace": "default"
+    },
+    "spec": {
+      "containers": [
+        {
+          "image": "nginx:alpine",
+          "name": "nginx"
+        }
+      ],
+      "nodeName": "node01"
+    }
+  },
+  {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "metadata": {
+      "name": "web-pod-4",		# this line
+      "namespace": "default"
+    },
+    "spec": {
+      "containers": [
+        {
+          "image": "nginx:alpine",
+          "name": "nginx"
+        }
+      ],
+      "nodeName": "node01"
+    }
+  },
+  {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "metadata": {
+      "name": "db-pod-1",		# and this line: $.*.metadata.name
+      "namespace": "default"
+    },
+    "spec": {
+      "containers": [
+        {
+          "image": "mysql",
+          "name": "mysql"
+        }
+      ],
+      "nodeName": "node01"
+    }
+  }
+]
+--------------
+
+
+Test the output
+	terminal --> cat podslist.json | jpath $.*.metadata.name
+
+# result:
+--------------
+[
+  "web-pod-1",
+  "web-pod-2",
+  "web-pod-3",
+  "web-pod-4",
+  "db-pod-1"
+]
+--------------
+
+Save the command in the required file
+	terminal --> echo 'cat podslist.json | jpath $.*.metadata.name' > answer17.sh
+
+- click 'Check' button
+
+
+
+
+
+18. Develop a JSON PATH query to get all pod names.
+---------------------------------------------------
+A file userslist.json file is provided in the terminal.
+The expected output should be like this.
+--------------
+[
+  "aws-user",
+  "dev-user",
+  "test-user"
+]
+--------------
+
+save query command to filename answer18.sh under root directory.
+
+Print the input file
+	terminal --> cat userslist.json
+
+userslist.json
+--------------
+{
+  "kind": "Config",
+  "apiVersion": "v1",
+  "preferences": {},
+  "clusters": [
+    {
+      "name": "development",
+      "cluster": {
+        "server": "KUBE_ADDRESS",
+        "certificate-authority": "/etc/kubernetes/pki/ca.crt"
+      }
+    },
+    {
+      "name": "kubernetes-on-aws",
+      "cluster": {
+        "server": "KUBE_ADDRESS",
+        "certificate-authority": "/etc/kubernetes/pki/ca.crt"
+      }
+    },
+    {
+      "name": "production",
+      "cluster": {
+        "server": "KUBE_ADDRESS",
+        "certificate-authority": "/etc/kubernetes/pki/ca.crt"
+      }
+    },
+    {
+      "name": "test-cluster-1",
+      "cluster": {
+        "server": "KUBE_ADDRESS",
+        "certificate-authority": "/etc/kubernetes/pki/ca.crt"
+      }
+    }
+  ],
+  "users": [
+    {
+      "name": "aws-user",								# we need this line
+      "user": {
+        "client-certificate": "/etc/kubernetes/pki/users/aws-user/aws-user.crt",
+        "client-key": "/etc/kubernetes/pki/users/aws-user/aws-user.key"
+      }
+    },
+    {
+      "name": "dev-user",								# this line
+      "user": {
+        "client-certificate": "/etc/kubernetes/pki/users/dev-user/developer-user.crt",
+        "client-key": "/etc/kubernetes/pki/users/dev-user/dev-user.key"
+      }
+    },
+    {
+      "name": "test-user",								# and this line: $.users[*].name
+      "user": {
+        "client-certificate": "/etc/kubernetes/pki/users/test-user/test-user.crt",
+        "client-key": "/etc/kubernetes/pki/users/test-user/test-user.key"
+      }
+    }
+  ],
+  "contexts": [
+    {
+      "name": "aws-user@kubernetes-on-aws",
+      "context": {
+        "cluster": "kubernetes-on-aws",
+        "user": "aws-user"
+      }
+    },
+    {
+      "name": "research",
+      "context": {
+        "cluster": "test-cluster-1",
+        "user": "dev-user"
+      }
+    },
+    {
+      "name": "test-user@development",
+      "context": {
+        "cluster": "development",
+        "user": "test-user"
+      }
+    },
+    {
+      "name": "test-user@production",
+      "context": {
+        "cluster": "production",
+        "user": "test-user"
+      }
+    }
+  ],
+  "current-context": "test-user@development"
+}
+--------------
+
+
+Test the output
+	terminal --> cat userslist.json | jpath $.users[*].name
+
+# result:
+--------------
+[
+  "aws-user",
+  "dev-user",
+  "test-user"
+]
+--------------
+
+Save the command in the required file
+	terminal --> echo 'cat userslist.json | jpath $.users[*].name' > answer18.sh
+
+- click 'Check' button
+
+
+
+
+
+=========================================
+Section 16 307. Advanced Kubectl Commands
+=========================================
+
+Doubled with Section 16 305. Pre-Requisites - JSON PATH
+
+
+
+=========================================================
+Section 16 308. Practice Test - Advanced Kubectl Commands
+=========================================================
+
+
+1. Get the list of nodes in JSON format and store it in a file at /opt/outputs/nodes.json.
+------------------------------------------------------------------------------------------
+
+List nodes in JSON format
+	terminal --> k get nodes -o json
+
+Save the result in the /opt/outputs/nodes.json file
+	terminal --> k get nodes -o json > /opt/outputs/nodes.json
+
+- click 'Check' button
+
+
+
+
+
+
+2. Get the details of the node node01 in json format and store it in the file /opt/outputs/node01.json.
+-------------------------------------------------------------------------------------------------------
+
+List nodes
+	terminal --> k get nodes
+
+	# result:
+	NAME           STATUS   ROLES           AGE     VERSION
+	controlplane   Ready    control-plane   6m13s   v1.31.0
+	node01         Ready    <none>          5m36s   v1.31.0
+
+
+Print node01 details in json format
+	terminal --> k get node node01 -o json
+
+Save the result in the /opt/outputs/node01.json
+	terminal --> k get node node01 -o json > /opt/outputs/node01.json
+
+- click 'Check' button
+
+
+
+
+
+3. Use JSON PATH query to fetch node names and store them in /opt/outputs/node_names.txt.
+-----------------------------------------------------------------------------------------
+Remember the file should only have node names.
+
+Print nodes info in json format
+	terminal --> k get nodes -o json
+
+Print nodes names
+	terminal --> k get nodes -o=jsonpath='{.items[*].metadata.name}'
+
+Save result in the required file
+	terminal --> k get nodes -o=jsonpath='{.items[*].metadata.name}' > /opt/outputs/node_names.txt
+
+- click 'Check' button
+
+
+
+4. Use JSON PATH query to retrieve the osImages of all the nodes and store it in a file /opt/outputs/nodes_os.txt.
+------------------------------------------------------------------------------------------------------------------
+The osImage is under the nodeInfo section under status of each node.
+
+Print nodes info in json format
+	terminal --> k get nodes -o json
+
+Print osImage info for all nodes in json format
+	terminal --> k get nodes -o=jsonpath='{.items[*].status.nodeInfo.osImage}'
+
+Save the result in the required file
+	terminal --> k get nodes -o=jsonpath='{.items[*].status.nodeInfo.osImage}' > /opt/outputs/nodes_os.txt
+
+- click 'Check' button
+
+
+
+
+5. A kube-config file is present at /root/my-kube-config. Get the user names from it and store it in a file /opt/outputs/users.txt.
+-----------------------------------------------------------------------------------------------------------
+Use the command kubectl config view --kubeconfig=/root/my-kube-config to view the custom kube-config.
+
+Print the config file
+	terminal --> cat /root/my-kube-config
+	or
+	terminal --> kubectl config view --kubeconfig=/root/my-kube-config
+
+Print the user
+	terminal --> kubectl config view --kubeconfig=my-kube-config  -o jsonpath="{.users[*].name}"
+
+Save the result in the required file
+	terminal --> kubectl config view --kubeconfig=my-kube-config  -o jsonpath="{.users[*].name}" > /opt/outputs/users.txt
+
+- click 'Check' button
+
+
+
+
+
+6. A set of Persistent Volumes are available. Sort them based on their capacity and store the result in the file /opt/outputs/storage-capacity-sorted.txt.
+----------------------------------------------------------------------------------------------------------------
+
+Print PVs info
+	terminal --> k get pv -o wide
+
+Print PVs info in json format 
+	terminal --> k get pv -o json
+
+Sort them by capacity
+	terminal --> kubectl get pv --sort-by=.spec.capacity.storage
+
+Save the result in the required file
+	terminal --> kubectl get pv --sort-by=.spec.capacity.storage > /opt/outputs/storage-capacity-sorted.txt
+
+- click 'Check' button
+
+
+
+7. That was good, but we don't need all the extra details. Retrieve just the first 2 columns of output and store it in /opt/outputs/pv-and-capacity-sorted.txt.
+----------------------------------------------------------------------------------------------------------------------
+The columns should be named NAME and CAPACITY. Use the custom-columns option and remember, it should still be sorted as in the previous question.
+
+Print PVs info
+	terminal --> k get pv -o wide
+
+Print PVs info in json format 
+	terminal --> k get pv -o json
+
+Print the first two columns
+terminal --> kubectl get pv --sort-by=.spec.capacity.storage -o=custom-columns=NAME:.metadata.name,CAPACITY:.spec.capacity.storage
+
+Save the result in the required file
+	terminal --> kubectl get pv --sort-by=.spec.capacity.storage -o=custom-columns=NAME:.metadata.name,CAPACITY:.spec.capacity.storage > /opt/outputs/pv-and-capacity-sorted.txt
+
+- click 'Check' button
+
+
+
+8. Use a JSON PATH query to identify the context configured for the aws-user in the my-kube-config context file and store the result in /opt/outputs/aws-context-name.
+----------------------------------------------------------------------------------------------------------------------------
+
+Print the kubeconfig file in json format
+	terminal --> kubectl config view --kubeconfig=my-kube-config -o json
+
+Print the context for the required user
+	terminal --> kubectl config view --kubeconfig=my-kube-config -o jsonpath="{.contexts[?(@.context.user=='aws-user')].name}"
+
+Save the result in the required file
+	terminal --> kubectl config view --kubeconfig=my-kube-config -o jsonpath="{.contexts[?(@.context.user=='aws-user')].name}" > /opt/outputs/aws-context-name
+
+- click 'Check' button
+
+
+Find information process
+	- print file in JSON format
+	- find the needed data and define json path query
+	- combine the filters with kubectl utility
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

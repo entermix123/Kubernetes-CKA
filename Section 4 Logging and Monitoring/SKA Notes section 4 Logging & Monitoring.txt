@@ -1,0 +1,293 @@
+CONTENT
+
+Section 4 90. Monitor Cluster Components
+Section 4 91. Practice Test - Monitoring
+Section 4 93. Managing Application Logs
+Section 4 95. Practice Test - Monitor Application Logs
+
+
+========================================
+Section 4 90. Monitor Cluster Components
+========================================
+
+Metric Server 
+-------------
+
+We can have one Metric Server per kubernetes cluster
+
+Metric Server retreive metrics from each of the kubernetes Nodes and Pods, aggregates them and stores them in memory. Saves data only in its working time. Loses all data after restart.
+
+If we want to have historical data, we need to use one of the other solutions.
+
+
+Metric Server communicate with kubelet on every node. In kubelet we have cAdvisor (contaner advisor) that retrieves peroformance metrics from pods and exposing them true kubelet api to make them available to Metric Server.
+
+
+If we using minikube, we can enable Metric Server as:
+	terminal --> minikube addons enable metrics-server
+
+
+For all other methods:
+	1. Download metrics server deployment files
+		terminal --> git clone https://github.com/kubernetes-incubator/metrics-server
+
+	2. Deploy the required components
+		terminal --> kubectl create -f deploy/1.8+/
+
+	# This command deploys a set of pods, services and rolls to enable metrics server to pull for performance metrics from the 	  nodes in the cluster
+
+
+We should give some time to the metrics server to pull and process data. 
+
+List Node metrics
+	terminal --> kubectl top node		# CPU and memory status for each node
+
+List pod metrics
+	terminal --> kubectl top pod		# CPU and memory status for each pod
+
+
+
+========================================
+Section 4 91. Practice Test - Monitoring
+========================================
+
+1. We have deployed a few PODs running workloads. Inspect them.
+---------------------------------------------------------------
+Wait for the pods to be ready before proceeding to the next question.
+
+
+List pods
+	terminal --> kubectl get pods
+
+- click 'Ok' button
+
+
+
+2. Let us deploy the Metrics Server to enable monitoring of the PODs and Nodes in the cluster.
+----------------------------------------------------------------------------------------------
+
+- click 'Ok' button
+
+
+
+3. Deploy the Metrics Server in your Kubernetes cluster by applying the latest release components.yaml manifest using the following command:
+------------------
+
+Run the kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+
+Run the command
+	terminal --> kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+
+- click 'Check' button
+
+
+
+4. It takes a few minutes for the metrics server to start gathering data.
+-------------------------------------------------------------------------
+Run the kubectl top node command and wait for a valid output.
+
+
+Wait few minutes and run this command
+	terminal --> kubectl top node
+
+- click 'Ok' button
+
+
+
+5. Identify the node that consumes the most CPU(cores).
+-------------------------------------------------------
+
+List nodes metrics
+	terminal --> kubectl top node
+
+- choose 'controlplane' as answer
+
+
+
+6. Identify the node that consumes the most Memory(bytes).
+----------------------------------------------------------
+
+List nodes metrics
+	terminal --> kubectl top node
+
+- choose 'controlplane' as answer
+
+
+
+7. Identify the POD that consumes the most Memory(bytes) in default namespace.
+------------------------------------------------------------------------------
+
+List pods metrics
+	terminal --> kubectl top pod
+
+- choose 'rabbit' as answ
+
+
+
+
+8. Identify the POD that consumes the least CPU(cores) in default namespace.
+----------------------------------------------------------------------------
+
+List pods metrics
+	terminal --> kubectl top pod
+
+- choose 'lion' as answ
+
+
+
+=======================================
+Section 4 93. Managing Application Logs
+=======================================
+
+
+How it works in Docker
+-------------------------------------------------------------------
+Start docker logging container
+	terminal --> docker run kodekloud/event-simulator
+
+	# stream events to the console
+
+If we start the contaier in detached mode, we cannot view the logs
+	terminal --> docker run -d kodekloud/event-simulator
+
+We can use docker logs command to see the logging container logs
+	terminal --> docker logs -f ecf
+
+	# docker 			- common docker command
+	# logs				- show logs
+	# -f 				- live logs stream
+	# ecf				- name of the logging container
+-------------------------------------------------------------------
+
+
+How it works in Kubernetes
+==========================
+
+We create a pod-definition file with logging image
+
+event-simulator.yaml
+---------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: event-simulator-pod
+spec:
+  containers:
+  - name: event-simulator
+    image: kodekloud/event-simulator
+---------------------------------------
+
+Create the pod
+	terminal --> kubectl create -f event-simulator.yaml
+
+	# kubectl 			- common kubernetes command
+	# create			- action used
+	# -f event-simulator.yaml	- used file
+
+
+View logs
+	terminal --> kubectl logs -f event-simulator-pod
+
+	# kubectl 			- common kubernetes command
+	# logs				- action used
+	# -f 				- live logs stream
+	# event-simulator-pod		- target pod
+
+
+
+
+
+If we have multiple configured containers in the logging pod, we have to specify the container we want to monitor
+
+event-simulator.yaml
+---------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: event-simulator-pod
+spec:
+  containers:
+  - name: event-simulator			# 1st container
+    image: kodekloud/event-simulator		
+  - name: image-processor			# 2nd container
+    image: some-image-processo
+---------------------------------------
+
+Specify the container in the logging command
+	terminal --> kubectl logs -f event-simulator-pod event-simulator
+
+	# kubectl 			- common kubernetes command
+	# logs				- action used
+	# -f 				- live logs stream
+	# event-simulator-pod		- target pod
+	# event-simulator		- target container
+
+
+Troubleshooting
+---------------
+If container is not specified in the command and we have multiple containers in the event-simulator.yaml file, the logging will fail!
+
+
+
+======================================================
+Section 4 95. Practice Test - Monitor Application Logs
+======================================================
+
+
+1. We have deployed a POD hosting an application. Inspect it. Wait for it to start.
+-----------------------------------------------------------------------------------
+
+List pods
+	terminal --> kubectl get pods
+
+- click 'Ok' button
+
+
+
+2. A user - USER5 - has expressed concerns accessing the application. Identify the cause of the issue.
+------------------------------------------------------------------------------------------------------
+Inspect the logs of the POD
+
+List pods
+	terminal --> kubectl get pods
+
+Show logs of the pod
+	terminal --> kubectl logs webapp-1
+
+	# WARNING in event-simulator: USER5 Failed to Login as the account is locked due to MANY FAILED ATTEMPTS.
+
+- choose 'Account is locked due to Many Failed Attempts' as answer
+
+
+
+3. We have deployed a new POD - webapp-2 - hosting an application. Inspect it. Wait for it to start.
+----------------------------------------------------------------------------------------------------
+
+List pods
+	terminal --> kubectl get pods
+
+Show logs of the pod webapp-2
+	terminal --> kubectl logs webapp-2
+
+- click 'Ok' button
+
+
+4. A user is reporting issues while trying to purchase an item. Identify the user and the cause of the issue.
+-------------------------------------------------------------------------------------------------------------
+Inspect the logs of the webapp in the POD
+
+List pods
+	terminal --> kubectl get pods
+
+Show logs of the pod webapp-2
+	terminal --> kubectl logs webapp-2
+
+	# WARNING in event-simulator: USER30 Order failed as the item is OUT OF STOCK.
+
+- click 'USER30 - Item Out of Stock' as answer
+
+
+
+

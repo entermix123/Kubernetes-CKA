@@ -1,0 +1,339 @@
+CONTENT
+
+Section 10 247. Design a Kubernetes Cluster
+Section 10 248. Choosing Kubernetes Infrastructure
+Section 10 248. Choosing Kubernetes Infrastructure
+Section 10 248. Configure High Availability (HA) Kubernetes Cluster
+Section 10 249. ETCD in High Availability (HA) Cluster
+Section 10 251. Important Update: Kubernetes the Hard Way
+
+
+
+
+===========================================
+Section 10 247. Design a Kubernetes Cluster
+===========================================
+
+Objectives
+----------
+	• Node Considerations
+	• Resource Requirements
+	• Network Considerations
+
+
+Questions
+---------
+• Purpose
+	• Education
+		- Minikube
+		- Single node cluster with kubeadm/GCP/AWS
+	• Development & Testing
+		- Multi node cluster with a Single Master and Multiple workers
+		- Setup using kubeadm tool or quick provision on GCP or AWS or AKS
+	• Hosting Production Applications
+		- High Availability Multi node cluster with multiple master nodes
+		- Kubeadm or GCP or Kops on AWS or other supported platforms
+		- Upto 5000 nodes
+		- Upto 150,000 PODs in the cluster
+		- Upto 300,000 Total Containers
+		- Upto 100 PODs per Node
+		# Cloud providers (GCP, AWS) automatically choose the right resource package depending on the counts of nodes.
+
+Nodes Count	|	GCP  	Plans	  Resources	 |	AWS	Plans	   Resources
+-------------------------------------------------------------------------------------------------
+1-5 		|	N1-standard-1 	| 1 vCPU 3.75 GB |	M3.medium	|  1 vCPU 3.75 GB
+6-10		|	N1-standard-2	| 2 vCPU 7.5 GB	 |	M3.large	|  2 vCPU 7.5 GB
+11-100		|	N1-standard 4	| 4 vCPU 15 GB	 |	M3.xlarge	|  4 vCPU 15 GB
+101-250		|	N1-standard 8	| 8 vCPU 30 GB	 |	M3.2xlarge	|  8 vCPU 30 GB
+251-500		|	N1-standard 16	| 16 vCPU 60 GB	 |	C4.4xlarge	|  16 vCPU 30 GB
+> 500		|       N1-standard 32	| 32 vCPU 120 GB | 	C4.8xlarge	|  36 vCPU 60 GB
+
+• Cloud or OnPrem?
+	- Use Kubeadm for on prem
+	- GKE for GCP			(GKE - Google Kubernetis Engine + one click cluster upgrade feature for easy maintenance)
+	- Kops for AWS
+	- Azure Kubernetes Service(AKS) for Azure
+• Storage
+	- High Performance SSD Backed Storage
+	- Multiple Concurrent connections Network based storage
+	- Persistent shared volumes for shared access across multiple PODs
+	- Label nodes with specific disk types
+	- Use Node Selectors to assign applications to nodes with specific disk types
+• Nodes
+	- Virtual or Physical Machines
+	- Minimum of 4 Node Cluster (Size based on workload)
+	- Master vs Worker Nodes
+	- Linux X86_64 Architecture
+
+	- Master nodes can host workloads
+	- Best practice is to not host workloads on Master nodes
+		- using kubeadm prevent hosting workload like setting a taint to the master node
+		- separate ETCD server to a different Cluster Nodes
+• Workloads
+	• How many?
+	• What kind?
+		• Web
+		• Big Data/Analytics
+	• Application Resource Requirements
+		• CPU Intensive
+		• Memory Intensive
+	• Traffic
+		• Heavy traffic
+		• Burst Traffic
+
+
+
+
+==================================================
+Section 10 248. Choosing Kubernetes Infrastructure
+==================================================
+
+We will use Linux OS for creating our Kubernetes Cluster. Some of the helpful tools we can use to automate the process are:
+	- Minukube	- creating a one node cluster easily using Oracle VirtualBox 
+				- Deploys VMS
+				- Single Node Cluster
+
+	- KUBEADM	- single or multi node cluster, but we have to configuration the host by ourself
+				- Require VMs to be ready
+				- Single/Multi Node Cluster
+
+
+Deployment Solutions
+
+Turnkey Solutions (Private Solutions)			- provide configured VMs and use tools to manage the cluster
+=================
+	- You Provision VMs
+	- You Configure VMs
+	- You Use Scripts to Deploy Cluster
+	- You Maintain VMs yourself
+	- Eg : Kubernetes on AWS using KOPS
+
+Tools
+-----
+OpenShift - popular open source kubernetes platform (by RedHat)
+		- provides a set of additional tools
+		- nide GUI to create and manage kubernetes constructs
+		- easily integrate with CD/CI pipelines
+
+Cloud Foundry Container Runtime - open source platform 
+		- BOSH tool - deploying and managing highly available kubernetes clusters
+
+VMware Cloud PKS - leverage existing VMware environment in Kubernetes
+
+Vagrant - provides set of useful scipts for kubernetes deployment on different cloud providers
+
+
+Hosted Solutions			- Cloud Providers
+(Managed Solutions)
+===================
+	- Kubernetes As A Service
+	- Provider provisions VMs
+	- Provider installs Kubernetes
+	- Provider maintains VMs
+	- Eg : Google Container Engine (GKE)
+
+Tools
+-----
+
+Google Container Engine (GKE)
+
+OpenShift Online (RedHat)
+
+Azure Kubernetes Service
+
+Amazon Elastic Container Service for Kubernetes (EKS)
+
+
+For learnign purposes we will set a local Vitualbox setup
+- one laptop
+	- VirtualBox
+		- 1 master node
+		- 2 worker nodes
+
+
+
+
+
+
+===================================================================
+Section 10 248. Configure High Availability (HA) Kubernetes Cluster
+===================================================================
+
+In high availability cluster we have redundancy of every component of the cluster to prevent a single point of failure.
+	- 2 Mater Nodes and controlplane components
+
+How Redundancy work on Master Nodes? 
+
+Components in the master node:
+	- API server 
+		- working with state (active/disabled) and one request at a time
+		- we use load balancer for managing requests for the servers (nginx, haproxy)
+		- we use kubectl utility to communicate with the server true the load balancer
+
+	- Controller Manager and Scheduler
+		- they CANNOT work in parallel, beacuse will duplicate pod actions
+		- Working with state (Active/Standby)
+			- configured Kube-controller-manager End-point
+				terminal --> kube-controller-manager 
+							--leader-elect true
+							--leader-elect-lease-duration 15s
+							--leader-elect-renew-deadline 10s
+							--leader-elect-retry-period 2s
+							-- [other options]
+
+	- ETCD server
+		Topologies
+			- Stacked Topology - ETCD servers are on the master nodes
+				- Easier to setup
+				- Easier to manage
+				- Fewer Servers
+				@ Risk during failure
+
+			- External ETCD Topology - ETCD is on separated of controlplane servers
+				- Less Risky
+				@ Harder to Setup
+				@ More Servers
+				# the API is the only component that talk to ETCD
+					terminal --> cat /etc/systemd/system/kube-apiserver.service
+
+						[Service]
+						ExecStart=/usr/local/bin/kube-apiserver \\
+						--advertise-address=${INTERNAL_IP} \\
+						--allow-privileged=true \\
+						--apiserver-count=3 \\
+						--etcd-cafile=/var/lib/kubernetes/ca.pem \\
+						--etcd-certfile=/var/lib/kubernetes/kubernetes.pem \\
+						--etcd-keyfile=/var/lib/kubernetes/kubernetes-key.pem \\
+						--etcd-servers=https://10.240.0.10:2379,https://10.240.0.11:2379  # this option
+
+				# marked option is for etcd location
+
+Our Design now is with total of 5 Nodes
+	- 2 master nodes (ETCD on them - stacked topology)
+	- 1 load balancer for the masters
+	- 2 worker nodes
+
+
+
+
+======================================================
+Section 10 249. ETCD in High Availability (HA) Cluster
+======================================================
+
+This lecture is Prerequisite for installing Kubernetes
+
+Objectives
+• What is ETCD?
+• What is a Key Value Store?
+• How to get started quickly?
+• How to operate ETCD?
+• What is a distributed system?
+• How ETCD Operates
+• RAFT Protocol
+• Best practices on number of nodes
+
+
+	- ETCD is a distributed reliable key-value store that is Simple, Secure & Fast
+		- key-value store - many files with same structure that can be edited manually (JSON/YAML)
+		- distributed - multiple copies of the data
+			- leader role with read/write perms and fowllower role with read only perms
+			- leader write and then distribute the copies to the followers
+			- write is complete when leader receive consent from the majority of the followers 
+				- majority - Quorum = N/2 + 1 (total number of nodes divided by 2 + 1)
+				- recommended minimum of 3 ETCD instances in one cluster
+			- consent is managed with RAFT protocol
+				- RAFT algorithm uses random timers to initiate leader election requests 
+				- first one to finish the timer with all consents is elected leader
+				- leader sends flags to followers that he is continuing the role of the leader
+				- when follwers do not recieve leader's flag, election leader process is initiated 
+	- Best practices
+		- Odd number of master nodes larger than one - 3, 5, 7
+			- Failing clusters during network segmentation if 6 nodes - 3 on one network and 3 on other - no quorum
+
+
+Install ETCD on a server
+------------------------
+
+1. Dowload the latest supported binaries
+	terminal --> wget -q --https-only "https://github.com/coreos/etcd/releases/download/v3.3.9/etcd-v3.3.9-linux-amd64.tar.gz"
+
+2. Extract the files
+	terminal --> tar -xvf etcd-v3.3.9-linux-amd64.tar.gz
+
+3. Create the required directory structure
+	terminal --> mv etcd-v3.3.9-linux-amd64/etcd* /usr/local/bin/
+	terminal --> mkdir -p /etc/etcd /var/lib/etcd
+
+4. Copy the certificate files generated for ETCD
+	terminal --> cp ca.pem kubernetes-key.pem kubernetes.pem /etc/etcd/
+
+5. configure the ETCD Service
+
+
+etcd.service
+---------------------------------------------------------
+ExecStart=/usr/local/etcd \\
+  --name ${ETCD_NAME} \\
+  --cert-file=/etc/etcd/kubernetes.pem \\
+  --key-file=/etc/etcd/kubernetes-key.pem \\
+  --peer-cert-file=/etc/etcd/kubernetes.pem \\
+  --peer-key-file=/etc/etcd/kubernetes-key.pem \\
+  --trusted-ca-file=/etc/etcd/ca.pem \\
+  --peer-trusted-ca-file=/etc/etcd/ca.pem \\
+  --peer-client-cert-auth \\
+  --client-cert-auth \\
+  --initial-advertise-peer-urls https://${INTERNAL_IP}:2380 \\
+  --listen-peer-urls https://${INTERNAL_IP}:2380 \\
+  --listen-client-urls https://${INTERNAL_IP}:2379,https://127.0.0.1:2379 \\
+  --advertise-client-urls https://${INTERNAL_IP}:2379 \\
+  --initial-cluster-token etcd-cluster-0 \\
+  --initial-cluster peer-1=https://${PEER1_IP}:2380,peer-2=https://${PEER2_IP}:2380 \\
+  --initial-cluster-state new \\
+  --data-dir=/var/lib/etcd
+---------------------------------------------------------
+
+Use ETCDCTL utility for ETCD communication
+	- ETCDCTL have two versions - v2 (default) and v3 (we will use v3)
+		- Set ETCDCTL to v3
+			terminal --> export ETCDCTL_API=3
+	- Save data
+		- Create key (name) - value (john)
+			terminal --> etcdctl put name john
+	- Retrieve data
+		- Show key-value pair
+			terminal --> etcdctl get name	
+		- List all keys
+			terminal --> etcdctl get / --prefix --keys-only	
+
+
+Number of Nodes - 3 or 5 is best for small projects, 7 and above is for bigger projects
+	- odd number for avoiding failures in case of networking partitioning
+	- odd number for greater fault tollerance (N - N/2 + 1; N - total nodes)
+
+Our Design now is with total of 5 Nodes
+	- 2 master nodes on one laptop (ETCD on them - stacked topology), 3 master nodes are recommended if we have resources
+	- 1 load balancer for the masters
+	- 2 worker nodes
+
+
+
+
+
+=========================================================
+Section 10 251. Important Update: Kubernetes the Hard Way
+=========================================================
+
+Installing Kubernetes the hard way can help you gain a better understanding of putting together the different components manually.
+
+An optional series on this is available at our youtube channel here:
+	- https://www.youtube.com/watch?v=uUupRagM7m0&list=PL2We04F3Y_41jYdadX55fdJplDvgNGENo
+
+The GIT Repo for this tutorial can be found here:
+	- https://github.com/mmumshad/kubernetes-the-hard-way
+
+
+
+
+
+
+

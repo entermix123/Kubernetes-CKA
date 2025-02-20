@@ -1,0 +1,103 @@
+CONTENT
+
+Section 18 317. Frequently Asked Questions
+Section 18 318. More Certification Tips
+Section 18 319. Bonus Lecture Conclusion
+Section 18 320. Kubernetes Update and Project Videos - Your Essential Guide
+
+
+==========================================
+Section 18 317. Frequently Asked Questions
+==========================================
+
+
+Q. Am I ready for the real exam?
+
+A. If you have completed all lectures, labs and mock exams in this course, you are almost ready for the exam. To be sure, randomly different labs or mock exams and see how you perform. If you can breeze through those without having to peek at the hints or answer files, consider yourself ready. Remember, you only need 66% to clear the real exam, and you also have a free retake. So go for it!
+
+
+
+Head over to this link (https://training.linuxfoundation.org/certification/certified-kubernetes-administrator-cka/?cjdata=MXxZfFl8WXww&cjevent=42bb0ec8efbf11ef820c00ba0a18b8f8&utm_source=CJ&utm_medium=affiliate) to enroll in the Certification Exam. Remember to keep the code - 20KODE - handy to get a 20% discount while registering for the CKA exam with Linux Foundation.
+
+Q. How much time does it take to get results after the exam?
+
+A. Results will be emailed within 48 hours.
+
+
+
+Q. Is this course and mock exams sufficient for the exam?
+
+A. Yes! The course covers all the topics required for the exam. If you practice the practice tests and mock exams enough times and make peace with the Kubernetes documentation pages, you should be good.
+
+
+
+Q. Are the difficulty level of the mock exams similar to the ones in the exam?
+
+A. We have created 2 new mock exams (2 & 3) that have a difficulty level more similar to the ones in the exam. So please check them out.
+
+
+
+Q. Is auto-completion available in the exam environment?
+
+A. Yes.
+
+
+
+Q. How do I switch between clusters/environments in the exam environment?
+
+A. The command to switch to the right cluster/context will be given at the top of each question. Make sure you run that always. Even if you think you are on the right cluster/context!
+
+More FAQs here - https://docs.linuxfoundation.org/tc-docs/certification/faq-cka-ckad-cks
+
+
+
+
+=======================================
+Section 18 318. More Certification Tips
+=======================================
+
+Official Tips:
+
+https://docs.linuxfoundation.org/tc-docs/certification/tips-cka-and-ckad
+
+Head over to this link (https://training.linuxfoundation.org/certification/certified-kubernetes-administrator-cka/?cjdata=MXxZfFl8WXww&cjevent=92244465efbf11ef80ab00b70a18b8f6&utm_source=CJ&utm_medium=affiliate) to enroll in the Certification Exam. Remember to keep the code - 20KODE - handy to get a 20% discount while registering for the CKA exam with Linux Foundation.
+
+
+
+========================================
+Section 18 319. Bonus Lecture Conclusion
+========================================
+
+Recommendations and Commercials
+
+If subsribe to KodeKloud use code UDEMY10 for extra discount
+
+
+===========================================================================
+Section 18 320. Kubernetes Update and Project Videos - Your Essential Guide
+===========================================================================
+
+
+Uncover additional insights through the videos listed below:
+
+Kubernetes Update Videos
+1. Kubernetes v1.27 Update
+Kubernetes Update 1.27: Chill Vibes Edition - Exploring the Latest Enhancements
+	- https://www.youtube.com/watch?v=rUFgZuIp1mY&ab_channel=KodeKloud
+
+2. Kubernetes v1.28 Update
+Kubernetes Update 1.28: Planternetes Edition - Exploring the Latest Enhancements
+	- https://www.youtube.com/watch?v=mRlBtYc-HSk&ab_channel=KodeKloud
+
+3. Kubernetes v1.29 Update
+Exploring Kubernetes 1.29 Updates - Mandala Universe
+	- https://www.youtube.com/watch?v=yCkQgKVwSVU&ab_channel=KodeKloud
+
+
+
+
+
+
+
+
+

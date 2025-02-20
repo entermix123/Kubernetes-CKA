@@ -1,0 +1,3022 @@
+CONTENT
+
+Section 5 98. Rolling Updates and Rollbacks
+Section 5 99. Practice Test - Rolling Updates and Rollbacks
+Section 5 101. Configuration Application
+Section 5 102. Commands
+Section 5 103. Commands and Arguments
+Section 5 104. Practice Test - Commands and Arguments
+Section 5 106. Configure Environment Varibles in Applications
+Section 5 107. Configure ConfigMaps in Applications
+Section 5 108. Practice Test - Environment Variables
+Section 5 110. Configure Secrets in Applications
+Section 5 111. A Note about Secrets
+Section 5 112. Additional Resource
+Section 5 113. Practice Test - Secrets
+Section 5 115. Encrypting Secret Data at Rest
+Section 5 117. Multi-Container Pods
+Section 5 118. Practice Test - Multi-Container Pods
+Section 5 120. Multi-Container Pods Design Patterns
+Section 5 121. InitContainers
+Section 5 122. Practice Test - InitContainers
+Section 5 124. Lelf Healing Applications
+
+
+
+===========================================
+Section 5 98. Rolling Updates and Rollbacks
+===========================================
+
+
+Explain Rollout and Versioning
+==============================
+
+When we first create a deployment (example: nginx:1.7.0) it creates a Rollout. A new rollout create a new deployment revision - Revision 1.
+
+When the application container is updated (nginx:1.7.1), a new Rollout is triggered and a new deployment revision is created - Revision 2.
+
+
+Rollout Commands
+----------------
+
+Show rollouts status
+	terminal --> kubectl rollout status deployment/myapp-deployment
+
+	# kubectl 				- common kubernetes command
+	# rollout status			- information about obejct required
+	# deployment/myapp-deployment		- taget object
+
+
+Show revisions and history of rollout
+	terminal --> kubectl rollout history deployment/myapp-deployment
+
+	# kubectl 				- common kubernetes command
+	# rollout history			- information about obejct required
+	# deployment/myapp-deployment		- taget object
+
+
+
+Deployment Strategies
+=====================
+
+1. Reacreate Strategy - Destroy all application pods at ones and create all pods again with the new version
+	- this creates a downtime of the app, because there is period of no working application 
+	- not the default deployment strategy
+	- not recommended
+
+
+2. Rolling Update Strategy - take down and update each pod one by one
+	- this strategy do not have downtime period
+	- default kubernetes strategy
+	- recommended
+
+
+How we update deployment
+========================
+
+Make changes to the deployemnt-definition file
+
+deployment-definition.yaml
+------------------------------------------------
+apiVersion: v1
+kind: Deployment
+metadata:
+  name: myapp-deployment
+  labels:
+    app: myapp
+    type: front-end
+spec:
+  template:
+    metadata:
+      name: myapp-pod
+      labels:
+	app: myapp
+	type: front-end
+    spec:
+      containers:
+      - name: nginx-container
+	image: nginx:1.7.1		# chaged version
+  replicas: 3
+  selector:
+    matchLabels:
+       type: front-end
+------------------------------------------------
+
+
+Update command we use usually
+	temrinal --> kubectl apply -f deployment-definition.yaml
+
+	# new rollout is triggered 
+	# new revision of the deployment is created
+
+
+Image update command
+	terminal --> kubectl set image deployemnt/myapp-deployment nginx-container=nginx:1.9.1
+
+	# this command DO NOT update deployemnt-definition.yaml file !!! Not Recommneded !!!
+
+
+
+Find what strategy was used in update
+-------------------------------------
+
+Show deployemnt details
+	terminal --> kubectl describe deployment my-depoyment
+
+Under 'StrategyType' field we can see 'Recreate' or 'RollingUpdate' values
+
+Also messages with information about setting replicas to '0' laso means that 'Recreate' strategy was used
+
+
+
+How RollingUpdate is working?
+-----------------------------
+
+When new deployment is created with 5 replicas, it first creates a ReplicaSet automatically that creates 5 replicas.
+
+When Upgrade is made a new ReplicaSet is created. The two replicasets are working simultaneously. Old ReplicaSet deletes one pod and the new ReplicaSet create one pod and so on.
+
+
+How Rollback work?
+------------------
+
+Star a rollback
+	terminal --> kubectl rollout undo deployment/myapp-deployment
+
+	# the deployment will destroy the pods in the last ReplicaSet and restore the pods in the previous ReplicaSet
+
+We can trace this process by listing ReplicaSets before and after a rollback command
+	terminal --> kubectl get replicasets
+
+
+
+Commands Summarize
+------------------
+
+Craete deployemnt
+	terminal --> kubectl create deployment -f deployment-definition.yaml
+
+List deployments
+	terminal --> kubectl get deployments
+
+Update deployemnts
+	terminal --> kubectl apply -f deployment-definition.yaml			# recommended
+	or
+	terminal --> kubectl set image deployemnt/myapp-deployment nginx=nginx:1.9.1	# not recommended, DO NOT update def file
+
+Show deployemnt status
+	terminal --> kubect rollout status deployemnt/myapp-deployment
+
+Show deployment history
+	terminal --> kubectl rollout history deployemnt/myapp-deployment
+
+
+===========================================================
+Section 5 99. Practice Test - Rolling Updates and Rollbacks
+===========================================================
+
+We will use 'k' alias for 'kubectl' command. We can see all alias with
+	terminal --> alias 
+
+1. We have deployed a simple web application. Inspect the PODs and the Services
+-------------------------------------------------------------------------------
+Wait for the application to fully deploy and view the application using the link called Webapp Portal above your terminal.
+
+List pods
+	terminal --> k get pods
+
+List deployemnts
+	terminal --> k get deploy
+
+Click on 'Webapp Portal' above top right corner of the console
+	- window with the working app should open
+
+- click 'Ok' button
+
+
+
+2. What is the current color of the web application?
+----------------------------------------------------
+Access the Webapp Portal.
+
+Click on 'Webapp Portal' above top right corner of the console
+	- window with the working app should open
+
+- choose 'blue' as answer (or whatever color is the background of the application)
+
+
+
+3. Run the script named curl-test.sh to send multiple requests to test the web application. Take a note of the output.
+----------------------------------------------------------------------------------------------------------------------
+Execute the script at /root/curl-test.sh.
+
+
+Run command:
+	terminal --> ./curl-test.sh
+
+- click 'Ok' button
+
+
+
+
+4. Inspect the deployment and identify the number of PODs deployed by it
+------------------------------------------------------------------------
+
+List deployments
+	terminal --> k get deploy
+
+- choose '4' as answer
+
+
+
+5. What container image is used to deploy the applications?
+-----------------------------------------------------------
+
+List deployemnts
+	terminal --> k get deploy
+
+Show used image in the target deployemnt
+	terminal --> k describe deploy frontend | grep Image
+
+OR 
+
+List pods
+	terminal --> k get pods
+
+Show image used in one of the pods
+	terminal --> k describe pod frontend-7b5df69f4-bms77 | grep Image
+
+- choose 'kodekloud/webapp-color:v1' as answer
+
+
+
+6. Inspect the deployment and identify the current strategy
+-----------------------------------------------------------
+
+List deployemnts
+	terminal --> k get deploy
+
+Show used strategy in the target deployemnt
+	terminal --> k describe deploy frontend | grep StrategyType
+
+- choose 'RollingUpdate' as answer
+
+
+
+7. If you were to upgrade the application now what would happen?
+----------------------------------------------------------------
+
+- choose 'PODs are upgraded few at a time' as answer
+
+
+
+8. Let us try that. Upgrade the application by setting the image on the deployment to kodekloud/webapp-color:v2
+---------------------------------------------------------------------------------------------------------------
+Do not delete and re-create the deployment. Only set the new image name for the existing deployment.
+
+List deployments
+	terminal --> k get deploy
+
+
+Option 1:
+---------
+Update deployemnt configs
+	terminal --> k edit deploy frontend
+
+frontedn deployment
+------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "2"
+  creationTimestamp: "2025-01-08T14:15:38Z"
+  generation: 2
+  name: frontend
+  namespace: default
+  resourceVersion: "1204"
+  uid: f28139c6-3a4d-4055-9620-f81bb2912a55
+spec:
+  minReadySeconds: 20
+  progressDeadlineSeconds: 600
+  replicas: 4
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      name: webapp
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        name: webapp
+    spec:
+      containers:
+      - image: kodekloud/webapp-color:v2			# changed
+        imagePullPolicy: IfNotPresent
+        name: simple-webapp
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 3
+  conditions:
+  - lastTransitionTime: "2025-01-08T14:16:02Z"
+    lastUpdateTime: "2025-01-08T14:16:02Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2025-01-08T14:15:38Z"
+    lastUpdateTime: "2025-01-08T14:36:09Z"
+    message: ReplicaSet "frontend-74649f5d7c" is progressing.
+    reason: ReplicaSetUpdated
+    status: "True"
+    type: Progressing
+  observedGeneration: 2
+  readyReplicas: 5
+  replicas: 5
+  unavailableReplicas: 2
+  updatedReplicas: 2
+------------------------------------------------
+save changes - escape, :wq!, enter
+
+
+Update deployemnt
+	terminal --> k apply deployemnt frontend
+
+Verify the change
+	terminal --> k describe deploy frontend
+
+
+Option 2:
+---------
+Show details of the deployment and copy the container name
+	terminal --> k describe deployment frontend
+
+	# container name is 'simple-webapp'
+
+Update the deployment without updating the deployment config
+	terminal --> k set image deploy frontend simple-webapp=kodekloud/webapp-color:v2
+
+	# k 						- common kubernetes command
+	# set image					- update deployment image
+	# deploy					- type object
+	# frontend					- target object name
+	# simple-webapp=kodekloud/webapp-color:v2	- container name and imagename
+
+Verify the change
+	terminal --> k describe deploy frontend
+
+
+- click 'Check' button
+
+
+
+
+9. Run the script curl-test.sh again. Notice the requests now hit both the old and newer versions. However none of them fail.
+-----------------------------------------------------------------------------------------------------------------------------
+Execute the script at /root/curl-test.sh.
+
+Run tests
+	terminal --> ./curl-test.sh
+
+	# we can see that there are new colors in the tests results
+	# if we run the tests few times, all colors wull be changed 
+	# that is how rollingupdate work
+
+- click 'Ok' button
+
+
+
+10 . Up to how many PODs can be down for upgrade at a time
+----------------------------------------------------------
+Consider the current strategy settings and number of PODs - 4
+
+List pods
+	terminal --> k get pods
+
+	# number of pods are 4
+
+Show details about the deployment
+	terminal --> k describe deploy frontend
+
+We have fields:
+	MinReadySeconds:        20
+	RollingUpdateStrategy:  25% max unavailable, 25% max surge
+
+- choose '1' as answer
+
+
+
+11. Change the deployment strategy to Recreate
+----------------------------------------------
+Delete and re-create the deployment if necessary. Only update the strategy type for the existing deployment.
+
+
+List deployemnts
+	terminal --> k get deploy
+
+Update deployemnt configs
+	terminal --> k edit deploy frontend
+
+frontedn deployment
+------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "2"
+  creationTimestamp: "2025-01-08T14:15:38Z"
+  generation: 2
+  name: frontend
+  namespace: default
+  resourceVersion: "1204"
+  uid: f28139c6-3a4d-4055-9620-f81bb2912a55
+spec:
+  minReadySeconds: 20
+  progressDeadlineSeconds: 600
+  replicas: 4
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      name: webapp
+  strategy:						# removed additional lines
+    type: Recreate					# changed
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        name: webapp
+    spec:
+      containers:
+      - image: kodekloud/webapp-color:v2			
+        imagePullPolicy: IfNotPresent
+        name: simple-webapp
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 3
+  conditions:
+  - lastTransitionTime: "2025-01-08T14:16:02Z"
+    lastUpdateTime: "2025-01-08T14:16:02Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2025-01-08T14:15:38Z"
+    lastUpdateTime: "2025-01-08T14:36:09Z"
+    message: ReplicaSet "frontend-74649f5d7c" is progressing.
+    reason: ReplicaSetUpdated
+    status: "True"
+    type: Progressing
+  observedGeneration: 2
+  readyReplicas: 5
+  replicas: 5
+  unavailableReplicas: 2
+  updatedReplicas: 2
+------------------------------------------------
+save changes - escape, :wq!, enter
+
+
+Verify the change
+	terminal --> k describe deploy frontend | grep StrategyType
+
+
+- click 'Check' button
+
+
+
+
+12. Upgrade the application by setting the image on the deployment to kodekloud/webapp-color:v3
+-----------------------------------------------------------------------------------------------
+Do not delete and re-create the deployment. Only set the new image name for the existing deployment.
+
+List deployments
+	terminal --> k get deploy
+
+
+Option 1:
+---------
+Update deployemnt configs
+	terminal --> k edit deploy frontend
+
+frontedn deployment
+------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "2"
+  creationTimestamp: "2025-01-08T14:15:38Z"
+  generation: 2
+  name: frontend
+  namespace: default
+  resourceVersion: "1204"
+  uid: f28139c6-3a4d-4055-9620-f81bb2912a55
+spec:
+  minReadySeconds: 20
+  progressDeadlineSeconds: 600
+  replicas: 4
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      name: webapp
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        name: webapp
+    spec:
+      containers:
+      - image: kodekloud/webapp-color:v3			# changed		
+        imagePullPolicy: IfNotPresent
+        name: simple-webapp
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 3
+  conditions:
+  - lastTransitionTime: "2025-01-08T14:16:02Z"
+    lastUpdateTime: "2025-01-08T14:16:02Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2025-01-08T14:15:38Z"
+    lastUpdateTime: "2025-01-08T14:36:09Z"
+    message: ReplicaSet "frontend-74649f5d7c" is progressing.
+    reason: ReplicaSetUpdated
+    status: "True"
+    type: Progressing
+  observedGeneration: 2
+  readyReplicas: 5
+  replicas: 5
+  unavailableReplicas: 2
+  updatedReplicas: 2
+------------------------------------------------
+save changes - escape, :wq!, enter
+
+
+Update deployemnt
+	terminal --> k apply deployemnt frontend
+
+Verify the change
+	terminal --> k describe deploy frontend
+
+
+Option 2:
+---------
+Show details of the deployment and copy the container name
+	terminal --> k describe deployment frontend
+
+	# container name is 'simple-webapp'
+
+Update the deployment without updating the deployment config
+	terminal --> k set image deploy frontend simple-webapp=kodekloud/webapp-color:v3
+
+	# k 						- common kubernetes command
+	# set image					- update deployment image
+	# deploy					- type object
+	# frontend					- target object name
+	# simple-webapp=kodekloud/webapp-color:v3	- container name and imagename
+
+Verify the change
+	terminal --> k describe deploy frontend
+
+
+- click 'Check' button
+
+
+
+13. Run the script curl-test.sh again. Notice the failures. Wait for the new application to be ready. Notice that the requests now do not hit both the versions
+----------------------------------------------------------------------------------------------------------------------------------
+Execute the script at /root/curl-test.sh.
+
+
+Run tests
+	terminal --> ./curl-test.sh
+
+	# we can see that all test result changed to red at once
+	# that is how recrate strategy work
+
+- click 'Ok' button
+
+
+
+========================================
+Section 5 101. Configuration Application
+========================================
+
+Configure Applications
+Configuring applications comprises of understanding the following concepts:
+
+	- Configuring Command and Arguments on applications
+
+	- Configuring Environment Variables
+
+	- Configuring Secrets
+
+We will see these next
+
+
+
+=======================
+Section 5 102. Commands
+=======================
+
+Recap Docker
+------------
+
+We start a custom ubuntu container - ubuntu-sleeper
+
+Dockerfile
+-----------------------------
+FROM Ubuntu
+
+ENTRYPOINT ["sleep"]		# This command is executed at the start of the container and argument is not required
+
+CMD ["5"]			# This command is executed at the start of the container and can take argument
+-----------------------------
+
+Build docker image
+	terminal --> docker build -t ubuntu-sleeper .
+
+	# docker 					- common docker command
+	# build						- build image
+	# -t ubuntu-sleeper				- name of the image
+	# .						- take current folder context (Dockerfile dir)
+
+When we run the container, he is running for 10 seconds and stops. 
+	terminal --> docker run ubuntu-sleeper 10
+
+	# the container overwrites 'CMD ["5"]' to 'CMD ["10"]'
+
+We can overwrite ENTRYPOINT with argument
+	terminal --> docker run --entrypoint sleep2.0 ubuntu-sleeper 10
+
+
+
+=====================================
+Section 5 103. Commands and Arguments
+=====================================
+
+Dockerfile
+-----------------------------
+FROM Ubuntu
+
+ENTRYPOINT ["sleep"]		# This command is executed at the start of the container and argument is not required
+
+CMD ["5"]			# This command is executed at the start of the container and can take argument
+-----------------------------
+
+Build docker image
+	terminal --> docker build -t ubuntu-sleeper .
+
+	# docker 					- common docker command
+	# build						- build image
+	# -t ubuntu-sleeper				- name of the image
+	# .						- take current folder context
+
+Start the custom ubuntu image (ubuntu-sleeper) in a container
+	terminal --> docker run --name ubuntu-sleeper ubuntu-sleeper
+
+	# docker 					- common docker command
+	# run 						- start a container
+	# --name ubuntu-sleeper				- name of the started container
+	# ubuntu-sleeper				- used image
+
+We can start a container and pass an argument for 10s (sleep 10)
+	terminal --> docker run --name ubuntu-sleeper ubuntu-sleeper 10
+
+	# docker 					- common docker command
+	# run 						- start a container
+	# --name ubuntu-sleeper				- name of the started container
+	# ubuntu-sleeper				- used image
+	# 10						- overwrite CMD ["5"] to CMD ["10"]
+
+
+We can start a pod from this image also.
+----------------------------------------
+
+pod-definition.yaml
+--------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ubuntu-sleeper-pod
+spec:
+  containers:
+  - name: ubuntu-sleeper
+    image: ubuntu-sleeper
+    command: ["sleep2.0"]	# we can overwrite ENTRYPOINT with 'command' field
+    args: ["10"]		# we can overwrite CMD command with 'args' field
+--------------------------------------
+
+Create a pod
+	terminal --> kubectl create -f pod-definition.yaml
+
+
+
+=====================================================
+Section 5 104. Practice Test - Commands and Arguments
+=====================================================
+
+
+1. How many PODs exist on the system?
+-------------------------------------
+In the current(default) namespace
+
+Count pods in default namespace
+	terminal --> k get pods --no-headers | wc -l
+
+	# k					- commonkubernetes command
+	# get 					- usd action
+	# -A					- in all namespaces
+	# --no-headers				- remove headers of the result
+	# | wc -l				- count result lines
+
+	# reult is 1
+
+Count pods in all namespaces
+	terminal --> k get pods -A --no-headers | wc -l
+
+	# k					- commonkubernetes command
+	# get 					- usd action
+	# -A					- in all namespaces
+	# --no-headers				- remove headers of the result
+	# | wc -l				- count result lines
+
+- choose '1' as answer
+
+
+
+2. What is the command used to run the pod ubuntu-sleeper?
+----------------------------------------------------------
+
+Show details about pod ubuntu-sleeper
+	terminal --> k describe pod ubuntu-sleeper
+
+	# uder containers / ubuntu / Command we can see 'sleedp 4800'
+
+- choose 'sleedp 4800' as answer
+
+
+
+3. Create a pod with the ubuntu image to run a container to sleep for 5000 seconds. Modify the file ubuntu-sleeper-2.yaml.
+--------------------------------------------------------------------------------------------------------------------------
+Note: Only make the necessary changes. Do not modify the name.
+
+Edit the file ubuntu-sleeper-2.yaml
+	terminal --> vi ubuntu-sleeper-2.yaml
+
+ubuntu-sleeper-2.yaml
+----------------------------
+apiVersion: v1 
+kind: Pod 
+metadata:
+  name: ubuntu-sleeper-2 
+spec:
+  containers:
+  - name: ubuntu
+    image: ubuntu
+    command: [ "sleep" ]		# added command
+    args: [ "5000" ]			# added argument
+----------------------------
+save changes - escape, :wq!, enter
+
+Verify changes
+	terminal --> cat ubuntu-sleeper-2.yaml
+
+Craete the pod
+	terminal --> k create -f ubuntu-sleeper-2.yaml
+
+Show details of the pod to verify the command
+	terminal --> k describe pod ubuntu-sleeper-2
+
+- click 'Check' button
+
+
+4. Create a pod using the file named ubuntu-sleeper-3.yaml. There is something wrong with it. Try to fix it!
+------------------------------------------------------------------------------------------------------------
+Note: Only make the necessary changes. Do not modify the name.
+
+Try to ctreate a pod with provied file
+	terminal --> k create -f ubuntu-sleeper-3.yaml
+
+We receive this error:
+Error from server (BadRequest): error when creating "ubuntu-sleeper-3.yaml": Pod in version "v1" cannot be handled as a Pod: json: cannot unmarshal number into Go struct field Container.spec.containers.command of type string
+
+Print the file ubuntu-sleeper-3.yaml
+	terminal --> cat ubuntu-sleeper-3.yaml
+
+We can see that the command is set with wrong syntax.
+
+Edit the file ubuntu-sleeper-3.yaml
+	terminal --> vi ubuntu-sleeper-3.yaml
+
+ubuntu-sleeper-3.yaml
+------------------------------------
+apiVersion: v1 
+kind: Pod 
+metadata:
+  name: ubuntu-sleeper-3 
+spec:
+  containers:
+  - name: ubuntu
+    image: ubuntu
+    command:
+      - "sleep"
+      - "1200"			# added dowble quotes
+------------------------------------
+save changes - escape, :wq!, enter
+
+Create the pod
+	terminal --> k create -f ubuntu-sleeper-3.yaml
+
+Verify if the pod is running
+	terminal --> k get pods
+
+- click 'Check' button
+
+
+
+5. Update pod ubuntu-sleeper-3 to sleep for 2000 seconds.
+---------------------------------------------------------
+Note: Only make the necessary changes. Do not modify the name of the pod. Delete and recreate the pod if necessary.
+
+Option 1:
+=========
+Edit the exsisting pod
+	terminal --> k edit pod ubuntu-sleeper-3
+
+ubuntu-sleeper-3
+--------------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: "2025-01-09T12:51:53Z"
+  name: ubuntu-sleeper-3
+  namespace: default
+  resourceVersion: "1185"
+  uid: 40bd8571-caac-413c-8a0a-c834d70c5416
+spec:
+  containers:
+  - command:
+    - sleep
+    - "1200"
+    image: ubuntu
+    imagePullPolicy: Always
+    name: ubuntu
+    resources: {}
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-qrd9v
+      readOnly: true
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  nodeName: controlplane
+  preemptionPolicy: PreemptLowerPriority
+  priority: 0
+  restartPolicy: Always
+  schedulerName: default-scheduler
+  securityContext: {}
+  serviceAccount: default
+  serviceAccountName: default
+  terminationGracePeriodSeconds: 30
+  tolerations:
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 300
+  volumes:
+  - name: kube-api-access-qrd9v
+    projected:
+      defaultMode: 420
+      sources:
+      - serviceAccountToken:
+          expirationSeconds: 3607
+          path: token
+      - configMap:
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: kube-root-ca.crt
+      - downwardAPI:
+          items:
+          - fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+            path: namespace
+status:
+  conditions:
+  - lastProbeTime: null
+    lastTransitionTime: "2025-01-09T12:51:55Z"
+    status: "True"
+    type: PodReadyToStartContainers
+  - lastProbeTime: null
+    lastTransitionTime: "2025-01-09T12:51:53Z"
+    status: "True"
+    type: Initialized
+  - lastProbeTime: null
+    lastTransitionTime: "2025-01-09T12:51:55Z"
+    status: "True"
+    type: Ready
+  - lastProbeTime: null
+    lastTransitionTime: "2025-01-09T12:51:55Z"
+    status: "True"
+    type: ContainersReady
+  - lastProbeTime: null
+    lastTransitionTime: "2025-01-09T12:51:53Z"
+    status: "True"
+    type: PodScheduled
+  containerStatuses:
+  - containerID: containerd://ec73149f31fe0db6ef04b1235233ad823b014a5823ef2661c1f07f45217a0467
+    image: docker.io/library/ubuntu:latest
+    imageID: docker.io/library/ubuntu@sha256:80dd3c3b9c6cecb9f1667e9290b3bc61b78c2678c02cbdae5f0fea92cc6734ab
+    lastState: {}
+    name: ubuntu
+    ready: true
+    restartCount: 0
+    started: true
+    state:
+      running:
+        startedAt: "2025-01-09T12:51:54Z"
+    volumeMounts:
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-qrd9v
+      readOnly: true
+      recursiveReadOnly: Disabled
+  hostIP: 192.168.211.144
+  hostIPs:
+  - ip: 192.168.211.144
+  phase: Running
+  podIP: 10.42.0.11
+  podIPs:
+  - ip: 10.42.0.11
+  qosClass: BestEffort
+  startTime: "2025-01-09T12:51:53Z"
+--------------------------------------------------------
+save changes - escape, :wq!, enter
+# Error appear and we cannot save the changes on the existing pod
+exit vim - :q!, enter
+
+We receive this message:
+error: pods "ubuntu-sleeper-3" is invalid
+A copy of your changes has been stored to "/tmp/kubectl-edit-121421931.yaml"
+error: Edit cancelled, no valid changes were saved.
+
+
+We can recreate the pod with temporary created file /tmp/kubectl-edit-121421931.yaml
+	terminal --> k replace --force -f /tmp/kubectl-edit-121421931.yaml
+
+	# This will delete the existing pod and recreate it with the file will provided
+
+! THE CHANGES WE MADE ARE NOT SAVED IN THE POD-DEFINITION FILE !
+
+
+Option 2:
+=========
+List files
+	terminal --> ls
+
+Edit the pod-definition file and apply the changes
+	terminal --> vi ubuntu-sleeper-3.yaml
+
+ubuntu-sleeper-3.yaml
+---------------------------------
+apiVersion: v1
+kind: Pod 
+metadata:
+  name: ubuntu-sleeper-3
+spec:
+  containers:
+  - name: ubuntu
+    image: ubuntu
+    command:
+      - "sleep"
+      - "2000"		# editted to 2000
+---------------------------------
+save changes - escape, :wq!, enter
+
+Verify the changes
+	terminal --> cat ubuntu-sleeper-3.yaml
+
+Apply changes
+	terminal --> k apply -f ubuntu-sleeper-3.yaml
+
+- click ;Check' button
+
+
+
+6. Inspect the file Dockerfile given at /root/webapp-color directory. What command is run at container startup?
+---------------------------------------------------------------------------------------------------------------
+
+List files in the directory /root/webapp-color
+	terminal --> ls /root/webapp-color
+
+Print the Dockerfile
+	terminal --> cat /root/webapp-color/Dockerfile
+
+- choose "python app.py" as answer
+
+
+
+7. Inspect the file Dockerfile2 given at /root/webapp-color directory. What command is run at container startup?
+----------------------------------------------------------------------------------------------------------------
+
+Print the Dockerfile2
+	terminal --> cat /root/webapp-color/Dockerfile2
+
+- choose 'python app.py --color red' as answer
+
+
+
+8. Inspect the two files under directory webapp-color-2. What command is run at container startup?
+--------------------------------------------------------------------------------------------------
+Assume the image was created from the Dockerfile in this directory.
+
+List files in the dir webapp-color-2
+	terminal --> ls webapp-color-2
+
+Print the Dockerfile
+	terminal --> cat webapp-color-2/Dockerfile
+
+Dockerfile
+------------------------------
+FROM python:3.6-alpine
+
+RUN pip install flask
+
+COPY . /opt/
+
+EXPOSE 8080
+
+WORKDIR /opt
+
+ENTRYPOINT ["python", "app.py"]		# start command
+
+CMD ["--color", "red"]			# args
+------------------------------
+
+Print the webapp-color-pod.yaml
+	terminal --> cat webapp-color-2/webapp-color-pod.yaml
+
+webapp-color-pod.yaml
+------------------------------
+apiVersion: v1 
+kind: Pod 
+metadata:
+  name: webapp-green
+  labels:
+      name: webapp-green 
+spec:
+  containers:
+  - name: simple-webapp
+    image: kodekloud/webapp-color
+    command: ["--color","green"]	# overwrite the command and args
+------------------------------
+
+- choose '--color green' as answer
+
+
+9. Inspect the two files under directory webapp-color-3. What command is run at container startup?
+--------------------------------------------------------------------------------------------------
+Assume the image was created from the Dockerfile in this directory.
+
+
+List files in the directory directory webapp-color-3
+	terminal --> ls directory webapp-color-3
+
+Print the Dockerfile
+	terminal --> cat webapp-color-3/Dockerfile
+
+Dockerfile
+------------------------------
+FROM python:3.6-alpine
+
+RUN pip install flask
+
+COPY . /opt/
+
+EXPOSE 8080
+
+WORKDIR /opt
+
+ENTRYPOINT ["python", "app.py"]		# command
+
+CMD ["--color", "red"]			# args
+------------------------------
+
+
+Print the webapp-color-pod-2.yaml
+	terminal --> cat webapp-color-3/webapp-color-pod-2.yaml
+
+webapp-color-pod.yaml
+------------------------------
+apiVersion: v1 
+kind: Pod 
+metadata:
+  name: webapp-green
+  labels:
+      name: webapp-green 
+spec:
+  containers:
+  - name: simple-webapp
+    image: kodekloud/webapp-color
+    command: ["python", "app.py"]	# overwrites the command
+    args: ["--color", "pink"]		# overwrites the arguments
+------------------------------
+
+- choose 'python app.py --color pink' as answer
+
+
+10. Create a pod with the given specifications. By default it displays a blue background. Set the given command line arguments to change it to green.
+-----------------------------------------------------------------
+
+Option 1
+--------
+Create pod
+	terminal --> k run webapp-green --image=kodedkloud/webapp-color --dry-run=client -o yaml > green-pod.yaml
+
+Edit the created file
+	terminal --> vi green-pod.yaml
+	- add 'args: [ "--color" "green" ]'
+	- save changes - escape, :wq!, enter
+
+Create the pod 
+	terminal --> k create -f green-pod.yaml
+
+
+Option 2
+--------
+
+Show help for run command
+	terminal --> kubectl run --help
+	
+# we have example
+	# Start the nginx pod using the default command, but use custom arguments (arg1 ..argN) for thet command
+	terminal --> kubectl run nginx --image=nginx -- <arg1> <arg2> .. <argN>
+
+	# kubectl					- common kubernetes command
+	# run						- sued action
+	# nginx						- name of the pod
+	# --image=nginx					- used image
+	# -- <arg1> <arg2> .. <argN>			- additional aguments
+
+
+Start the pod using run command and add arguments for color green
+	terminal --> kubectl run webapp-green --image=kodekloud/webapp-color -- --color green
+
+	# kubectl					- common kubernetes command
+	# run						- sued action
+	# webapp-green					- name of the pod
+	# --image=kodekloud/webapp-color		- used image
+	# -- --color green				- additional aguments
+
+Verify the pod creation and commands
+	terminal --> k describe pod webapp-green
+
+- click 'Çheck' button
+
+
+
+
+=============================================================
+Section 5 106. Configure Environment Varibles in Applications
+=============================================================
+
+How we set variables in docker
+	terminal --> docker -e APP_COLOR=pink simple-webapp-color
+
+How we set variables in pod-definition file:
+
+pod-definition.yaml
+-----------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-webapp-color
+spec:
+  containers:
+  - name: simple-web-app-color
+    image: simple-web-app-color
+    ports:
+      - containerPorts: 8080
+    env:
+      - name: APP_COLOR_1		# set pod environment variable name 1
+	value: pink			# set pod environment variable value 1 from plane value
+
+      - name: APP_COLOR_2		# set pod environment variable name 2
+	valueFrom: 			
+	    configMapKeyRef:		# set pod environment variable value 2 from ConfigMap
+
+      - name: APP_COLOR_3		# set pod environment variable name 3
+	valueFrom: 			
+	    secretKeyRef: 		# set pod environment variable value 3 from Secrets
+-----------------------------------
+
+
+
+===================================================
+Section 5 107. Configure ConfigMaps in Applications
+===================================================
+
+
+Create configMap:
+
+Option 1: Imperative approach
+=============================
+We will not create a configMap definition file, but pass all values in the command directly or with config file
+
+Option 1.1:
+-----------
+Create configMap with one command. Can be complicated if multiple key-value parirs are passed
+	terminal --> kubectl create configmap app-config \
+			--from-literal=APP_COLOR=blue \
+			--from-literal=APP_MOD=prod   \
+
+	# kubectl					- common kubernetes command
+	# create					- sued action
+	# configmap					- type object
+	# app-config					- name of the object
+	# --from-literal=APP_COLOR=blue			- pass env variable 1
+	# --from-literal=APP_MOD=prod			- pass env variable 2
+
+
+Option 1.2:
+-----------
+	terminal --> kubectl create configmap app-config --from-file=app_config.properties
+
+	# kubectl					- common kubernetes command
+	# create					- sued action
+	# configmap					- type object
+	# app-config					- name of the object
+	# --from-file=app_config.properties		- used file with key-value data
+
+
+
+Option 2: Declarative approach
+==============================
+We will create configmap definition file and specify it in the pod-definition file
+
+config-map.yaml
+-----------------------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  APP_COLOR: blue
+  APP_MODE: prod
+-----------------------------------
+
+Create the configmap object
+	terminal --> kubectl create -f config-map.yaml
+
+
+Wehave to name correctly files of different comnponents, because we will have to use them in other files. For example:
+
+app-config			mysql-config			redis-config
+---------------------		---------------------		---------------------
+APP_COLOR: blue			port: 3306			port: 6379
+APP_MODE=prod			max_allowed_packets: 128M	rdb_compression: yes
+---------------------		---------------------		---------------------
+
+View ConfigMaps
+	terminal --> kubectl get configmaps
+
+Print configmap
+	terminal --> kubectl describe configmaps
+
+
+
+ConfigMap in Pods
+=================
+
+pod-definition.yaml
+-----------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-webapp-color
+spec:
+  containers:
+  - name: simple-web-app-color
+    image: simple-web-app-color
+    ports:
+      - containerPorts: 8080
+    envFrom	
+    - configMapKeyRef:			# set pod ConfigMap items
+	  name: app-config		# name of the configmap
+-----------------------------------
+
+Create the pod
+	terminal --> kubectl create -f pod-definition.yaml
+
+
+
+We can inject single environment variable:
+-----------------------------------------------
+
+pod-definition.yaml
+-----------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-webapp-color
+spec:
+  containers:
+  - name: simple-web-app-color
+    image: simple-web-app-color
+    ports:
+      - containerPorts: 8080
+    env:
+      - name: APP_COLOR	
+    - configMapKeyRef:			# set pod ConfigMap items
+	  name: app-config		# name of the configmap
+	  key: APP_COLOR
+-----------------------------------
+
+
+We can inject volumes:
+----------------------
+
+pod-definition.yaml
+-----------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-webapp-color
+spec:
+  containers:
+  - name: simple-web-app-color
+    image: simple-web-app-color
+    ports:
+      - containerPorts: 8080
+    volumes:
+    - name: app-config-volume		# name of the volume
+    - configMap:			
+	name: app-config		# name of the configmap
+-----------------------------------
+
+
+
+
+====================================================
+Section 5 108. Practice Test - Environment Variables
+====================================================
+
+
+1. How many PODs exist on the system?
+-------------------------------------
+in the current(default) namespace
+
+
+List pods in current namspace
+	terminal --> k get pods
+
+- choose '1' as answer
+
+
+
+
+2. What is the environment variable name set on the container in the pod?
+-------------------------------------------------------------------------
+
+
+Show details of the pod
+	terminal --> k describe pod webapp-color
+
+	# we can see it in section Containers / webapp-color / Environment
+
+- choose 'APP_COLOR' as answer
+
+
+
+3. What is the value set on the environment variable APP_COLOR on the container in the pod?
+-------------------------------------------------------------------------------------------
+
+Show details of the pod
+	terminal --> k describe pod webapp-color
+
+	# we can see it in section Containers / webapp-color / Environment
+
+- choose 'pink' as answer
+
+
+
+4. View the web application UI by clicking on the Webapp Color Tab above your terminal.
+---------------------------------------------------------------------------------------
+This is located on the right side.
+
+Click on 'Webapp Color' button in above the top right corner of the console
+
+We can see that the background color is pink
+
+- cli 'Ok' button
+
+
+5. Update the environment variable on the POD to display a green background.
+----------------------------------------------------------------------------
+Note: Delete and recreate the POD. Only make the necessary changes. Do not modify the name of the Pod.
+
+
+Option 1:
+---------
+Edit the existing pod
+	terminal --> k edit pod webapp-color
+
+
+----------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: "2025-01-10T09:30:08Z"
+  labels:
+    name: webapp-color
+  name: webapp-color
+  namespace: default
+  resourceVersion: "744"
+  uid: 87101307-c64b-4ae6-925e-6fc49e068189
+spec:
+  containers:
+  - env:
+    - name: APP_COLOR
+      value: green				# set this field to green
+...
+----------------------------------------------
+save changes - esxape, :wq!, enter
+Error will appear that we cannot change existing pod
+exit editor - :q!, enter
+
+We receive this message:
+error: pods "webapp-color" is invalid
+A copy of your changes has been stored to "/tmp/kubectl-edit-2446419648.yaml"
+error: Edit cancelled, no valid changes were saved.
+
+
+Use the craeted temporary file to recreate the pod
+	terminal --> k replace --force -f /tmp/kubectl-edit-2446419648.yaml
+
+	# k					- common kubernetes command (kubectl)
+	# replace				- used action
+	# --force				- delete existing pod and recreate it
+	# -f /tmp/kubectl-edit-2446419648.yaml	- use file
+
+Verify pod creation
+	terminal --> k get pods
+
+- click 'Check' button
+
+
+
+
+6. View the changes to the web application UI by clicking on the Webapp Color Tab above your terminal.
+------------------------------------------------------------------------------------------------------
+If you already have it open, simply refresh the browser.
+
+Click on 'Webapp Color' button in above the top right corner of the console
+
+We can see that the background color is green
+
+- cli 'Ok' button
+
+
+
+7. How many ConfigMaps exists in the default namespace?
+-------------------------------------------------------
+
+List configmaps
+	terminal --> k get configmap
+
+	# we can see 2 lines in the result
+
+Or we can receive directly the count
+	terminal --> k get configmap --no-headers | wc -l
+
+- choose '2' as answer
+
+
+8. Identify the database host from the config map db-config.
+------------------------------------------------------------
+
+Verify the existance of db-config
+	terminal --> k get configmap
+
+Show details for db-config
+	terminal --> k describe cm db-config
+
+	# k					- common kubernetes command
+	# describe				- used action
+	# cm					- config map short syntax
+	# db-config				- target configmap
+
+
+We can see in the result
+------------------------
+DB_HOST:
+----
+SQL01.example.com
+------------------------
+
+- choose 'SQL01.example.com' as answer
+
+
+
+9. Create a new ConfigMap for the webapp-color POD. Use the spec given below.
+-----------------------------------------------------------------------------
+
+Show create configmap help command
+	terminal --> k create cm --help
+
+We can see the third example
+----------------------------
+  # Create a new config map named my-config with key1=config1 and key2=config2
+  kubectl create configmap my-config --from-literal=key1=config1 --from-literal=key2=config2
+
+
+Create configmap
+	terminal --> k create cm webapp-config-map --from-literal=APP_COLOR=darkblue --from-literal=APP_OTHER=disregard
+
+	# k					- common kubernetes command
+	# create				- used action
+	# cm					- config map short syntax
+	# webapp-config-map			- name of the configmap
+	# --from-literal=APP_COLOR=darkblue	- set first variable
+	# --from-literal=APP_OTHER=disregard	- set second variable
+
+Verify configmap creation
+	terminal --> k get cm
+
+- click 'Check' button
+
+
+10. Update the environment variable on the POD to use only the APP_COLOR key from the newly created ConfigMap.
+--------------------------------------------------------------------------------------------------------------
+Note: Delete and recreate the POD. Only make the necessary changes. Do not modify the name of the Pod.
+
+
+Edit the existing pod
+	terminal --> k edit pod webapp-color
+
+We cab see the right syntax here: https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/
+
+
+----------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: "2025-01-10T09:40:45Z"
+  labels:
+    name: webapp-color
+  name: webapp-color
+  namespace: default
+  resourceVersion: "952"
+  uid: 74625adc-ace2-4c53-b9f8-691ee899472f
+spec:
+  containers:
+  - env:
+    - name: APP_COLOR
+      valueFrom:
+        configMapKeyRef:
+          name: webapp-config-map
+          key: APP_COLOR
+    image: kodekloud/webapp-color
+----------------------------------------------
+save changes - esxape, :wq!, enter
+Error will appear that we cannot change existing pod
+exit editor - :q!, enter
+
+We receive this message:
+error: pods "webapp-color" is invalid
+A copy of your changes has been stored to "/tmp/kubectl-edit-3138255488.yaml"
+error: Edit cancelled, no valid changes were saved.
+
+
+Use the craeted temporary file to recreate the pod
+	terminal --> k replace --force -f /tmp/kubectl-edit-3138255488.yaml
+
+	# k					- common kubernetes command (kubectl)
+	# replace				- used action
+	# --force				- delete existing pod and recreate it
+	# -f /tmp/kubectl-edit-3138255488.yaml	- use file
+
+Verify pod creation
+	terminal --> k get pods
+
+Verify the pod configmap
+	terminal --> k describe pod webapp-color
+
+- click 'Check' button
+
+
+11. View the changes to the web application UI by clicking on the Webapp Color Tab above your terminal.
+-------------------------------------------------------------------------------------------------------
+If you already have it open, simply refresh the browser.
+
+
+Click on 'Webapp Color' button in above the top right corner of the console
+
+We can see that the background color is blue
+
+- cli 'Ok' button
+
+
+
+
+
+================================================
+Section 5 110. Configure Secrets in Applications
+================================================
+
+We have simple Web-MySQK Application
+------------------------------------------------------------------
+import os
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.route("/")
+def main():
+
+    mysql.connector.connect(host='mysql', database='mysql',
+			     user='root', password='paswrd')
+
+    return render_template('hello.html', color=fetchcolor())
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port="8080")
+------------------------------------------------------------------
+
+We can see that the varibles are visible.
+
+We can create a secret and inject it in to the pod configurations
+
+
+Option 1: Imperative way
+========================
+We create a secret without using a secret definition file
+
+Option 1.1: using one command to pass mutiple secrets. It can become complicated if we need to pass high count secrets.
+-----------
+Create a secret with one command
+	terminal --> k crate secret generic app-secret \
+			--from-literal=DB_Host=mysql \
+			--from-literal=DB_User=root \
+			--from-literal=DB_Password=paswrd \
+
+Option1.2: using file. We specify key-value pairs in a file nad then pass it in the craetion command
+Create a secret with file
+	terminal --> k create secret generic app-secret --from-file=app_secret.rpperties
+
+
+
+
+Option 2: Declarative way
+=========================
+We create secret definition file and use it in pod configurations
+
+We need to encode the values of the secreats
+	terminal --> echo -n 'mysql' | base64
+	# result: bXlzcWw=
+
+	terminal --> echo -n 'root' | base64
+	# result: cm9vdA==
+
+	terminal --> echo -n 'paswrd' | base64
+	# result: cGFzd3Jk
+
+We craete secret definition file
+
+secret-data.yaml
+-----------------------------------
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secret
+data:
+  DB_Host=bXlzcWw=
+  DB_User=cm9vdA==
+  DB_Password=cGFzd3Jk
+-----------------------------------
+
+Create the secret
+-----------------
+	terminal --> k create -f secret-data.yaml
+
+List secrets
+------------
+	terminal --> get secrets
+
+Show secrets length, but hide the values
+----------------------------------------
+	terminal --> k describe secrets
+
+Show encoded secrets
+--------------------
+	terminal --> k get secrets app-secret -o yaml
+
+	# k					- common kubernetes command (kubectl)
+	# get					- used action
+	# secrets				- object type
+	# app-secret				- taget object name
+	# -o yaml				- set output in yaml format
+
+
+Decode encoded values
+---------------------
+	terminal --> echo -n 'bXlzcWw=' | base64 --decode
+	# result: mysql
+
+	terminal --> echo -n 'cm9vdA==' | base64 --decode
+	# result: root
+
+	terminal --> echo -n 'cGFzd3Jk' | base64 --decode
+	# result: paswrd
+
+
+
+Secrets in Pods
+===============
+
+secret-data.yaml
+-----------------------------------
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secret
+data:
+  DB_Host=bXlzcWw=
+  DB_User=cm9vdA==
+  DB_Password=cGFzd3Jk
+-----------------------------------
+
+
+pod-definition.yaml
+-----------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-webapp-color
+  labels:
+    name: simple-webapp-color
+spec:
+  containers:
+  - name: sipmle-webapp-color
+    image: sipmle-webapp-color
+    ports:
+      - containerPort: 8080
+    envFrom:
+      - secretRef:
+            name: app-secret
+-----------------------------------
+
+Create the pod
+	terminal --> k create -f pod-definition.yaml
+
+
+Secrets in Pods
+===============
+
+ENV
+---------------------------
+envFrom:
+  - secretRef:
+	name: app-config
+--------------------------
+
+SINGLE-ENV
+--------------------------
+env:
+  - name: DB_Password
+    valueFrom:
+      secretKeyRef:
+	name: app-secret
+	key: DB_Password
+--------------------------
+
+
+
+Secrets in Pods as Volumes
+--------------------------
+
+VOLUME
+--------------------------
+volumes:
+- nameL app-secret-volume
+  secret:
+    secretName: app-secret
+--------------------------
+
+All secrets are created as different files in the volume.
+
+List secrets file in volume
+	terminal --> ls /opt/app-secret-volumes
+	# the result is 'DB_Host DB_Password DB_User'	- 3 files for every secret
+
+Print secret file in volume
+	terminal --> cat /opt/app-secret-volumes/DB_Password
+	# result 'paswrd' - plain text
+
+
+=====================
+	HINTS
+=====================
+
+Risk: Secrets are not encrypted, but only encoded
+	Solution: Do not push secrets objects in SCM along with the code !
+
+Risk: Secrets are not encrypted in ETCD - Enable encryption in Rest !
+	Solution: info: https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/
+
+Risk: Anyone able to create pods/deployments in the same namespqce can access the secrets
+	Solution: Configure least-privilege access to Secrets - RBAC
+
+Solution: Consider third-party secrets store providers
+	- AWS Provider, Azure Provider, GCP Provider, Vault Provider
+
+
+
+
+
+===================================
+Section 5 111. A Note about Secrets
+===================================
+
+Remember that secrets encode data in base64 format. Anyone with the base64 encoded secret can easily decode it. As such the secrets can be considered as not very safe.
+
+The concept of safety of the Secrets is a bit confusing in Kubernetes. The kubernetes documentation page (https://kubernetes.io/docs/concepts/configuration/secret/) and a lot of blogs out there refer to secrets as a "safer option" to store sensitive data. They are safer than storing in plain text as they reduce the risk of accidentally exposing passwords and other sensitive data. In my opinion it's not the secret itself that is safe, it is the practices around it. 
+
+Secrets are not encrypted, so it is not safer in that sense. However, some best practices around using secrets make it safer. As in best practices like:
+
+Not checking-in secret object definition files to source code repositories.
+
+Enabling Encryption at Rest for Secrets so they are stored encrypted in ETCD. (https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/)
+
+
+Also the way kubernetes handles secrets. Such as:
+
+A secret is only sent to a node if a pod on that node requires it.
+
+Kubelet stores the secret into a tmpfs so that the secret is not written to disk storage.
+
+Once the Pod that depends on the secret is deleted, kubelet will delete its local copy of the secret data as well.
+
+Read about the protections (https://kubernetes.io/docs/concepts/configuration/secret/#protections) and risks of using secrets here https://kubernetes.io/docs/concepts/configuration/secret/#risks
+
+
+Having said that, there are other better ways of handling sensitive data like passwords in Kubernetes, such as using tools like Helm Secrets, HashiCorp Vault (https://www.vaultproject.io/). I hope to make a lecture on these in the future.
+
+
+==================================
+Section 5 112. Additional Resource
+==================================
+
+Dive deep into the world of Kubernetes security with our comprehensive guide to Secret Store CSI Driver.
+
+https://www.youtube.com/watch?v=MTnQW9MxnRI
+
+It is recommended to use AWS, Azure, GCP, Vault or other providers, because we don't have saved secrets on our kubernetes cluster, bu they are pulled in livetime. This means less attack surface and one platform less for audit.
+
+
+Secrets providers can be isntalled with HELM (https://helm.sh/) on our kubernetes cluster and configuration looking like this
+
+aws-secret-provider-configuration				AWS Secrets Manager
+------------------------------------				----------------------------------------
+apiVersion: secrets-store.csi.x-k8s.io/v1			DB-CREDS
+kind: SecretProviderClass					  DB_PASSWORD: mupass
+metadata:							  DB_USERNAME: myuser
+  name: db-secrets						----------------------------------------
+spec:
+  provider: aws
+  parameters:
+    objects:
+	- objectName: "db_creds"
+	- objectTypeL "secretmanager"
+------------------------------------
+
+
+
+How to mount secrets from provider in pod
+-----------------------------------------
+
+Create a volume
+
+pod-definition.yaml
+------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-webapp-color
+  labels:
+    name: simple-webapp-color
+spec:
+  volumes:				# created volume section
+    - name: db-creds
+      csi:
+	driver: secrets-store.csi.k8s.io
+	readOnly: true
+	volumeAttributes:
+	  secretProviderClass: db-secrets	# match existing secrets provider object in the k8s cluster
+  containers:
+  - name: simple-webapp-color
+    image: simple-webapp-color
+    volumeMounts:
+      - name: db-creds
+        mountPath: /tmp
+------------------------------------
+
+
+DEMOS - https://www.youtube.com/watch?v=MTnQW9MxnRI&ab_channel=KodeKloud
+=====
+- set secrets in AWS             	- 8:15 from video
+- install CSI Driver in Kubernetes 	- 9:33 from video
+	- create service account
+- create secretProvider.yaml		- 19:00 from video
+- create a deployment with secrets	- 20:50 from video
+- change db passwords			- 26:00 from video
+
+
+
+
+======================================
+Section 5 113. Practice Test - Secrets
+======================================
+
+
+1. How many Secrets exist on the system?
+----------------------------------------
+In the current(default) namespace.
+
+List secrets
+	terminal --> k get secrets
+
+- choose '1' as answer
+
+
+2. How many secrets are defined in the dashboard-token secret?
+--------------------------------------------------------------
+
+Show details about the secrets
+	terminal  --> k describe secret dashboard-token
+
+We count all key-value pairs after 'Data'
+
+- choose '3' as answer
+
+
+
+3. What is the type of the dashboard-token secret?
+--------------------------------------------------
+
+Show details about the secrets
+	terminal  --> k describe secret dashboard-token
+
+We can see 'Type:  kubernetes.io/service-account-token'
+
+- choose 'kubernetes.io/service-account-token' as answer
+
+
+
+4. Which of the following is not a secret data defined in dashboard-token secret?
+---------------------------------------------------------------------------------
+
+Show details about the secrets
+	terminal  --> k describe secret dashboard-token
+
+- choose 'type' as answer
+
+
+
+5. We are going to deploy an application with the below architecture
+--------------------------------------------------------------------
+We have already deployed the required pods and services. Check out the pods and services created. Check out the web application using the Webapp MySQL link above your terminal, next to the Quiz Portal Link.
+
+List pods
+---------
+	terminal --> k get pods
+
+result:
+
+NAME         READY   STATUS    RESTARTS   AGE
+mysql        1/1     Running   0          105s
+webapp-pod   1/1     Running   0          105s
+
+
+
+List services
+-------------
+	terminal --> k get svc
+
+result:
+
+NAME             TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
+kubernetes       ClusterIP   10.43.0.1       <none>        443/TCP          16m
+sql01            ClusterIP   10.43.140.43    <none>        3306/TCP         2m8s
+webapp-service   NodePort    10.43.227.191   <none>        8080:30080/TCP   2m9s
+
+
+Open 'Webapp MySQL' tab above top right corner of the console
+	- should show 'FAILED' text in with red background
+		- error text shown for failed connection with db
+
+
+
+6. The reason the application is failed is because we have not created the secrets yet. Create a new secret named db-secret with the data given below.
+-----------------------------------------------------------------------------------
+You may follow any one of the methods discussed in lecture to create the secret.
+
+requirements:
+-------------
+Secret Name: db-secret
+Secret 1: DB_Host=sql01
+Secret 2: DB_User=root
+Secret 3: DB_Password=password123
+
+Show create secret help info
+	terminal --> k create secret generic --help
+
+The third example:
+  # Create a new secret named my-secret with key1=supersecret and key2=topsecret
+  kubectl create secret generic my-secret --from-literal=key1=supersecret --from-literal=key2=topsecret
+
+Create secret with imperative approach - one line command
+	terminal --> k create secret generic db-secret --from-literal=DB_Host=sql01 --from-literal=DB_User=root --from-literal=DB_Password=password123
+
+	# k					- common kubernetes command (kubectl)
+	# create				- used action
+	# secret				- object type
+	# generic				- secret from a local file, directory, or literal value
+	# db-secret				- secret name
+	# --from-literal=DB_Host=sql01		- set key-value paris for each secret
+
+Verify secret creation
+	terminal --> k get secrets
+
+Show details for created secret	
+	terminal --> k describe secret db-secret
+
+- click 'Check' button
+
+
+
+7. Configure webapp-pod to load environment variables from the newly created secret.
+------------------------------------------------------------------------------------
+Delete and recreate the pod if required.
+
+List pods
+	terminal --> k get pods
+
+Show details of webapp-pod
+	terminal --> k describe pod webapp-pod
+
+Edit the pod config
+	terminal --> k edit pod webapp-pod
+
+We can see the syntax here - https://kubernetes.io/docs/tasks/inject-data-application/distribute-credentials-secure/#define-container-environment-variables-using-secret-data
+
+
+-----------------------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: "2025-01-10T14:40:56Z"
+  labels:
+    name: webapp-pod
+  name: webapp-pod
+  namespace: default
+  resourceVersion: "949"
+  uid: 5a2ea32c-d465-437b-9a86-df644a2e492a
+spec:
+  containers:
+  - image: kodekloud/simple-webapp-mysql
+    imagePullPolicy: Always
+    name: webapp
+    resources: {}
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    envFrom:
+    - secretRef:
+        name: db-secret
+    volumeMounts:
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-s2zlq
+...
+-----------------------------------------------------------------
+save changes - esxape, :wq!, enter
+Error will appear that we cannot change existing pod
+exit editor - :q!, enter
+
+We receive this message:
+error: pods "webapp-color" is invalid
+A copy of your changes has been stored to "/tmp/kubectl-edit-1832334219.yaml"
+error: Edit cancelled, no valid changes were saved.
+
+Use the craeted temporary file to recreate the pod
+	terminal --> k replace --force -f /tmp/kubectl-edit-1832334219.yaml
+
+	# k					- common kubernetes command (kubectl)
+	# replace				- used action
+	# --force				- delete existing pod and recreate it
+	# -f /tmp/kubectl-edit-1832334219.yaml	- use file
+
+Verify pod creation
+	terminal --> k get pods
+
+Verify the pod configmap
+	terminal --> k describe pod webapp-color
+
+- click Çheck'button
+
+
+8. View the web application to verify it can successfully connect to the database
+---------------------------------------------------------------------------------
+
+Open 'Webapp MySQL' tab above top right corner of the console
+	- should show 'SUCCESS' text in with green background
+
+- click 'Ok' button
+
+
+
+=============================================
+Section 5 115. Encrypting Secret Data at Rest
+=============================================
+
+Documentation - https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/
+
+HOW SECRETS WORKS IN KUBERNETES - only encoded
+-----------------------------------------------------------
+Create a secret
+	terminal --> k create secret generic my-secret --from-literal=key1=supersecret
+
+Print secret my-secret as yaml file
+	terminal --> k describe secret my-secret
+
+Print my-secret detailed information
+	terminal --> k get secret my-secret -o yaml
+
+Decode the secret and see the original
+	terminal --> echo "c3VwZXJzZWNyZXQ=" | base64 --decode
+	# result: supersecret
+-----------------------------------------------------------
+
+
+
+We will focus on how secrets are stored in ETCD
+===============================================
+
+Check if etcdctl is available, if not, intall it
+	terminal --> apt-get install etcd-client
+
+We can print the ETCD files
+	terminal --> ETCDCTL_API=3 etcdctl --cacert=/etc/kubernetes/pki/etcd/ca.crt --cert=/etc/kubernetes/pki/etcd/server.crt --key=/etc/kubernetes/pki/etcd/server.key get /registry/secrets/default/my-secret | hexdump -C
+
+	# In default format the secrets are saved in plain text !
+
+
+Step 1 - Check if encryption is enabled
+---------------------------------------
+
+Option 1: 
+List running processes
+	terminal --> ps -aux
+
+We have to find out if the encription of secrets is enabled. We find ikube-api server and check if encription is running option
+	terminal --> ps aux | grep kube-api | grep encryption-provider
+	# if no result is reterned on the console, encryption is disabled
+
+Option 2:
+List system definition files
+	terminal --> ls /etc/kubernetes/manifests/
+
+Print apiserver definition file
+	terminal --> cat /etc/kubernetes/manifests/kube-apiserver.yaml
+
+Check if '--encryption-provider' exists in the list of options. If we cannot find it, then is not enabled.
+
+
+Step 2 - Create a configuration file and pass it to '--encryption-provider' option in the process
+-------------------------------------------------------------------------------------------------
+
+Understanding configuration file
+	- in resources we have what we want to be encrypted
+	- in providers we have what encryption provider we will use (first one is used by default)
+
+encryption configuration example
+----------------------------------------------------------------------------
+apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfiguration
+resources:
+  - resources:
+      - secrets
+      - configmaps
+      - pandas.awesome.bears.example 						# a custom resource API
+    providers:
+      # This configuration does not provide data confidentiality. The first
+      # configured provider is specifying the "identity" mechanism, which
+      # stores resources as plain text.
+      #
+      # The first encryption algorithm is enabled by default !!!
+      #
+      # - identity: {} 		# enabled by default, plain text, NO encryption, NOT RECOMMENDED
+      - aesgcm:							# encryption algorithm 1
+          keys:
+            - name: key1					# key used by the algorithm
+              secret: c2VjcmV0IGlzIHNlY3VyZQ==			# will be used to encrypt with the algorithm
+            - name: key2
+              secret: dGhpcyBpcyBwYXNzd29yZA==
+      - aescbc:							# encryption algorithm 2
+          keys:
+            - name: key1					# key used by the algorithm
+              secret: c2VjcmV0IGlzIHNlY3VyZQ==			# will be used to encrypt with the algorithm
+            - name: key2
+              secret: dGhpcyBpcyBwYXNzd29yZA==
+      - secretbox:							# encryption algorithm 2
+          keys:
+            - name: key1						# key used by the algorithm
+              secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=	# will be used to encrypt with the algorithm
+  - resources:
+      - events
+    providers:
+      - identity: {} 		# do not encrypt Events even though *.* is specified below
+  - resources:
+      - '*.apps' 		# wildcard match requires Kubernetes 1.27 or later
+    providers:
+      - aescbc:
+          keys:
+          - name: key2
+            secret: c2VjcmV0IGlzIHNlY3VyZSwgb3IgaXMgaXQ/Cg==
+  - resources:
+      - '*.*' 			# wildcard match requires Kubernetes 1.27 or later
+    providers:
+      - aescbc:
+          keys:
+          - name: key3
+            secret: c2VjcmV0IGlzIHNlY3VyZSwgSSB0aGluaw==
+----------------------------------------------------------------------------
+
+More info about providers - https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/#providers
+
+
+Step 2.1 Create a encryption configuration file - enc.yaml 
+----------------------------------------------------------
+Generate random encoded password
+	terminal --> head -c 32 /dev/random | base64
+	# result: RBm3yS8qOCH/GrHAx8y+pnHAkKEhjASAvsX0OlImFyQ=
+
+Create simplified encryption configuration file
+	terminal --> vi enc.yaml
+
+enc.yaml
+----------------------------------------------------
+apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfiguration
+resources:
+  - resources:
+      - secrets
+    providers:
+      - aescbc:
+          keys:
+            - name: key1
+              secret: RBm3yS8qOCH/GrHAx8y+pnHAkKEhjASAvsX0OlImFyQ=
+      # - identity: {} 							# REMOVE THIS LINE, NO ENCRYPTION
+----------------------------------------------------
+
+
+Step 2.2 - Save the new encryption config file to /etc/kubernetes/enc/enc.yaml on the control-plane node.
+---------------------------------------------------------------------------------------------------------
+
+Create the direcotiry
+	terminal --> mkdir /etc/kubernetes/enc
+
+Move created 'enc.yaml' file there
+	terminal --> mv enc.yaml /etc/kubernetes/enc
+
+Verify file location
+	terminal --> ls /etc/kubernetes/enc
+
+
+Step 2.3 - Edit the manifest for the kube-apiserver static pod: /etc/kubernetes/manifests/kube-apiserver.yaml
+-------------------------------------------------------------------------------------------------------------
+
+Edit api server definition file
+	terminal --> vi /etc/kubernetes/manifests/kube-apiserver.yaml
+
+kube-apiserver.yaml
+---------------------------------------------------------------
+#
+# This is a fragment of a manifest for a static Pod.
+# Check whether this is correct for your cluster and for your API server.
+#
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    kubeadm.kubernetes.io/kube-apiserver.advertise-address.endpoint: 10.20.30.40:443
+  creationTimestamp: null
+  labels:
+    app.kubernetes.io/component: kube-apiserver
+    tier: control-plane
+  name: kube-apiserver
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+    - kube-apiserver
+    ...
+    - --encryption-provider-config=/etc/kubernetes/enc/enc.yaml  		# add this line
+    volumeMounts:
+    ...
+    - name: enc                           # add this line
+      mountPath: /etc/kubernetes/enc      # add this line
+      readOnly: true                      # add this line
+    ...
+  volumes:
+  ...
+  - name: enc                             # add this line
+    hostPath:                             # add this line
+      path: /etc/kubernetes/enc           # add this line
+      type: DirectoryOrCreate             # add this line
+---------------------------------------------------------------
+save changes - escape, :wq!, enter
+
+Wait until kube-apiserver reinitialize. We can see api server status
+	terminal --> crictl pods
+
+Verify if the encryption enabled
+	terminal --> ps aux | grep kube-api | grep encryption-provider
+	# there should be result returned on the console
+
+
+
+Step 3 - Test if the encryption is working preperly
+---------------------------------------------------
+
+Create another secret object
+	terminal --> k create secret generic my-secret-2 --from-literal=key2=topsecret
+
+	# k					- common kubernetes command (kubectl)
+	# create				- used action
+	# secret				- object type
+	# generic				- secret from a local file, directory, or literal value
+	# db-secret				- secret name
+	# --from-literal=key2=topsecret		- set key-value paris for each secret
+
+
+List secrets to verify creation of my-secret-2 with enabled encritpion
+	terminal --> k get secrets
+
+Print the ETCD file again to check if secrets are encrypted
+	terminal --> ETCDCTL_API=3 etcdctl --cacert=/etc/kubernetes/pki/etcd/ca.crt --cert=/etc/kubernetes/pki/etcd/server.crt --key=/etc/kubernetes/pki/etcd/server.key get /registry/secrets/default/my-secret-2 | hexdump -C
+
+	# the result must be encrypted
+
+
+The my-secret will not be automatically encrypted. Encryption is working only on newly created objects
+
+To encrypt already existing secrets we have to update all obejcts
+	terminal --> kubectl get secrets --allnamespaces -o json | kubectl replace -f -
+
+	# kubectl						- common kubernetes command (kubectl)
+	# get							- used action
+	# secret						- object type
+	# --allnamespaces					- from all namespaces
+	# -o json						- in json format
+	# | kubectl replace -f -				- save files with same data (refresh to encrypt)
+
+Print first created secret my-secret
+	terminal --> ETCDCTL_API=3 etcdctl --cacert=/etc/kubernetes/pki/etcd/ca.crt --cert=/etc/kubernetes/pki/etcd/server.crt --key=/etc/kubernetes/pki/etcd/server.key get /registry/secrets/default/my-secret | hexdump -C
+
+	# the result must be encrypted also
+
+
+
+===================================
+Section 5 117. Multi-Container Pods
+===================================
+
+ We focus on microservice architecture. For example we want each Web server instance to be monitored by one instance of Logging monitoring instance. They should be in separate contaniers and managed by its kind. That is wy we have multicontainer pods. They share same lifecycle, network, storage and namespace. That mean that they can reffer to each other as 'localhost' and they have access to the same volume storage.
+
+
+Example for multicontainer pod
+
+pod-definition.yaml
+-----------------------------------------------------
+apiVErsion: v1
+kind: Pod
+metadata:
+  name: simple-webapp
+  labels:
+    name: simple-webapp
+spec:
+  contaniners:
+  - name: simple-webapp			# container 1
+    image: simple-webapp
+    ports:
+      - containerPort: 8080
+  - name: log-agent			# contanier 2
+    image: log-agent
+-----------------------------------------------------
+
+
+
+===================================================
+Section 5 118. Practice Test - Multi-Container Pods
+===================================================
+
+1. Identify the number of containers created in the red pod.
+------------------------------------------------------------
+
+List pods
+	terminal --> k get pods
+
+Show info for 'red' pod
+	terminal --> k describe pod red
+
+	# under contaniers we have 3 instances - apple, wine and scarlet
+
+- choose '3' as answer
+
+
+
+2. Identify the name of the containers running in the blue pod.
+---------------------------------------------------------------
+
+Show info for 'blue' pod
+	terminal --> k describe pod blue
+
+	# under contaniers we have 2 instances - teal and navy
+
+- choose 'teal & navy' as answer
+
+
+
+
+3. Create a multi-container pod with 2 containers.
+--------------------------------------------------
+Use the spec given below:
+
+If the pod goes into the crashloopbackoff then add the command sleep 1000 in the lemon container.
+
+Name: yellow
+Container 1 Name: lemon
+Container 1 Image: busybox
+Container 2 Name: gold
+Container 2 Image: redis
+
+Create the pod template configuration file & save it in yellow.yaml
+	terminal --> k run yellow --image=busybox --dry-run=client -o yaml > yellow.yaml
+
+	# k 					- common kubernetes command
+	# run					- start pod
+	# yellow				- name of the pod
+	# --image=busybox			- image of the pod
+	# --dry-run=client			- do not create the object (test run the pod)
+	# -o yaml				- set yaml output format
+	# > yellow.yaml				- save output in yallow.yaml file
+
+
+Edit the file
+	terminal --> vi yellow.yaml
+
+yellow.yaml
+---------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: yellow
+  name: yellow
+spec:
+  containers:
+  - image: busybox
+    name: lemon				# change to lemon
+    resources: {}
+    command: [ "sleep", "1000" ]	# add command sleep 1000
+  - name: gold				# add second container with name gold
+    image: redis			# set second container image as redis
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always
+status: {}
+---------------------------------
+save changes - escape, :wq!, enter
+
+Verify chnages
+	terminal --> cat yellow.yaml
+
+Create the pod 
+	terminal --> k create -f yellow.yaml
+
+Verify pod creation
+	terminal --> k describe pod yellow
+
+- click Çheck'button
+
+
+
+4. We have deployed an application logging stack in the elastic-stack namespace. Inspect it.
+--------------------------------------------------------------------------------------------
+Before proceeding with the next set of questions, please wait for all the pods in the elastic-stack namespace to be ready. This can take a few minutes.
+
+Show pods in 'elastic-stack' namespace
+	terminal --> k get pods -n elastic-stack
+
+	# we have 3 pods - app, elastic-search and kibana
+
+- click 'Ok' button
+
+
+
+5. Once the pod is in a ready state, inspect the Kibana UI using the link above your terminal. There shouldn't be any logs for now.
+---------------------------------------------------------------------------------------------------------
+We will configure a sidecar container for the application to send logs to Elastic Search.
+
+NOTE: It can take a couple of minutes for the Kibana UI to be ready after the Kibana pod is ready.
+
+You can inspect the Kibana logs by running:
+
+kubectl -n elastic-stack logs kibana
+
+Click on 'Kibana' tab above top right corner of the console and see the dashboard
+
+We can inspect 'Kibana' logs
+	terminal --> kubectl -n elastic-stack logs kibana
+
+Click on 'Elastic Search' tab above top right corner of the console and see current logs
+
+- click 'Ok' button
+
+
+6. Inspect the app pod and identify the number of containers in it.
+-------------------------------------------------------------------
+It is deployed in the elastic-stack namespace.
+
+Show details about 'app' pod in elastic-stack namespace
+	terminal --> k describe pod app -n elastic-stack
+
+	# we can see only one container
+
+- choose '1' as answer
+
+
+7. The application outputs logs to the file /log/app.log. View the logs and try to identify the user having issues with Login.
+------------------------------------------------------------------------------------------------------------------------------
+Inspect the log file inside the pod.
+
+See the logs entering the pod and print them
+	terminal --> k -n elastic-stack exec -it app -- cat /log/app/log
+
+	# k						- common kubernetes command
+	# -n elastic-stack				- elastic-stack namespace
+	# exec						- execute command
+	# -it						- interactive mode (enter the pod)
+	# -- cat /log/app/log				- print the file in the pod location
+
+OR 
+
+Show logs outside the pod
+	terminal --> k logs app -n elastic-stack
+
+	# we can see 'WARNING in event-simulator: USER5 Failed to Login as the account is locked due to MANY FAILED ATTEMPTS.'
+
+- choose 'USER5' as answer
+
+
+
+8. Edit the pod in the elastic-stack namespace to add a sidecar container to send logs to Elastic Search. Mount the log volume to the sidecar container.
+----------------------------------------------------------------------------------------------
+Only add a new container. Do not modify anything else. Use the spec provided below.
+
+Note: State persistence concepts are discussed in detail later in this course. For now please make use of the below documentation link for updating the concerning pod.
+
+https://kubernetes.io/docs/tasks/access-application-cluster/communicate-containers-same-pod-shared-volume/
+
+Name: app
+Container Name: sidecar
+Container Image: kodekloud/filebeat-configured
+Volume Mount: log-volume
+Mount Path: /var/log/event-simulator/
+Existing Container Name: app
+Existing Container Image: kodekloud/event-simulator
+
+
+Edit the pod
+	terminal --> k edit pod app -n elastic-stack
+
+
+---------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: "2025-01-11T09:03:03Z"
+  labels:
+    name: app
+  name: app
+  namespace: elastic-stack
+  resourceVersion: "742"
+  uid: 34119bbf-a56f-45cf-b8b7-4fdd59c52195
+spec:
+  containers:
+  - image: kodekloud/filebeat-configured		# added from this line
+    name: sidecar
+    volumeMounts:
+    - mountPath: /var/log/event-simulator/
+      name: log-volume					# to this line
+  - image: kodekloud/event-simulator
+    imagePullPolicy: Always
+    name: app
+    resources: {}
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /log
+      name: log-volume
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-xxtrb
+      readOnly: true
+  dnsPolicy: ClusterFirst
+.....
+---------------------------------------------
+save changes - esxape, :wq!, enter
+Error will appear that we cannot change existing pod
+exit editor - :q!, enter
+
+We receive this message:
+error: pods "app" is invalid
+A copy of your changes has been stored to "/tmp/kubectl-edit-3129749520.yaml"
+error: Edit cancelled, no valid changes were saved.
+
+Use the craeted temporary file to recreate the pod
+	terminal --> k replace --force -f /tmp/kubectl-edit-3129749520.yaml
+
+	# k					- common kubernetes command (kubectl)
+	# replace				- used action
+	# --force				- delete existing pod and recreate it
+	# -f /tmp/kubectl-edit-3129749520.yaml	- use file
+
+Verify pod creation
+	terminal --> k get pods -n elastic-stack
+
+Verify the pod changes. Show details:
+	terminal --> k describe pod app -n elastic-stack
+
+- click 'Çheck' button
+
+
+9. Inspect the Kibana UI. You should now see logs appearing in the Discover section.
+------------------------------------------------------------------------------------
+You might have to wait for a couple of minutes for the logs to populate. You might have to create an index pattern to list the logs. If not sure check this video: https://bit.ly/2EXYdHf
+
+Click on 'Kibana' tab above top right corner of the console and go to 'Discover' section to see the logs
+
+- click 'Ok' button
+
+
+===================================================
+Section 5 120. Multi-Container Pods Design Patterns
+===================================================
+
+Multi-container Pods Design Patterns
+There are 3 common patterns, when it comes to designing multi-container PODs. The first and what we just saw with the logging service example is known as a side car pattern. The others are the adapter and the ambassador pattern.
+
+But these fall under the CKAD curriculum and are not required for the CKA exam. So we will be discuss these in more detail in the CKAD course.
+
+
+
+=============================
+Section 5 121. InitContainers
+=============================
+
+InitContainers
+In a multi-container pod, each container is expected to run a process that stays alive as long as the POD's lifecycle. For example in the multi-container pod that we talked about earlier that has a web application and logging agent, both the containers are expected to stay alive at all times. The process running in the log agent container is expected to stay alive as long as the web application is running. If any of them fails, the POD restarts.
+
+But at times you may want to run a process that runs to completion in a container. For example a process that pulls a code or binary from a repository that will be used by the main web application. That is a task that will be run only  one time when the pod is first created. Or a process that waits  for an external service or database to be up before the actual application starts. That's where initContainers comes in.
+
+An initContainer is configured in a pod like all other containers, except that it is specified inside a initContainers section,  like this:
+
+----------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-pod
+  labels:
+    app: myapp
+spec:
+  containers:
+  - name: myapp-container
+    image: busybox:1.28
+    command: ['sh', '-c', 'echo The app is running! && sleep 3600']
+  initContainers:
+  - name: init-myservice
+    image: busybox
+    command: ['sh', '-c', 'git clone <some-repository-that-will-be-used-by-application> ; done;']
+----------------------------------------------------
+
+
+When a POD is first created the initContainer is run, and the process in the initContainer must run to a completion before the real container hosting the application starts. 
+
+You can configure multiple such initContainers as well, like how we did for multi-containers pod. In that case each init container is run one at a time in sequential order.
+      !---------------------------------!
+
+If any of the initContainers fail to complete, Kubernetes restarts the Pod repeatedly until the Init Container succeeds.
+
+----------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-pod
+  labels:
+    app: myapp
+spec:
+  containers:
+  - name: myapp-container
+    image: busybox:1.28
+    command: ['sh', '-c', 'echo The app is running! && sleep 3600']
+  initContainers:
+  - name: init-myservice
+    image: busybox:1.28
+    command: ['sh', '-c', 'until nslookup myservice; do echo waiting for myservice; sleep 2; done;']
+  - name: init-mydb
+    image: busybox:1.28
+    command: ['sh', '-c', 'until nslookup mydb; do echo waiting for mydb; sleep 2; done;']
+----------------------------------------------------
+
+
+Read more about initContainers here. And try out the upcoming practice test.
+	- https://kubernetes.io/docs/concepts/workloads/pods/init-containers/
+
+
+
+=============================================
+Section 5 122. Practice Test - InitContainers
+=============================================
+
+1. Identify the pod that has an initContainer configured.
+---------------------------------------------------------
+
+List pods 
+	terminal --> k get pods
+
+	# we can see 'green' pod have 2 containers in it
+	# result: 'green   2/2     Running   0          33s'
+	# so we expect this container to be with InitContainer in it
+
+Show details of all pods 
+	terminal --> k describe pod
+
+	# we can see that actually pod 'blue' have InitContainer in it.
+
+- choose 'blue' as answer
+
+
+2. What is the image used by the initContainer on the blue pod?
+---------------------------------------------------------------
+
+Show details about 'blue' pod
+	terminal --> k describe pod blue
+
+	We can see in the section InitContainer / Image: busybox
+
+- choose 'busybox' as answer
+
+
+3. What is the state of the initContainer on pod blue?
+------------------------------------------------------
+
+Show details about 'blue' pod
+	terminal --> k describe pod blue
+
+	# we can see in section InitContaimer / State: Terminated
+
+- choose 'Terminated' as answer
+
+
+4. Why is the initContainer terminated? What is the reason?
+-----------------------------------------------------------
+
+Show details about 'blue' pod
+	terminal --> k describe pod blue
+
+	# we can see in section InitContaimer / Reason: Completed
+
+- choose 'The process completed successfully' as answer
+
+
+5. We just created a new app named purple. How many initContainers does it have?
+--------------------------------------------------------------------------------
+
+List pods
+	terminal --> k get pods
+
+Show details of pod purple
+	terminal --> k describe pod purple
+
+	# we can see 2 entities under InitContaiers
+
+- choose '2' as answer
+
+
+
+6. What is the state of the POD?
+--------------------------------
+
+Show details of pod purple
+	terminal --> k describe pod purple
+
+	# we can see Status Pending
+
+- choose 'Pending' as answer
+
+
+7. How long after the creation of the POD will the application come up and be available to users?
+-------------------------------------------------------------------------------------------------
+
+Show details of pod purple
+	terminal --> k describe pod purple
+
+	# we can see that the commands of hhe two InitContainers are sleep 600 and sleep 1200, combined sleep 1800
+	# 1800 / 60 = 30 minutes
+
+- choose '30 minutes' as answer
+
+
+8. Update the pod red to use an initContainer that uses the busybox image and sleeps for 20 seconds
+---------------------------------------------------------------------------------------------------
+Delete and re-create the pod if necessary. But make sure no other configurations change.
+
+Edit the 'red' pod
+	terminal --> k edit pod red
+
+----------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: "2025-01-11T10:03:33Z"
+  name: red
+  namespace: default
+  resourceVersion: "836"
+  uid: 0ce3d3f6-eb53-4624-976a-69b3119084da
+spec:
+  initContainers:				# added from this line
+  - image: busybox
+    name: busybox
+    command: [ "sleep", "20" ]			# to this line
+  containers:
+  - command:
+    - sh
+    - -c
+    - echo The app is running! && sleep 3600
+    image: busybox:1.28
+    imagePullPolicy: IfNotPresent
+----------------------------------------------------
+save changes - esxape, :wq!, enter
+Error will appear that we cannot change existing pod
+exit editor - :q!, enter
+
+We receive this message:
+error: pods "red" is invalid
+A copy of your changes has been stored to "/tmp/kubectl-edit-2777576492.yaml"
+error: Edit cancelled, no valid changes were saved.
+
+Use the craeted temporary file to recreate the pod
+	terminal --> k replace --force -f /tmp/kubectl-edit-2777576492.yaml
+
+	# k					- common kubernetes command (kubectl)
+	# replace				- used action
+	# --force				- delete existing pod and recreate it
+	# -f /tmp/kubectl-edit-2777576492.yaml	- use file
+
+Verify pod creation
+	terminal --> k get pods
+
+Verify the pod configuration
+	terminal --> k describe pod red
+
+- click 'Check' button
+
+
+
+9. A new application orange is deployed. There is something wrong with it. Identify and fix the issue.
+------------------------------------------------------------------------------------------------------
+Once fixed, wait for the application to run before checking solution.
+
+List pods
+	terminal --> k get pods
+
+	# we can see pod 'orange' with status 'Init:CrashLoopBackOff'
+
+Show details of pod 'orange'
+	terminal --> k describe pod orange
+
+	# we can see that in section initContainers / init-myservice / Dommand / we have 'sleeeep 2'
+	# syntax of the command is wrong
+
+We can show log specifically fro init container
+	terminal --> k logs orange -c init-myservice
+
+	# result: sh: sleeeep: not found
+	# wrong command syntax
+
+Edit the pod and fix the command
+	terminal --> k edit pod orange
+
+----------------------------------------------------
+...
+  initContainers:
+  - command:
+    - sh
+    - -c
+    - sleep 2;		# fix the command 
+    image: busybox
+...
+----------------------------------------------------
+save changes - esxape, :wq!, enter
+Error will appear that we cannot change existing pod
+exit editor - :q!, enter
+
+We receive this message:
+error: pods "orange" is invalid
+A copy of your changes has been stored to "/tmp/kubectl-edit-116032954.yaml"
+error: Edit cancelled, no valid changes were saved.
+
+Use the craeted temporary file to recreate the pod
+	terminal --> k replace --force -f /tmp/kubectl-edit-116032954.yaml
+
+	# k					- common kubernetes command (kubectl)
+	# replace				- used action
+	# --force				- delete existing pod and recreate it
+	# -f /tmp/kubectl-edit-116032954.yaml	- use file
+
+Verify pod creation
+	terminal --> k get pods
+
+Verify the pod configuration
+	terminal --> k describe pod orange
+
+- click 'Check' button
+
+
+
+
+========================================
+Section 5 124. Lelf Healing Applications
+========================================
+
+Kubernetes supports self-healing applications through ReplicaSets and Replication Controllers. The replication controller helps in ensuring that a POD is re-created automatically when the application within the POD crashes. It helps in ensuring enough replicas of the application are running at all times.
+
+Kubernetes provides additional support to check the health of applications running within PODs and take necessary actions through Liveness and Readiness Probes. However these are not required for the CKA exam and as such they are not covered here. These are topics for the Certified Kubernetes Application Developers (CKAD) exam and are covered in the CKAD course.
+
+
+
+
+
+
+
+
+
+
+
+
+

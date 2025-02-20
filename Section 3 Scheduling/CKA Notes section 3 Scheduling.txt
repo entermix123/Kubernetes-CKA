@@ -1,0 +1,3526 @@
+CONTENT
+
+Section 3 53. Manual Scheduling
+Section 3 55. Practice Test - Manual Scheduling
+Section 3 56. Labels and Selectors
+Section 3 58. Practice Test - Labels and Selectors
+Section 3 59. Taints and Tolerations
+Section 3 61. Practice Test - Taints and Tolerations
+Section 3 62. Node Selectors
+Section 3 63. Node Affinity
+Section 3 65. Practice Test - Node Affinity
+Section 3 66. Taints and Tolerations vs Node Affinity
+Section 3 67. Resource Requirements and Limits
+Section 3 68. A quick note on editing Pods and Deployments
+Section 3 70. Practice Test - Resource Limits
+Section 3 71. DaemonSets
+Section 3 73. Practice Test - DaemonSets
+Section 3 74. Static Pods
+Section 3 76. Practice Test - Static Pods
+Section 3 77. Multiple Schedulers
+Section 3 79. Practice Test - Multiple Schedulers
+Section 3 80. Scheduler Profile
+Section 3 81. References
+Section 3 82. 2025 Admission Controller
+Section 3 83. 2025 Admission Controller - Practice Test
+Section 3 84. 2025 Validating and Mutating Admission Controllers
+Section 3 84. 2025 Validating and Mutating Admission Controllers - Practice Test
+
+
+
+===============================
+Section 3 53. Manual Scheduling
+===============================
+
+How a shceduler work at the back-end?
+-------------------------------------
+
+Every Pod definition file have 'nodeName' field that by default is not set. 
+
+pod-definition.yml
+------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+  labels:
+      app: myapp
+spec:
+  containers:		
+    - name: nginx
+      image: nginx		
+      ports:
+      - containerPort:8080
+
+  nodeName:					# This field
+------------------------------------------
+
+If this field is not set, the Pod stay in pending state.
+
+The scheduler find Pods with default 'nodeName' field and set it to as the name of the node, creating a binding object (Pod to Node).
+
+If there is no shceduler we have to set Pods 'nodeName' field to as the name of the Node manually to create a connection between them. We can specify 'nodeName' field only on creation time. Kubernetes will not allow us to change this field of already existing Pod. In this case we can create a binding object and send a POST request to the Pod's binding API  with data converted to JSON foramt.
+
+Pod-bind-definition.yml
+------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+target:
+  apiVersion: v1
+  kind: Node
+  name: node02
+------------------------------------------
+
+Sending POST request
+	terminal --> curl --header "Content-Type:application/json" --request POST --data '{"apiVersion: "v1", "kind": "Binding" ..."}' https://$SERVER/api/v1/namespaces/default/pods/$PODNAME/binding/
+
+
+
+
+
+===============================================
+Section 3 55. Practice Test - Manual Scheduling
+===============================================
+
+
+1. A pod definition file nginx.yaml is given. Create a pod using the file.
+--------------------------------------------------------------------------
+Only create the POD for now. We will inspect its status next.
+
+Explore the environment
+	terminal --> kubectl get nodes
+
+List current directory
+	terminal --> ls
+
+Print nginx.yml
+	terminal --> cat nginx.yaml
+
+Create a pod with nginx.yaml file
+	terminal --> kubectl create -f nginx.yaml
+
+- click 'Check' button
+
+
+
+2. What is the status of the created POD?
+-----------------------------------------
+
+Show Pods status
+	terminal --> kubect get pods
+	or
+	terminal --> kubectl describe pod nginx
+
+	# we can see filed 'Status': Pending
+
+- choose 'Pending' as answer
+
+
+3. Why is the POD in a pending state?
+-------------------------------------
+Inspect the environment for various kubernetes control plane components.
+
+
+Show scheduler pod
+	terminal --> kubectl get pods -n kube-system
+
+	# kubectl				- common kubernetes command
+	# get					- used action
+	# pods					- kind object
+	# -n kube-system			- system namespace
+
+We can see that there is not existing scheduler pod
+
+- choose 'No Scheduler Present' as answer
+
+
+
+4. Manually schedule the pod on node01.
+---------------------------------------
+Delete and recreate the POD if necessary.
+
+We can edit pod-definition file and apply the changes
+
+Edit pod definition file
+	terminal --> vi nginx.yaml
+
+nginx.yaml
+------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+  -  name: nginx
+     image: nginx
+  nodeNmae: node01				# added
+------------------------------------------
+save changes - escape, :wq!, enter
+
+Show pod's state
+	terminal --> kubectl get pods --watch		# --watch - continuously update status
+
+Recreate the pod
+	terminal --> kubectl replace --force -f nginx.yaml
+
+- click 'Check' button
+
+
+
+5. Now schedule the same pod on the controlplane node.
+------------------------------------------------------
+Delete and recreate the POD if necessary.
+
+We CANNOT move container (running process) from one node to another. We must delete existing pod from one Node and  recreate it to another Node.
+
+Edit pod definition file
+	terminal --> vi nginx.yaml
+
+nginx.yaml
+------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+  -  image: nginx
+     name: nginx
+  nodeNmae: controlplane				# change Node
+------------------------------------------
+save changes - escape, :wq!, enter
+
+Recreate the pod
+	terminal --> kubectl replace --force -f nginx.yaml
+
+Show pod's state
+	terminal --> kubectl get pods --watch		# --watch - continuously update status
+	or
+	terminal --> kubectl get pods -o wide		# -o wide - show more infomration
+
+- click 'Check' button
+
+
+
+==================================
+Section 3 56. Labels and Selectors
+==================================
+
+Labels and Selectors give us the possibility to filter object by different criteria.
+
+Labels are properties of every objects.
+Selectors are the criteria we are filtering on.
+
+example for pod-definition.yaml file
+------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-webapp
+  labels:
+    app: App1
+    funtion: Front-End
+
+spec:
+  containers:
+  -  name: simple-webapp
+     image: simple-webapp
+     ports:
+     - containerPort: 8080
+------------------------------------------
+
+Show pod filtered with selector
+	terminal --> kubectl get pods --selector app=App1
+
+
+
+
+example for replicaset-definition.yaml file
+------------------------------------------
+apiVersion: v1
+kind: ReplicaSet
+metadata:
+  name: simple-webapp
+  labels:
+    app: App1
+    funtion: Front-End
+
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: App1			# this label have to match with template laabel
+  template:
+    metadata:
+      labels:
+        app: App1		# this labels have to cmatch with matchLabel
+	function: Front-end
+    spec:
+      containers:
+      - name: simple-webapp
+        image: simple-webapp
+------------------------------------------
+
+Only if 2 labels in soec match, replicaset is created succeffully. 
+
+
+
+example for service-definition.yaml file
+----------------------------------------
+
+service-definition.yaml file
+------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-service
+spec:
+  selector:
+    app: App1		# this label must match replicaset template label
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 9376
+------------------------------------------
+
+
+
+
+
+Annotations - are used for additionla information and interpretation purposes
+-----------
+
+
+replicaset-definition.yaml
+------------------------------------------
+apiVersion: v1
+kind: ReplicaSet
+metadata:
+  name: simple-webapp
+  labels:
+    app: App1
+    funtion: Front-End
+  annotation: 1.34	# annotation information
+
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: App1			
+  template:
+    metadata:
+      labels:
+        app: App1		
+	function: Front-end
+    spec:
+      containers:
+      - name: simple-webapp
+        image: simple-webapp
+------------------------------------------
+
+
+
+
+
+==================================================
+Section 3 58. Practice Test - Labels and Selectors
+==================================================
+
+
+1. We have deployed a number of PODs. They are labelled with tier, env and bu. How many PODs exist in the dev environment (env)?
+------------------
+Use selectors to filter the output
+
+Show all object (pods) in dev environment
+	terminal --> kubectl get all --selector env=prod --no-headers
+
+	# kubectl				- common kubernetes command
+	# get					- used action
+	# all					- object kind
+	# --selector env=prod			- set selector for environment
+	# --no-headers				- exclude headers of the result table
+
+Show count of all filtered objects
+	terminal --> kubectl get all --selector env=prod --no-headers | wc -l
+
+	# kubectl				- common kubernetes command
+	# get					- used action
+	# all					- object kind
+	# --selector env=prod			- set selector for environment
+	# --no-headers				- exclude headers of the result table
+	# | wc -l				- show count of lines in the result
+
+- choose '7' as answer
+
+
+
+2. How many PODs are in the finance business unit (bu)?
+-------------------------------------------------------
+
+Show pods in bu finance
+	terminal --> kubectl get pods --selector bu=finance
+
+	# kubectl				- common kubernetes command
+	# get					- used action
+	# pods					- object kind
+	# --selector bu=finance			- set selector for business unit
+
+
+Show count
+	terminal --> kubectl get pods --selector bu=finance --no-headers | wc -l
+
+	# kubectl				- common kubernetes command
+	# get					- used action
+	# pods					- object kind
+	# --selector bu=finance			- set selector for environment
+	# --no-headers				- exclude headers of the result table
+	# | wc -l				- show count of lines in the result
+
+- choose '6' as answer
+
+
+3. How many objects are in the prod environment including PODs, ReplicaSets and any other objects?
+--------------------------------------------------------------------------------------------------
+
+Show all object in prod environment
+	terminal --> kubectl get all --selector env=prod --no-headers | wc -l
+
+	# kubectl				- common kubernetes command
+	# get					- used action
+	# all					- object kind
+	# --selector env=prod			- set selector for environment
+	# --no-headers				- exclude headers of the result table
+	# | wc -l				- show count of lines in the result
+
+- choose '7' as answer
+
+
+
+4. Identify the POD which is part of the prod environment, the finance BU and of frontend tier?
+-----------------------------------------------------------------------------------------------
+
+Show the pod in prod environment, finance bu and frontend tier
+	terminal --> kubectl get pods --selector env=prod,bu=finance,tier=frontend
+
+	# kubectl				- common kubernetes command
+	# get					- used action
+	# all					- object kind
+	# --selector 				- selector
+	# env=prod				- env=rpod selector
+	# bu=finance				- bu=finance selector
+	# tier=frontend				- tier-frontend selector
+
+- choose 'app-1-zzxdf' as answer
+
+
+
+5. A ReplicaSet definition file is given replicaset-definition-1.yaml. Attempt to create the replicaset; you will encounter an issue with the file. Try to fix it.
+------------------------------------------------
+Once you fix the issue, create the replicaset from the definition file.
+
+
+Print replicaset-definition-1.yaml
+	terminal --> cat replicaset-definition-1.yaml
+
+Try to create replicaset
+	terminal --> kubectl create -f replicaset-definition-1.yaml
+
+We receive this error: "The ReplicaSet "replicaset-1" is invalid: spec.template.metadata.labels: Invalid value: map[string]string{"tier":"nginx"}: `selector` does not match template `labels`"
+
+Edit and fix the replicaset-definition-1.yaml file
+	terminal --> vi replicaset-definition-1.yaml
+
+replicaset-definition-1.yaml
+-----------------------------------
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+   name: replicaset-1
+spec:
+   replicas: 2
+   selector:
+      matchLabels:
+        tier: front-end
+   template:
+     metadata:
+       labels:
+        tier: front-end			# changed from 'nginx' to 'front-end'
+     spec:
+       containers:
+       - name: nginx
+         image: nginx
+-----------------------------------
+save changes - escape, :wq!, enter
+
+Create replicaset
+	terminal --> kubectl create -f replicaset-definition-1.yaml
+
+Verify creation of the replicaset
+	terminal --> kubectl get rs
+
+
+- click 'Check' as answer
+
+
+
+
+====================================
+Section 3 59. Taints and Tolerations
+====================================
+
+Taint is restriction option that prevent pods to be created on a specific Node except pods with that taint toleration. By default Pods have no set tolerations. So every time we create taint on a node we have to add tolerations on the pods we plan to create on this Node.
+
+Description of the command to set taint to Node
+	terminal --> kubectl taint nodes node-name key-value:taint-effect
+
+There are 3 taint -effects
+	1. NoSchedule 			- restrict creating pods
+	2. PreferNoSchedule		- system will try not to create pods on this node
+	3. NoExecute			- no new pods will be created on the Node and if any existing pods do not 					  olerate the taint will be evicted (removed)
+
+Taints and tolerations DO NOT set Pods only in specific Nodes, but set restriction with Pods can be created in specific Node.
+ If we want to set specific Pods to specific Nodes we can use 'affinity', that we will go over later.
+
+Set taint to Node
+	terminal --> kubectl taint nodes node01 app=blue:NoSchedule
+
+	# kubectl 			- common kubernetes command
+	# taint				- used action
+	# nodes node01			- type object and its name
+	# app=blue:NoSchedule		- app name and taint-effect
+
+
+Set toleration in pod-definition.yml file
+
+pod-definition.yml
+------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-pod
+spec:
+  containers:
+  -  name: nginx-container
+     image: nginx
+  tolerations:
+    - key: "app"
+      operator: "Equal"
+      value: "blue"
+      effect: "NoSchedule"
+------------------------------------------
+
+
+INFO:
+Master Node have taint: NoSchedule to prevent deployment of any Pods except required.
+
+We can see the master Node taints with
+	terminal --> kubectl describe node kubemaster | grep Taint
+
+	# see 'Taint: node-role.kubernetes.io/master:NoSchedule'
+
+
+====================================================
+Section 3 61. Practice Test - Taints and Tolerations
+====================================================
+
+
+1. How many nodes exist on the system?
+--------------------------------------
+Including the controlplane node.
+
+Show all Nodes
+	terminal --> kubectl get nodes
+
+- choose '2' as answer
+
+
+
+2. Do any taints exist on node01 node?
+--------------------------------------
+
+Show taints
+	terminal --> kubectl describe node node01 | grep Taint
+
+- choose 'No' as answer
+
+
+
+3. Create a taint on node01 with key of spray, value of mortein and effect of NoSchedule
+----------------------------------------------------------------------------------------
+
+Show Taint help commands
+	terminal --> kubectl taint --help
+
+# First example:
+  # Update node 'foo' with a taint with key 'dedicated' and value 'special-user' and effect 'NoSchedule'
+  # If a taint with that key and effect already exists, its value is replaced as specified
+  kubectl taint nodes foo dedicated=special-user:NoSchedule
+
+
+Create taint
+	terminal --> kubectl taint node node01 spray=mortein:NoSchedule
+
+	# kubectl 				- common kubernetes command
+	# taint 				- action used
+	# node					- type object
+	# node01				- name of the target object
+	# spray=mortein:NoSchedule		- describe taint
+
+Verify created taint
+	terminal --> kubectl describe node node01 | grep Taint
+
+- click 'Check' button
+
+
+
+4. Create a new pod with the nginx image and pod name as mosquito.
+------------------------------------------------------------------
+
+Start pod
+	terminal --> kubectl run mosquito --image=nginx
+
+	# kubectl 				- common kubernetes command
+	# run 					- start pod
+	# mosquito				- name of the pod
+	# --image=nginx				- used image
+
+Check creation of the pod
+	terminal --> kubectl get pods
+
+- click 'Check' button
+
+
+
+5. What is the state of the POD?
+--------------------------------
+
+Show pods
+	terminal --> kubectl get pods
+
+- choose 'Pending' as answer
+
+
+
+6. Why do you think the pod is in a pending state?
+--------------------------------------------------
+
+Show information of the pod mosquito
+	terminal --> kubectl describe pod mosquito
+
+We have message - "Warning  FailedScheduling  2m24s  default-scheduler  0/2 nodes are available: 1 node(s) had untolerated taint {node-role.kubernetes.io/control-plane: }, 1 node(s) had untolerated taint {spray: mortein}. preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling."
+
+- choose 'POD Mosquito cannot tolerate taint Mortein' as answer
+
+
+
+7. Create another pod named bee with the nginx image, which has a toleration set to the taint mortein.
+------------------------------------------------------------------------------------------------------
+
+generate pod definition file with toleration to Mortein
+	terminal --> kubectl run bee --image=nginx --dry-run=client -o yaml > bee.yaml
+
+	# kubectl 				- common kubernetes command
+	# run 					- start pod
+	# bee					- name of the pod
+	# --image=nginx				- used image
+	# --dry-run=client			- generate file
+	# -o yaml				- set output format yaml
+	# > be..yaml				- set output file 
+
+
+Print the file 
+	terminal --> cat bee.yaml
+
+Edit the file bee.yaml
+	terminal --> vi bee.yaml
+
+We can check syntax on https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+
+bee.yaml
+-----------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: bee
+  name: bee
+spec:
+  containers:
+  - image: nginx
+    name: bee
+    resources: {}
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always
+  tolerations:			# added section
+      - key: spray
+        operator: Equal
+        value: mortein
+        effect: NoSchedule
+status: {}
+-----------------------------
+save changes - escape, :wq!, enter
+
+
+Create pod
+	terminal --> kubectl create -f bee.yaml
+
+Show ccreated pod status
+	tterminal --> kubectl get pods --watch
+
+
+
+- click 'Check' button
+
+
+8. Notice the bee pod was scheduled on node node01 despite the taint.
+---------------------------------------------------------------------
+
+Show pod info
+	terminal --> kubectl get pods -o wide
+
+We can seethat the bee pod is now on node01
+
+- click 'Ok' button
+
+
+
+9. Do you see any taints on controlplane node?
+----------------------------------------------
+
+Show taint info of controlplane node
+	terminal --> kubectl describe node controlplane | grep Taint
+
+- choose 'Yes-NoSchedule' as answer
+
+
+
+10. Remove the taint on controlplane, which currently has the taint effect of NoSchedule.
+-----------------------------------------------------------------------------------------
+
+Remove the taint node-role.kubernetes.io/control-plane:NoSchedule
+	terminal --> kubectl taint node controlplane node-role.kubernetes.io/control-plane:NoSchedule-
+
+	# kubectl 						- common kubernetes command
+	# taint 						- used action
+	# node							- type object
+	# controlplane						- object name
+	# node-role.kubernetes.io/control-plane:NoSchedule-	- target taint with '-' for delete
+
+Show taint info of controlplane node
+	terminal --> kubectl describe node controlplane | grep Taint
+
+- click 'Check' button
+
+
+
+11. What is the state of the pod mosquito now?
+----------------------------------------------
+
+Check status
+	terminal --> kubectl get pods
+
+We can see that the 'mosquito' pod have state 'running'
+
+- choose 'Running' as answer
+
+
+
+12. Which node is the POD mosquito on now?
+------------------------------------------
+
+Show all objects
+	terminal --> kubectl get pods -A -o wide
+
+- choose 'controlplane' as answer
+
+
+
+
+============================
+Section 3 62. Node Selectors
+============================
+
+How to set pods to run on a specific Node?
+------------------------------------------
+
+Option 1 - With Node selectors - simpiest and easiest 
+========
+
+Label a Node and assign the pod to the Node, specifying node label in the pod-definition.yaml file
+
+
+How to label a Node?
+--------------------
+	terminal --> kubectl label nodes <node-name> <label-key>=<label-value>
+	terminal --> kubectl label nodes node-1 size=Large
+
+
+pod-definition.yaml
+-----------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-pod
+spec:
+  containers:
+  - name: data-processor
+    image: data-processor
+  nodeSelector:			# this match with Node label
+    size: Large
+-----------------------------
+
+Create the pod
+	terminal --> kubectl create -f pod-definition.yaml
+
+
+We cannot set complex selector configuraions, so most advanced concept is to use affinity.
+
+
+
+
+===========================
+Section 3 63. Node Affinity
+===========================
+
+The goal is to ensure that specific Pods are hosted on particular Nodes
+
+Setting the affinity in pod-definition.yaml file
+
+pod-definition.yaml
+-----------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-pod
+spec:
+  containers:
+  - name: data-processor
+    image: data-processor
+
+  affinity:						# affinity configuration
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+	nodeSelectorTerms:
+	- matchExpressions:
+	  - key: size		# in case of 'Exists' operator, the system checks only if key 'size' exists, no need of values	
+	    operator: In	# specify the logic operator. Can be 'Notin', 'Exists'	
+	    values:		# specify the labels of the nodes that can host this pod
+	    - Large		# in case of 'Notin' operator, we specify exclusions like '- Small'
+	    - Medium		
+-----------------------------
+
+
+There are 2 few types of node affinities:
+
+Available:
+	- requiredDuringSchedulingIgnoredDuringExecution:
+	- prefferedDuringSchedulingIgnoredDuringExecution:
+
+Planned:
+	- requiredDuringSchedulingRequiredDuringExecution:
+
+There are 2 states of a lifecycle of a Pod
+
+- DuringScheduling - where the pod do not exist and is created for the first time
+================== - when the pod is defined, the affinity rules ensure that the pod will be hosted on the right Node
+
+# Required - shceduler will mandate that the pod is placed on Node with the given affinity rule
+---------- - if node with this the specified label is not found the pod will not be shceduled
+	   - this option is used for importatnt (crutial) pods. They will not be operationg unless on the right node
+
+# Preffered - if node with specified affinity is not found, the scheduler will ignore affinities place the pod on available node
+----------- - this option is used for not crutial pods that can operate on different nodes 
+
+
+- DuringExecution - where the pod is running, change is made to the environment and affects tha affinity (change of node label)
+=================
+
+The only available option is 'Ignored', where the pod is not affected by changes
+
+New planned state is 'Required'
+
+# Required - when node label is changed, pod runing on the node will be evicted (removed)
+----------
+
+
+
+
+===========================================
+Section 3 65. Practice Test - Node Affinity
+===========================================
+
+
+1. How many Labels exist on node node01?
+----------------------------------------
+
+Show information for node01
+	terminal --> kubectl describe node node01
+
+- choose '5' as answer
+
+
+
+2. What is the value set to the label key beta.kubernetes.io/arch on node01?
+----------------------------------------------------------------------------
+
+Show information for node01
+	terminal --> kubectl describe node node01
+
+- choose 'amd64' as answer
+
+
+
+3. Apply a label color=blue to node node01
+------------------------------------------
+
+Show help commands for label
+	terminal --> kubectl label --help
+
+Apply label to node01
+	terminal --> kubectl label node node01 color=blue
+
+	# kubectl 				- common kubernetes command
+	# label					- used action
+	# node					- type object
+	# node01				- object name
+	# color=blue				- key-value pair for label
+
+Verify that the label is added
+	terminal --> kubectl describe node node01
+
+- click 'Check' button
+
+
+
+4. Create a new deployment named blue with the nginx image and 3 replicas.
+--------------------------------------------------------------------------
+
+create deployment
+	terminal --> kubectl create deployment blue --image=nginx --replicas=3
+
+	# kubectl 				- common kubernetes command
+	# create				- used action
+	# deployment				- type object
+	# blue					- object name
+	# --image=nginx				- image used
+	# --replicas=3				- number of replicas
+
+- click 'Check' button
+
+
+
+5. Which nodes can the pods for the blue deployment be placed on?
+-----------------------------------------------------------------
+Make sure to check taints on both nodes!
+
+
+Check taints for node01
+	terminal --> kubectl describe node node01 | grep Taints
+
+	# no taints on node01
+
+Check taints for controlplane
+	terminal --> kubectl describe node controlplane | grep Taints
+
+	# no taints on controlplane
+
+- choose 'controlplane and node01' as answer
+
+
+
+6. Set Node Affinity to the deployment to place the pods on node01 only.
+------------------------------------------------------------------------
+
+Edit deployment blue
+	terminal --> kubectl edit deployment blue
+
+We can check affinity synatx on https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes-using-node-affinity/
+
+------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+  creationTimestamp: "2025-01-07T09:18:00Z"
+  generation: 1
+  labels:
+    app: blue
+  name: blue
+  namespace: default
+  resourceVersion: "1531"
+  uid: d17ef107-b6f6-4fc0-b26f-f0523cb44d56
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 3
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: blue
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: blue
+    spec:
+      affinity:							# added affinity configuration from here
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: color					# set color as key
+                operator: In
+                values:
+                - blue						# to here, set value as blue
+      containers:
+      - image: nginx
+        imagePullPolicy: Always
+        name: nginx
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 3
+  conditions:
+  - lastTransitionTime: "2025-01-07T09:18:06Z"
+    lastUpdateTime: "2025-01-07T09:18:06Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2025-01-07T09:18:00Z"
+    lastUpdateTime: "2025-01-07T09:18:06Z"
+    message: ReplicaSet "blue-6dc9b889f5" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 1
+  readyReplicas: 3
+  replicas: 3
+  updatedReplicas: 3
+------------------------------------------------------
+save changes - escape, :wq!, enter
+
+
+- click 'Check' button
+
+
+
+
+7. Which nodes are the pods placed on now?
+------------------------------------------
+
+List pods in wide foramt
+	terminal --> kubectl get pods -o wide
+
+- choose 'node01' as answer
+
+
+
+8. Create a new deployment named red with the nginx image and 2 replicas, and ensure it gets placed on the controlplane node only.
+----------------------------------------------------------------------------------------------------------------------------------
+Use the label key - node-role.kubernetes.io/control-plane - which is already set on the controlplane node.
+
+
+Show labels for controlplane node
+	terminal --> kubectl describe node controlplane
+
+# under 'Labels' we have empty key 'node-role.kubernetes.io/control-plane='
+# we have to assign the deployment on the node with this kay
+
+Create deployment
+	terminal --> kubectl create deployment red --image=nginx --replicas=2 --dry-run=client -o yaml > red.yaml
+
+print the file
+	terminal --> cat red.yaml
+
+Add the affinity rule to red.yaml file
+	terminal --> vi red.yaml
+
+red.yaml
+------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: red
+  name: red
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: red
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: red
+    spec:
+      affinity:
+         nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+              - matchExpressions:
+                - key: node-role.kubernetes.io/control-plane
+                  operator: Exists
+      containers:
+      - image: nginx
+        name: nginx
+        resources: {}
+status: {}
+------------------------------------------------------
+save changes - excape, :wq!, enter
+
+Create the deployment
+	terminal --> kubectl create -f red.yaml
+
+List pods
+	terminal --> kubectl get pods -o wide
+
+- click 'Check' button
+
+
+
+=====================================================
+Section 3 66. Taints and Tolerations vs Node Affinity
+=====================================================
+
+Taints and tolerations do not guarantee that the tolerant pods will be hosted on tainted nodes only!
+
+Affinity do not gurantee that no other pods except assigned will be hosted on the same nodes!
+
+The solution to guarantee specific pods will be hosted to specific nodes is to use taints, tolerations and affinity rules combined!
+
+	- Set Taints to the Nodes to gurantee that only tolerant pods will be hosted
+	- Set tolerations to pods to guarantee that the pods can be hosted on the 
+	- Set Affinity rules to pods to gurantee that the pods will not be hosted on other nodes except choosen ones
+
+
+
+==============================================
+Section 3 67. Resource Requirements and Limits
+==============================================
+
+Scheduler is responsible for choosing the most appropriate node to host new pod
+	- chooses the node with most free resources
+	- if there is no node woth required resources, it set the node in pending state and do not host it.
+
+Every pod has a resource requirements section in the definition file
+
+pod-definition.yml
+------------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-webapp-color
+  labels:
+    name: simple-webapp-color
+spec:
+  containers:
+    - name: simple-webapp-color
+      image: simple-webapp-color
+      ports:
+      - containerPort: 8080
+
+      resources:
+	requests:
+	  memory: "4Gi"
+	  cpu: 2
+------------------------------------------------------
+
+
+CPU
+===
+'cpu' can be expressed in lower limit as 
+	- 0.1 or 100m (m - mili)
+	or
+	- 1m
+
+1CPU = 1 AWS vCPU or 1 GCP Core or 1 Azure Core or 1 hyperthread
+
+
+Memory
+======
+
+Memory can be expressed as 
+	- 1G (Gigabyte) 	= 1 000 000 000 bytes
+	- 1M (Megabyte) 	= 1 000 000 bytes
+	- 1K (Kilobytes) 	= 1 000 bytes
+
+	- 1Gi (Gibibyte)	= 1 073 741 824 bytes
+	- 1Mi (Mebibyte)	= 1 048 576 bytes
+	- 1Ki (Kibibytes) 	= 1 024 bytes
+
+
+Pod have no limits of the resources it can use on a Node!
+
+
+We can specify the limits of the pod resources in the limits section in pod-definition file
+
+pod-definition.yaml
+------------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-webapp-color
+  labels:
+    name: simple-webapp-color
+spec:
+  containers:
+    - name: simple-webapp-color
+      image: simple-webapp-color
+      ports:
+      - containerPort: 8080
+
+      resources:
+	requests:
+	  memory: "4Gi"
+	  cpu: 2
+	limits:			# set limits for the pod resources
+	  memory: "2Gi"
+	  cpu: 2
+------------------------------------------------------
+
+
+
+
+Exceed Limits
+=============
+
+Pod CANNOT more CPU that the set cpu limit.
+-------------------------------------------
+
+Pod CAN use more memory that the set in the limits. When that happend the Pod will be terminated with error OOM (out of memory) 
+--------------------------------------------------
+
+
+### Kubernetes have no requests or limits set by default. This mean that pods can consume cpu and memory freely and slow or suffocate other pods or services on the Node. ###
+
+
+Behavior - CPU
+==============
+
+Not recommended
+---------------
+- No Requests and No Limits are set. Every pod in the node is not guarantee that it have the minimum resources to run and no guarantee that one pod will not use all available resources
+
+Used but not recommended
+------------------------
+- If Limits are set but No Requests, the Requests take the values of the Limits (Requests = Limits)
+
+Recommended
+-----------
+- If Requests and Limits are set, then if one of the pods need to use more resources and the node have these resources, the pod is not allowed to use them. This is not ideal case for noraml work. Reccomended for shared enviroments that we want to limit the user to use more resources (like tha lab environment for this course)
+
+Recommended
+-----------
+- Set Requests but No Limits. In this case every pod is guaranteed to have minimal resources, but able to consume more if needed.
+
+
+Behavior - Memory - same as CPU but if we want to free memory we have to remove the pod taht consumes the memory
+=================
+
+
+
+Limit Ranges
+============
+
+limit-range-cpu.yaml
+-----------------------------
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: cpu-resource-constraint
+spec:
+  limits:
+  - default:		
+      cpu: 500m		# default cpu limit
+    defaultRequest:
+      cpu: 500m		# default request cpu
+    max:
+      cpu: "1"		# max limit
+    min:
+      cpu: 100m		# minimum requests
+    type: Container
+-----------------------------
+
+
+
+limit-range-memory.yaml
+-----------------------------
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: memory-resource-constraint
+spec:
+  limits:
+  - default:		
+      memory: 1Gi		# default memory limit
+    defaultRequest:
+      memory: 1Gi		# default memory request 
+    max:
+      memory: 1Gi		# max memory limit
+    min:
+      memory: 500Mi		# minimum memory requests
+    type: Container
+-----------------------------
+
+
+Changes on limit resource definitions do not affect already created pods but only the created after the change!
+
+
+Total Resource Restrictions
+===========================
+
+To restrict used resources in all pods of the cluster we can create Resource Quotas for each NameSpace.
+
+resource-quota.yaml
+-----------------------------
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: my-resource-quota
+spec:
+  hard:
+    requests.cpu: 4
+    requests.memory: 4Gi
+    limits.cpu: 10
+    limits.memory: 10Gi
+-----------------------------
+
+
+Docs
+====
+Manage Memory, Cpu and API Resources - https://kubernetes.io/docs/tasks/administer-cluster/manage-resources/
+LimitRange for CPU - https://kubernetes.io/docs/tasks/administer-cluster/manage-resources/cpu-default-namespace/
+LimitRange for Memory - https://kubernetes.io/docs/tasks/administer-cluster/manage-resources/memory-default-namespace/
+
+
+==========================================================
+Section 3 68. A quick note on editing Pods and Deployments
+==========================================================
+
+Edit a POD
+Remember, you CANNOT edit specifications of an existing POD other than the below.
+
+spec.containers[*].image
+
+spec.initContainers[*].image
+
+spec.activeDeadlineSeconds
+
+spec.tolerations
+
+For example you cannot edit the environment variables, service accounts, resource limits (all of which we will discuss later) of a running pod. But if you really want to, you have 2 options:
+
+1. Run the terminal --> kubectl edit pod <pod name> command.  This will open the pod specification in an editor (vi editor). Then edit the required properties. When you try to save it, you will be denied. This is because you are attempting to edit a field on the pod that is not editable.
+
+A copy of the file with your changes is saved in a temporary location "/tmp/kubectl-edit-ccvrq.yaml".
+
+You can then delete the existing pod by running the command:
+	terminal --> kubectl delete pod webapp
+
+Then create a new pod with your changes using the temporary file
+	terminal --> kubectl create -f /tmp/kubectl-edit-ccvrq.yaml
+
+2. The second option is to extract the pod definition in YAML format to a file using the command
+	terminal --> kubectl get pod webapp -o yaml > my-new-pod.yaml
+
+Then make the changes to the exported file using an editor (vi editor). Save the changes
+	terminal --> vi my-new-pod.yaml
+
+Then delete the existing pod
+	terminal --> kubectl delete pod webapp
+
+Then create a new pod with the edited file
+	terminal --> kubectl create -f my-new-pod.yaml
+
+Edit Deployments - recommended
+----------------
+With Deployments you can easily edit any field/property of the POD template. Since the pod template is a child of the deployment specification,  with every change the deployment will automatically delete and create a new pod with the new changes. So if you are asked to edit a property of a POD part of a deployment you may do that simply by running the command
+	terminal --> kubectl edit deployment my-deployment
+
+
+
+=============================================
+Section 3 70. Practice Test - Resource Limits
+=============================================
+
+1. A pod called rabbit is deployed. Identify the CPU requirements set on the Pod
+--------------------------------------------------------------------------------
+in the current(default) namespace
+
+Show pod details
+	terminal --> kubectl describe pod rabbit
+
+- choose '0.5 (500m)' as answer
+
+
+2. Delete the rabbit Pod.
+-------------------------
+Once deleted, wait for the pod to fully terminate.
+
+
+Delete rabbit pod
+	terminal --> kubectl delete pod rabbit
+
+Show pod status
+	terminal --> kubectl get pods --watch
+
+When the pod is deleted click 'Check' button
+
+
+
+
+3. Another pod called elephant has been deployed in the default namespace. It fails to get to a running state. Inspect this pod and identify the Reason why it is not running.
+---------------------------------------------
+
+Show pods
+	terminal --> kubectl get pods -o wide
+
+
+Show elephant pod details
+	terminal --> kubectl describe pod elephant
+
+In the section Containers / Last State / Reasons: OOMKilled
+
+- choose 'OOMKilled' as answer 
+
+
+
+4. The status OOMKilled indicates that it is failing because the pod ran out of memory. Identify the memory limit set on the POD.
+---------------------------------------------------------------------------------------------------------------------------------
+
+Show elephant pod details
+	terminal --> kubectl describe pod elephant
+
+Under Containers / Limits / Memory we have 10Mi
+
+- click 'Ok' button
+
+
+
+5. The elephant pod runs a process that consumes 15Mi of memory. Increase the limit of the elephant pod to 20Mi.
+----------------------------------------------------------------------------------------------------------------
+Delete and recreate the pod if required. Do not modify anything other than the required fields.
+
+If we try to edit the pod configuration and change the memory limit to 20Mi
+	terminal --> kubectl edit pod elephant
+
+Save changes
+	terminal --> escape, :wq!, enter
+	# we receive error
+
+Exit file without saving changes
+	terminal --> :q!, enter
+
+Now we can use teporaty created file "/tmp/kubectl-edit-1577548652.yaml" to recreate the 'elephant' pod
+
+Print created file
+	terminal --> cat /tmp/kubectl-edit-1577548652.yaml
+
+Recreate 'elephant' pod
+	terminal --> kubectl replace --force -f /tmp/kubectl-edit-1577548652.yaml
+
+	# kubectl 				- common kubernetes command
+	# replace				- recreate object
+	# --force				- delete object and create new one
+	# -f /tmp/kubectl-edit-1577548652.yaml	- used definition file
+
+Print pods 
+	terminal --> kubectl get pods -o wide
+
+Verify memory limit in elephant pod details
+	terminal --> kubectl describe pod elephant
+
+- cklick 'Check' button
+
+
+
+6. Inspect the status of POD. Make sure it's running
+----------------------------------------------------
+
+List pods
+	terminal --> kubectl get pods -o wide
+
+
+
+7. Delete the elephant Pod.
+---------------------------
+Once deleted, wait for the pod to fully terminate.
+
+
+Delete elephant pod
+	terminal --> kubectl delete pod elephant
+
+Show pod status
+	terminal --> kubectl get pods --watch
+
+- click 'Check' button
+
+
+
+
+
+========================
+Section 3 71. DaemonSets
+========================
+
+DeamonSets are like ReplicaSets - help us deploy multiple instances of a pod, but runs one copy of the pod in each node in our cluster.
+
+When a new Node is added to the cluster, a replica of a pod is added to that node. When the Node is removed, the pod is automatically removed.
+
+DeamonSets ensure that one copy of the pod is alway present in all Nodes in the cluster.
+
+
+Use Cases
+---------
+
+- If we want to add monitoring agent or log collector in each nodes in our cluster. The DaemonSet is perfect for that action. Then we don't have to worry about adding or removing monitoring and logging pods in the nodes when change nodes in the cluster.
+
+Examples for DeamoSet are:
+	- kube-proxy 
+	- weave-net
+
+
+Creating a DeamonSet is like creating a ReplicaSet process.
+
+daemon-set-definition.yaml
+-----------------------------------
+apiVersion: apps/v1
+kind: DeamonSet
+metadata:
+  name: monitoring-daemon
+spec:
+  selector:
+    matchLabels:
+      app: monitoring-agent		# should match teh label in the template
+  template:
+    metadata:
+      labels:
+        app: monitoring-agent		# should match teh label in the matchLabels
+    spec:
+      containers:
+      - name: monitoring-agent
+	image: monitoring-agent
+-----------------------------------
+
+Create daemon-set
+	terminal --> kubectl create -f daemon-set-definition.yaml
+
+List daemonsets
+	terminal --> kubectl get daemonsets
+
+Show details of daemonset
+	terminal --> kubectl describe daemonsets monitoring-daemon
+
+	# kubectl 				- common kubernetes command
+	# describe				- used action
+	# daemonset				- type object
+	# monitoring-deamon			- name of the object
+
+
+How daemonset work?
+-------------------
+
+Till v1.12 - manually set nodeName property and specification in the pod-definition file and then create the Pod
+	   - when created they land automatically on the respected nodes
+
+From v1.12 - daemonset uses Default Scheduler and NodeAffinity rules to schedule pod on nodes
+
+
+========================================
+Section 3 73. Practice Test - DaemonSets
+========================================
+
+
+1. How many DaemonSets are created in the cluster in all namespaces?
+--------------------------------------------------------------------
+Check all namespaces
+
+List daemonsets in all namespaces
+	terminal --> kubectl get daemonsets -A
+
+	# kubectl 				- common kubernetes command
+	# get					- used action
+	# daemonset				- type object
+	# -A					- in all namespaces
+
+- choose '2' as answer
+
+
+2. Which namespace is the kube-proxy Daemonset created in?
+----------------------------------------------------------
+
+List info for daemonset kube-proxy
+	terminal --> kubectl get daemonsets -A -o wide
+
+- choose 'kube-system' as answer
+
+
+
+3. Which of the below is a DaemonSet?
+-------------------------------------
+
+List daemonsets
+	terminal --> kubectl get daemonsets -A
+
+	# in NAME column we have names
+
+- choose 'kube-flannel-ds' as answer
+
+
+
+4. On how many nodes are the pods scheduled by the DaemonSet kube-proxy?
+------------------------------------------------------------------------
+
+Option 1:
+List daemonsets
+	terminal --> kubectl get daemonsets -A
+
+	# we can see '1' is READY / CURRENT / DESIRED
+
+Option 2:
+Show details about daemonset in the default namespace
+	terminal --> kubectl describe daemonset kube-proxy -n kube-system
+
+	# kubectl 				- common kubernetes command
+	# describe				- used action
+	# daemonset				- type object
+	# kube-proxy				- object name
+	# -n kube-system			- specify namespace (this is the default namespace)
+
+As result we have 
+Desired Number of Nodes Scheduled: 1
+Current Number of Nodes Scheduled: 1
+
+- choose '1' as answer
+
+
+
+5. What is the image used by the POD deployed by the kube-flannel-ds DaemonSet?
+-------------------------------------------------------------------------------
+
+Show all pods
+	terminal --> kubectl get pods -A
+	
+	# we can see that we have 'kube-flannel' namespace
+
+Show details for kube-flannel daemonset
+	terminal --> kubectl describe ds kube-flannel-ds -n kube-flannel
+
+OR
+
+Show details about the Pod
+	terminal --> kubectl describe pods kube-flannel-ds-zgsnk -n kube-flannel
+
+- choose 'docker.io/flannel/flannel:v0.23.0' as answer
+
+
+
+6. Deploy a DaemonSet for FluentD Logging.
+------------------------------------------
+Use the given specifications.
+
+
+Create a template file (fluentd.yaml) from deployment taht we will use from daemonset
+	terminal --> kubectl create deployment elasticsearch -n kube-system --image=registry.k8s.io/fluentd-elasticsearch:1.20 --dry-run=client -o yaml > fluentd.yml
+
+Edit the created template file
+	terminal --> vi fluentd.yml
+
+fluentd.yml
+-------------------------------
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  creationTimestamp: null
+  labels:
+    app: elasticsearch
+  name: elasticsearch
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: elasticsearch
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: elasticsearch
+    spec:
+      containers:
+      - image: registry.k8s.io/fluentd-elasticsearch:1.20
+        name: fluentd-elasticsearch
+        resources: {}
+-------------------------------
+- remove replicas, strategy and status lines
+
+save changes - escape, :wq!, enter
+
+
+Print file to verify changes
+	terminal --> cat fluentd.yml
+
+Create daemonset
+	terminal --> kubectl create -f fluentd.yml
+
+Verify creation of the daemonset
+	terminal --> kubectl get ds -n kube-system
+
+- click 'Check' button
+
+
+
+
+=========================
+Section 3 74. Static Pods
+=========================
+
+We can manage a single host manually. It have to be installerd the following software:
+	- kubelet
+	- docker
+
+We make pod-definitions.yml files in directory "/etc/kubernetes/manifests". The kubelete periodicly check this folder for definition files and create pods on the host. It also make sure that the pods stays alive - if the pod crashes, kubelet restart it. If we make changes on the definition files, the kubelet recreates the pods from the changed files to take effect. If file is removed, the pod is deleted automatically. The pods that are created without the help of api-server or objects from the rest of the system are called Static Pods. We can only create Pods if we place pod-definition files in this directory "/etc/kubernetes/manifests". We cannot create deployments or replicasets or other objects placing definition files in the directory. The kubelet can work only with pods. This folder can be passed in the service:
+
+1st way
+-------
+kubelet.service
+----------------------------------
+ExecStart=/usr/local/bin/kubelet \\
+  --container-runtime=remote \\
+  --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock \\
+  --pod-manifest-path=/etc/Kubernetes/manifests \\				# this is the option for manifest folder
+  --kubeconfig=/var/lib/kubelet/kubeconfig \\
+  --network-plugin=cni \\
+  --register-node=true \\
+  --v=2
+----------------------------------
+
+2nd way
+-------
+We can set config file in the service options. Admintool uses this approach to create clusters.
+
+kubelet.service
+----------------------------------
+ExecStart=/usr/local/bin/kubelet \\
+  --container-runtime=remote \\
+  --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock \\
+  --config=kubeconfig.yaml \\							# set the config file
+  --kubeconfig=/var/lib/kubelet/kubeconfig \\
+  --network-plugin=cni \\
+  --register-node=true \\
+  --v=2
+----------------------------------
+
+kubeconfig.yaml
+----------------------
+staticPodPath: /etc/kubernetes/manifests
+----------------------
+
+When inspecting a cluster we have to check where this directory is set. Then we know where to save pod-definition files for static pods.
+
+
+We can list static pods with docker command or with other runtime commands
+	terminal --> docker ps
+	or
+	terminal --> crictl ps
+	or
+	terminal --> nerdctl ps
+
+
+Kubelet take instructions to manage pods from different inputs:
+	- true "/etc/kubernetes/manifests" folder			- static pods
+	- true http api endpoint (kube-apiserver uses this method)	- kube-system pods
+
+The kubernetes system is aware of static pods. If there are static pods and we list them:
+	terminal --> kubectl get pods
+
+	# static pods will appear with 'static' in the name - static-web-node01 
+	# the host node name will be appended to the pod name as well
+	# also this is just a mirror image of the pod
+	# we canno edit or delete the pod like any the dinamic (kubernetes system) pod
+	# we can only delete them by modifing the definition files in manifests folder
+
+
+Use cases of static pods
+------------------------
+
+We install kuebelet service:
+
+kubelet.service
+----------------------------------
+ExecStart=/usr/local/bin/kubelet \\
+  --container-runtime=remote \\
+  --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock \\
+  --config=kubeconfig.yaml \\							# set the config file
+  --kubeconfig=/var/lib/kubelet/kubeconfig \\
+  --network-plugin=cni \\
+  --register-node=true \\
+  --v=2
+----------------------------------
+
+We manually make a node with static components. First we set:
+	- apiserver.yaml 			# definition file for api server
+	- controller-manager.yaml 		# definition for controller
+	- etcd.yaml				# definition for db
+	- pod-definition.yaml			# definition for pod/s
+
+We have to put all files in the manifests folder - "/etc/kubernetes/manifests"
+
+The kubelet start to operate with this objects. All objects will be monitored and restarted if needed.
+
+This is how kubeadmintool sets a kubernetes cluster. This si wey if we list pods in kube-system namespace we see all administrative objects as pods:
+	terminal --> kubectl get pods -n kube-system
+
+
+The difference between static pods and daemonsets
+
+	* Daemonsets are responsible to ensure one instance of application is available on all nodes in the cluster
+		- it is handled by daemonset contriller by kube-apiserver
+
+	* Static pods are created and managed directly by the kubelet without any interference by the kube-apiserver or rest of 		the kubernetes controlplace components
+
+Both static pods and pods created by daemonsets are ignored by kube-scheduler. Kube-Scheduler has no effect on this pods.
+
+
+
+=========================================
+Section 3 76. Practice Test - Static Pods
+=========================================
+
+1. How many static pods exist in this cluster in all namespaces?
+----------------------------------------------------------------
+
+List all pods
+	terminal --> kubectl get pods -A 
+	
+	# all static pod's names are ending with the name of the node (controlplane)
+
+Or
+
+Print pod's configuration file
+
+	terminal --> kubectl get pod kube-apiserver-controlplane -n kube-system -o yaml
+
+	# kubectl 				- kubernetes common command
+	# get					- used action
+	# pod					- object type
+	# kube-apiserver-controlplane		- name of the pod
+	# -n kube-system			- namespace name (default namespace)
+	# -o yaml				- set output format
+
+- at the section ownerReferences / kind and name prperties can show who is the owner
+	- if kind is ReplicaSet is not static pod
+	- if kind is Node is static pod
+
+- choose '4' as answer
+
+
+
+
+2. Which of the below components is NOT deployed as a static pod?
+-----------------------------------------------------------------
+
+List all pods
+	terminal --> kubectl get pods -A
+
+	# all static pod's names end with nodename (controlplane)
+	# all system pod's names ends with 5 random characters
+
+- choose 'coredns' as answer
+
+
+
+3. Which of the below components is NOT deployed as a static POD?
+-----------------------------------------------------------------
+
+List all pods
+	terminal --> kubectl get pods -A
+
+	# all static pod's names end with nodename (controlplane)
+	# all system pod's names ends with 5 random characters
+
+- choose 'kube-proxy' as answer
+
+
+
+5. On which nodes are the static pods created currently?
+--------------------------------------------------------
+
+List all pods
+	terminal --> kubectl get pods -A -o wide
+
+	# all static pod's names end with nodename (controlplane)
+	# all system pod's names ends with 5 random characters
+
+- choose 'controlplane' as answer 
+
+
+
+6. What is the path of the directory holding the static pod definition files?
+-----------------------------------------------------------------------------
+
+Show kubelet conf
+	terminal --> cat /var/lib/kubelet/config.yaml
+
+	# we can see line: staticPodPath: /etc/kubernetes/manifests
+
+- choose '/etc/kubernetes/manifests' as answer
+
+
+
+
+7. How many pod definition files are present in the manifests directory?
+------------------------------------------------------------------------
+
+list manifests folder content
+	terminal --> ls /etc/kubernetes/manifests
+
+- choose '4' as answer
+
+
+
+
+8. What is the docker image used to deploy the kube-api server as a static pod?
+-------------------------------------------------------------------------------
+
+List pods
+	terminal --> kubectl get pods -A -o wide
+
+Show kube-apiserver details
+	terminal --> kubectl describe pod kube-apiserver-controlplane -n kube-system
+
+	# under section Containers / Image we have - registry.k8s.io/kube-apiserver:v1.31.0
+
+Or 
+
+Print apiserver config file
+	terminal --> cat /etc/kubernetes/manifests/kube-apiserver.yaml
+
+	# under section Containers / Image we have - registry.k8s.io/kube-apiserver:v1.31.0
+
+- choose 'registry.k8s.io/kube-apiserver:v1.31.0' as answer
+
+
+
+
+9. Create a static pod named static-busybox that uses the busybox image and the command sleep 1000
+--------------------------------------------------------------------------------------------------
+
+Create pod template
+	terminal --> kubectl run static-busybox --image=busybox --restart=Never --dry-run=client -o yaml --command -- sleep 1000 > static-busybox.yaml
+
+	# kubectl 					- common kubernetes command
+	# run 						- start pod
+	# static-busybox				- name of the pod
+	# --image=busybox				- used image
+	# --restart=Never				- dont restart
+	# --dry-run=client				- dont create the object but test run it
+	# -o yaml					- set output format as yaml
+	# --command -- sleep 1000			- command sleep from task description
+	# > static-busybox.yaml				- save output in this file
+
+
+Print file to ensure creation
+	terminal --> cat static-busybox.yaml
+
+Move the file to the manifests folder
+	terminal --> cp static-busybox.yaml /etc/kubernetes/manifests/
+
+Check if the pod is automatically created
+	terminal -> kubectl get pods
+
+- click 'Check' button
+
+
+
+9. Edit the image on the static pod to use busybox:1.28.4
+---------------------------------------------------------
+
+Edit the static-busybox.yaml file
+	terminal --> vi /etc/kubernetes/manifests/static-busybox.yaml
+
+static-busybox.yaml
+------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: static-busybox
+  name: static-busybox
+spec:
+  containers:
+  - command:
+    - sleep
+    - "1000"
+    image: busybox:1.28.4	# cheange to busybox:1.28.4
+    name: static-busybox
+    resources: {}
+  dnsPolicy: ClusterFirst
+  restartPolicy: Never
+status: {}
+------------------------------
+save changes - escape, :wq!, enter
+
+Print file to ensure changes
+	terminal --> cat /etc/kubernetes/manifests/static-busybox.yaml
+
+Check if the pod is recreated and running
+	terminal --> kubectl get pods --watch
+
+- click 'Check' button
+
+
+
+10. We just created a new static pod named static-greenbox. Find it and delete it.
+----------------------------------------------------------------------------------
+This question is a bit tricky. But if you use the knowledge you gained in the previous questions in this lab, you should be able to find the answer to it.
+
+List pods
+	terminal --> kubectl get pods -A -o wide
+
+If we delete the pod with kubectl command the pod will be recreated
+	terminal --> kubectl delete pod static-greenbox-node01
+
+List pods again
+	terminal --> kubectl get pods -A -o wide
+
+We need to delete pod-definition file. So we have to list the Nodes with more info
+	terminal --> kubectl get nodes -o wide
+	
+	# copy the INTERNAL-IP address
+
+Connect to node01 to INTERNAL-IP
+	terminal --> ssh 192.168.219.175
+	terminal --> yes
+
+List tcontent in manifests folder
+	terminal --> ls /etc/kubernetes/manifests/
+
+	# the folder is empty
+
+Print configuration file
+	terminal --> cat /var/lib/kubelet/config.yaml
+
+	# staticPodPath: /etc/just-to-mess-with-you
+
+
+List content of the folder /etc/just-to-mess-with-you
+	terminal --> ls /etc/just-to-mess-with-you
+
+	# we have the file greenbox.yaml
+
+Delete the file
+	terminal --> rm /etc/just-to-mess-with-you/greenbox.yaml
+
+Exit node01
+	terminal --> exit
+
+Check when the pod is deleted
+	terminal --> kubectl get pods --watch
+
+- click 'Check' button
+
+
+=================================
+Section 3 77. Multiple Schedulers
+=================================
+
+We can create our own scheduler and set specific app definition file to contain this custom scheduler.
+
+The default shceduler's name is 'default-scheduler'
+
+scheduler-cinfig.yaml
+------------------------------------------------
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+profiles:
+- schedulerName: default-scheduler
+------------------------------------------------
+
+
+Custom Scheduler config
+-----------------------
+
+1st custom scheduler:
+
+my-scheduler-cinfig.yaml
+------------------------------------------------
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+profiles:
+- schedulerName: my-scheduler				# unique name
+------------------------------------------------
+
+
+2nd custom scheduler:
+
+my-scheduler-2-cinfig.yaml
+------------------------------------------------
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+profiles:
+- schedulerName: my-scheduler-2				# unique name
+------------------------------------------------
+
+
+How to deploy scheduler
+=======================
+
+Option 1 - manually
+-------------------
+
+Dowload the scheduler binary:
+terminal --> wget https://storage.googleapis.com/kubernetes-release/release/v1.12.0/bin/linux/amd64/kube-scheduler
+
+start scheduler service:
+
+kube-scheduler.service					# deafult scheduler service
+------------------------------------------------
+ExecStart=/usr/local/bin/kube-scheduler \\
+  --config=/etc/kubernetes/config/kube-scheduler.yaml
+------------------------------------------------
+
+
+Start custom scheduler 1:
+
+my-scheduler.service
+------------------------------------------------
+ExecStart=/usr/local/bin/kube-scheduler \\
+  --config=/etc/kubernetes/config/my-scheduler-config.yaml
+------------------------------------------------
+
+
+Start custom scheduler 2:
+
+my-scheduler-2.service
+------------------------------------------------
+ExecStart=/usr/local/bin/kube-scheduler \\
+  --config=/etc/kubernetes/config/my-scheduler-2-config.yaml
+------------------------------------------------
+
+
+Option 2 - as a Pod
+-------------------
+
+1. Set config file
+
+my-scheduler-cinfig.yaml
+------------------------------------------------
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+profiles:
+- schedulerName: my-scheduler	
+leaderElection:					# this setting set leader scheduler in case we have multiple master nodes
+  leaderElect: true				# with multiple scheduler services running
+  resourceNamespace: kube-system		# this setting help the system recognize the lead scheduler service
+  resourceName: lock-object-my-scheduler			
+------------------------------------------------
+
+
+2. Set pod-definition file
+
+my-custom-scheduler.yaml
+------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-custom-scheduler
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+    - kube-scheduler
+    - --address=127.0.0.1
+    - --kubeconfig=/etc/kubernetes/scheduler.conf
+    - --config=/etc/kubernetes/my-scheduler-config.yaml
+
+    image: k8s.gcr.io/kube-scheduler-amd64:v1.11.3
+    name: kube-scheduler
+------------------------------------------------
+
+
+
+Option 3 - as a Deployment
+--------------------------
+
+my-scheduler-cinfig.yaml
+------------------------------------------------
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+profiles:
+- schedulerName: my-scheduler	
+leaderElection:					# this setting set leader scheduler in case we have multiple master nodes
+  leaderElect: true				# with multiple scheduler services running
+  resourceNamespace: kube-system		# this setting help the system recognize the lead scheduler service
+  resourceName: lock-object-my-scheduler			
+------------------------------------------------
+
+We can see documentation - https://kubernetes.io/docs/tasks/extend-kubernetes/configure-multiple-schedulers/
+
+Additional setting for authentication, authorization and accounts are included
+
+my-scheduler-definition.yaml
+------------------------------------------------
+apiVersion: v1
+kind: ServiceAccount				# account
+metadata:
+  name: my-scheduler
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1	# cluster authorization for scheduler
+kind: ClusterRoleBinding
+metadata:
+  name: my-scheduler-as-kube-scheduler
+subjects:
+- kind: ServiceAccount
+  name: my-scheduler
+  namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: system:kube-scheduler
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1	# cluster authorization for volumes
+kind: ClusterRoleBinding
+metadata:
+  name: my-scheduler-as-volume-scheduler
+subjects:
+- kind: ServiceAccount
+  name: my-scheduler
+  namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: system:volume-scheduler
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1	# cluster authorization for api-server
+kind: RoleBinding
+metadata:
+  name: my-scheduler-extension-apiserver-authentication-reader
+  namespace: kube-system
+roleRef:
+  kind: Role
+  name: extension-apiserver-authentication-reader
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: my-scheduler
+  namespace: kube-system
+---
+apiVersion: v1					
+kind: ConfigMap							# mapping for configuration file
+metadata:
+  name: my-scheduler-config
+  namespace: kube-system
+data:
+  my-scheduler-config.yaml: |					# kube-scheduler config file
+    apiVersion: kubescheduler.config.k8s.io/v1beta2		# passed as volume
+    kind: KubeSchedulerConfiguration
+    profiles:
+      - schedulerName: my-scheduler
+    leaderElection:
+      leaderElect: false 
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    component: scheduler
+    tier: control-plane
+  name: my-scheduler
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      component: scheduler
+      tier: control-plane
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        component: scheduler
+        tier: control-plane
+        version: second
+    spec:
+      serviceAccountName: my-scheduler
+      containers:
+      - command:
+        - /usr/local/bin/kube-scheduler
+        - --config=/etc/kubernetes/my-scheduler/my-scheduler-config.yaml
+        image: gcr.io/my-gcp-project/my-kube-scheduler:1.0
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 10259
+            scheme: HTTPS
+          initialDelaySeconds: 15
+        name: kube-second-scheduler
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 10259
+            scheme: HTTPS
+        resources:
+          requests:
+            cpu: '0.1'
+        securityContext:
+          privileged: false
+        volumeMounts:
+          - name: config-volume
+            mountPath: /etc/kubernetes/my-scheduler
+      hostNetwork: false
+      hostPID: false
+      volumes:
+        - name: config-volume
+          configMap:
+            name: my-scheduler-config
+------------------------------------------------
+
+
+When schedulers are deployed as pods:
+------------------------------------
+
+List schedulers if deployed as pods
+	terminal --> kubectl get pods --namespace=kube-system
+
+	# kube-scheduler-master pod
+	# my-custom-scheduler pod
+
+
+How to use deployed shceduler
+-----------------------------
+
+pod-definition.yaml
+------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+  - image: nginx
+    name: nginx
+  schedulerName: my-custom-scheduler			# added field for specific scheduler
+------------------------------------------------
+
+Create the configured pod
+	terminal --> kubectl create -f pod-definition.yaml
+
+Troubleshooting
+---------------
+If the scheduler is not configure correctly, the pod will remain in pending state !
+	terminal --> kubectl get pods
+	# nginx / STATUS: pending
+
+If the scheduler is configured correctly, the pod will be innning state !
+	terminal --> kubectl get pods
+	# nginx / STATUS: running
+
+
+
+View Events
+-----------
+
+How to check who is the scheduler that picked up the specific pod?
+
+List all events in the current namespace
+	terminal --> kubectl get events -o wide
+
+	# REASON: Scheduled
+	# SOURCE: my-custom-scheduler
+	# MESSAGE: Successfully assigned default/nginx to node01
+
+
+
+View Scheduler Logs
+-------------------
+
+List scheduler logs
+	terminal --> kubectl logs my-custom-scheduler --namespace=kube-system
+
+
+
+
+=================================================
+Section 3 79. Practice Test - Multiple Schedulers
+=================================================
+
+
+1. What is the name of the POD that deploys the default kubernetes scheduler in this environment?
+-------------------------------------------------------------------------------------------------
+
+List pods in all namespaces
+	terminal --> kubectl get pods -A
+
+	# we can see pod with name 'kube-scheduler-controlplane'
+
+- choose 'kube-scheduler-controlplane' as answer
+
+
+
+2. What is the image used to deploy the kubernetes scheduler?
+-------------------------------------------------------------
+Inspect the kubernetes scheduler pod and identify the image
+
+Find the scheduler pod in all namespaces
+	terminal --> kubectl get pods -A
+
+Show details for the pod
+	terminal --> kubectl describe pod kube-scheduler-controlplane -n kube-system
+
+	# kubectl					- common kubernetes command
+	# describe					- sued action
+	# pod						- object type	
+	# kube-scheduler-controlplane			- pod's name
+	# -n kube-system				- namespace
+
+Under 'Image' field we can see 'registry.k8s.io/kube-scheduler:v1.31.0'
+
+- choose 'registry.k8s.io/kube-scheduler:v1.31.0' as answer
+
+
+
+3. We have already created the ServiceAccount and ClusterRoleBinding that our custom scheduler will make use of.
+----------------------------------------------------------------------------------------------------------------
+Checkout the following Kubernetes objects:
+
+ServiceAccount: my-scheduler (kube-system namespace)
+ClusterRoleBinding: my-scheduler-as-kube-scheduler
+ClusterRoleBinding: my-scheduler-as-volume-scheduler
+
+
+Run the command: kubectl get serviceaccount -n kube-system and kubectl get clusterrolebinding
+
+
+Note: - Don't worry if you are not familiar with these resources. We will cover it later on.
+
+
+
+Check service account
+	terminal --> kubectl get sa my-scheduler -n kube-system
+
+	# kubectl					- common kubernetes command
+	# get						- sued action
+	# sa						- object type (servoce account)	
+	# my-scheduler					- object name
+	# -n kube-system				- namespace
+
+result:
+-------
+NAME           SECRETS   AGE
+my-scheduler   0         2m
+
+
+Check ClusterRoleBindings
+	terminal --> kubectl get clusterrolebinding
+
+
+- click 'Ok' button
+
+
+
+4. Let's create a configmap that the new scheduler will employ using the concept of ConfigMap as a volume.
+We have already given a configMap definition file called 'my-scheduler-configmap.yaml' at /root/ path that will create a configmap with name 'my-scheduler-config' using the content of file /root/my-scheduler-config.yaml.
+---------------------------------------------------------------------------------------
+
+
+Print the config file
+	terminal --> cat /root/my-scheduler-config.yaml
+
+my-scheduler-config.yaml
+----------------------------------------------
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+profiles:
+  - schedulerName: my-scheduler
+leaderElection:
+  leaderElect: false
+----------------------------------------------
+
+
+Create configmap 
+	terminal --> kubectl create configmap my-scheduler-config --from-file=/root/my-scheduler-config.yaml -n kube-system
+
+	# kubectl					- common kubernetes command
+	# create					- sued action
+	# configmap					- object type 
+	# my-scheduler-config				- object name
+	# --from-file=/root/my-scheduler-config.yaml	- used file
+	# -n kube-system				- namespace
+
+
+Verify configmap creation
+	terminal --> kubectl get configmap my-scheduler-config -n kube-system
+
+	# kubectl					- common kubernetes command
+	# get						- sued action
+	# configmap					- object type 
+	# my-scheduler-config				- object name
+	# -n kube-system				- namespace
+
+- click 'Check' button
+
+
+
+
+5. Deploy an additional scheduler to the cluster following the given specification.
+-----------------------------------------------------------------------------------
+Use the manifest file provided at /root/my-scheduler.yaml. Use the same image as used by the default kubernetes scheduler.
+
+
+Print the provided file
+	terminal --> cat /root/my-scheduler.yaml
+
+Find default kubernetes scheduler
+	terminal --> kubectl get pods -A 
+
+	# kube-scheduler-controlplane
+
+Find the image used in the default kubernetes scheduler
+	terminal --> kubectl describe pod kube-scheduler-controlplane -n kube-system | grep Image
+
+	# kubectl					- common kubernetes command
+	# describe					- sued action
+	# pod						- object type	
+	# kube-scheduler-controlplane			- pod's name
+	# -n kube-system				- namespace
+	# | grep Image					- show image field only
+
+	# image: registry.k8s.io/kube-scheduler:v1.31.0
+
+Checge the image in the provided file
+	terminal --> vi /root/my-scheduler.yaml
+-----------------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: my-scheduler
+  name: my-scheduler
+  namespace: kube-system
+spec:
+  serviceAccountName: my-scheduler
+  containers:
+  - command:
+    - /usr/local/bin/kube-scheduler
+    - --config=/etc/kubernetes/my-scheduler/my-scheduler-config.yaml
+    image: registry.k8s.io/kube-scheduler:v1.31.0			# change image
+    livenessProbe:
+      httpGet:
+        path: /healthz
+        port: 10259
+        scheme: HTTPS
+      initialDelaySeconds: 15
+    name: kube-second-scheduler
+    readinessProbe:
+      httpGet:
+        path: /healthz
+        port: 10259
+        scheme: HTTPS
+    resources:
+      requests:
+        cpu: '0.1'
+    securityContext:
+      privileged: false
+    volumeMounts:
+      - name: config-volume
+        mountPath: /etc/kubernetes/my-scheduler
+  hostNetwork: false
+  hostPID: false
+  volumes:
+    - name: config-volume
+      configMap:
+        name: my-scheduler-config				# this is the configmap we created
+----------------------------------------------------------
+save changes - escape, :wq!, enter
+
+Print the file to ensure changes
+	terminal --> cat /root/my-scheduler.yaml
+
+
+Create scheduler
+	terminal --> kubectl create -f /root/my-scheduler.yaml
+
+Verify the scheduler creation
+	terminal --> kubectl get pods -n kube-system
+
+	# kubectl					- common kubernetes command
+	# get						- sued action
+	# pods						- object type	
+	# -n kube-system				- namespace
+
+	# we have 'my-scheduler' entity available
+
+- click 'Check' button
+
+
+
+
+6. A POD definition file is given. Use it to create a POD with the new custom scheduler.
+---------------------------------------------------------------------------------------
+File is located at /root/nginx-pod.yaml
+
+
+Print the provided file
+	terminal --> cat /root/nginx-pod.yaml
+
+Edit pod-definition file and add specific scheduler
+	terminal --> vi /root/nginx-pod.yaml
+
+nginx-pod.yaml
+------------------------------
+apiVersion: v1
+kind: Pod 
+metadata:
+  name: nginx
+spec:
+  schedulerName: my-scheduler		# added
+  containers:
+  - image: nginx
+    name: nginx
+------------------------------
+save changes - escape, :wq!, enter
+
+
+Create the pod
+	terminal --> kubectl create -f nginx-pod.yaml
+
+Verify pod craetion
+	terminal --> kubectl get pods
+
+- click 'Check' button
+
+
+
+
+===============================
+Section 3 80. Scheduler Profile
+===============================
+
+Recap Shceduler work
+====================
+
+We have pod-definition.yaml file
+------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-webapp-color
+spec:
+  PriorityClassName: high-priority	# priority setting
+  containers:
+  - name: simple-webapp-color
+    image: simple-webapp-color
+     resources:
+       requests:
+	 memory: "1Gi"
+	 cpu: 10			# require node with 10 cpu available
+------------------------------
+
+We have 4 stages of scheduling.
+
+For each stage we can add more plugins true the extention point. There are extentions points before and after every stage, so we can add more than one scheduling plugins for each stage.
+
+
+Scheduling Phase
+----------------
+We have also Scheduling Queue where pods are waiting to be scheduled. They are sorted based on priority defined on the pods.
+Extentiion Points
+	- queueSort
+	Extention Plugins:
+		- PrioritySort
+
+To use priority settings, priority class must be created. Here is how it looks
+
+priority class
+-------------------------------
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: high-priority
+value: 1000000
+globalDefault: false
+description: "This priority class should be used for XYZ sevice pods only"
+-------------------------------
+
+
+Filtering Phase
+---------------
+This phase filters the potential nodes scheduler can host the pods on. Filtering is based on the resources every node have (CPU and memory).
+
+Extentiion Points
+	- preFiler 
+	----------
+	Scheduling Plugins:
+		- NodeResourcesFit	# check node resources
+		- NodePorts		# Check the Node ports
+		- NodeAffinity		# check the Node affinity settings
+
+	- filter
+	--------
+	Scheduling Plugins:
+		- NodeResourcesFit	# check node resources
+		- NodeName		# check nodeName field in the pod-definition file, filters out if not match
+		- NodeUnschedulable	# check for 'Unschedulable:' binary field (true/false)
+		- Taint Toleration	# check for taints and tolerations
+		- NodePorts		# check the Node ports
+		- NodeAffinity		# check the Node affinity settings
+
+	- postFilter
+	------------
+	Scheduling Plugins:
+		- NodeAffinity		# check the Node affinity settings
+
+
+
+Scoring Phase
+-------------
+Scheduler give a potential nodes scores for resources after the pod is hosted (reminding resources)
+The node with most reminding resources is scored as most relevant to deploy the pod on.
+
+Extentiion Points
+	- preScore
+	-----------
+	Scheduling Plugins:
+		- Taint Toleration	# check for taints and tolerations
+
+	
+	- score
+	-------
+	Scheduling Plugins:
+		- NodeResourcesFit	# check node resources
+		- ImageLocality		# set high score if have the container image used by the pods (not crutial)
+		- Taint Toleration	# check for taints and tolerations
+		- NodeAffinity		# check the Node affinity settings
+
+
+	- reserve
+	---------
+	Scheduling Plugins:
+		None
+
+
+Binding Phase
+-------------
+Final phase where the pod is finaly bound with the choosen node
+Extentiion Points
+	- prermit
+	-----------
+	Scheduling Plugins:
+		None
+
+	- preBind
+	-----------
+	Scheduling Plugins:
+		None
+
+	- bind 
+	------
+	Scheduling Plugins:
+		- DefaultBinder 	# check for binding settings
+
+	- postBind
+	----------
+	Scheduling Plugins:
+		None
+
+
+How we can customize the scheduling work:
+=========================================
+
+
+We can set few scheduler profiles in the my-scheduler-config.yaml file
+
+my-scheduler-config.yaml
+----------------------------------------------
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+profiles:
+- schedulerName: my-scheduler-3
+  plugins:
+    score:
+      disable:
+      - name: TaintToleration
+      enabled:
+      - name: MyCustomPluginA
+      - name: MyCustomPluginB
+
+- schedulerName: my-scheduler-4
+  plugins:
+    preScore:
+      disable:
+      - name: '*'			# disable all plugins
+    score:
+      disabled:
+      - name: '*'			# disable all plugins
+
+- schedulerName: my-scheduler-5
+
+----------------------------------------------
+
+
+========================
+Section 3 81. References
+========================
+
+Scheduler code hierarchy overview:
+https://github.com/kubernetes/community/blob/master/contributors/devel/sig-scheduling/scheduling_code_hierarchy_overview.md
+
+Advanced Scheduling in Kubernetes:
+https://kubernetes.io/blog/2017/03/advanced-scheduling-in-kubernetes/
+
+How does the Kubernetes scheduler work?
+https://jvns.ca/blog/2017/07/27/how-does-the-kubernetes-scheduler-work/
+https://stackoverflow.com/questions/28857993/how-does-kubernetes-scheduler-work
+
+
+
+
+
+=======================================
+Section 3 82. 2025 Admission Controller
+=======================================
+
+
+With RBAC (role based access control) we can give access for specific actions to specific roles. Developers can create, edit, list and delete pods. Admins can manage servers, schedulers, etc. 
+
+We want to set more specific permissions like or requirements not connected with cpecific role:
+	- Only permit images from certain registry
+	- Do not permit to use images with 'latest' tag
+	- Do not allow requests to containers runned as root user
+	- only permit certain capabilities
+	- Pod always has labels
+
+
+This is where admission controller comes in:
+
+kubectl	-> Authentication -> Authorization -> Admission Controller -> Create Pod
+
+Admission Controller help us implement better security measures to enforce how a cluster is used. There are prebuild admission controllers that comes with kubernetes.
+	- AlwaysPullImages			# every time a pod is created, the images are always pulled
+	- DefaultStorageClass			# observes creation of PVCs and automatically adds default storage class to them
+	- EventRateLimit			# Set a limit of requests that API server can work one at a time
+	- NamespaceExists			# reject requests to not existing namespaces
+
+
+Example with NamespaceExists admission controller
+-------------------------------------------------
+
+If we send a request to namespace that do not exist
+	terminal --> kubectl run nginx --image nginx --namespace blue
+	
+	# result: Error from server (NotFound): namespace "bluse" not found
+
+The request is authenticated then authorized and the NamespaceExists handles the request and check if the 'blue' namespace is available. If 'blue' namespace not exists the request is rejected.
+
+NamespaceExists is build in admission controller that is enabled by default.
+
+
+There is another admission controller that is not enabled by default - NamespaceAutoProvision
+NamespaceAutoProvision controller will automatically create the namespace if the requested namespace do not exist.
+
+List enabled admission controllers
+----------------------------------
+	terminal --> kube-apiserver -h | grep enable-admission-plugins
+
+
+If we use kubeadm, we need to execute the command from controlplane pod
+-----------------------------------------------------------------------
+	terminal --> kubectl exec kube-apiserver-controlplane -n kube-system -- kube-apiserver -h | grep enable-admission-plugins
+
+
+Enable admission controller
+---------------------------
+In kube-apiserver.service we add admission controler we need to edit the option'--enable-admission-plugin=NodeRestriction,NamespaceAutoProvision' 	# added NamespaceAutoProvision
+
+If we are in kubeadm based setup, we need to update the option '- --enable-admission-plugin=NodeRestriction,NamespaceAutoProvision' in kube-apiserver manifests file /etc/kubernetes/manifests/kube-apiserver.yaml 
+# added NamespaceAutoProvision
+
+
+Disable admission controller
+----------------------------
+In kube-apiserver.service we add disabled admission controler as option'--disable-admission-plugin=DefaultStorageClass' 
+# disabled DefaultStorageClass
+
+
+Now as we enabled NamespaceAutoProvision admission controller if we try to run a container in non existing it will be automatically created.
+	Create Pod in not existing 'blue' namespace
+		terminal --> kubectl run nginx --image nginx --namespace blue
+	
+		# result: Pod/nginx created
+
+	List namespaces
+		terminal --> kubectl get namespaces
+
+		# result: blue	Active 3m		# created blue namespace
+
+
+
+NamespaceAutoProvision and NamespaceExists provission controllers are depricated and replaced by NamespaceLifecycle admission controller.
+
+NamespaceLifecycle ensure to reject requests to not existing namespaces and that the default namespaces such as default, kube-system and kube-public cannot be deleted.
+
+
+
+
+
+=======================================================
+Section 3 83. 2025 Admission Controller - Practice Test
+=======================================================
+
+1. What is not a function of admission controller?
+--------------------------------------------------
+
+Admission controller do not handle any authentications
+
+- choose 'authenticate user' as answer
+
+
+
+
+2. Which admission controller is not enabled by default?
+--------------------------------------------------------
+
+We need to find kube-apiserver pod and list enabled admission plugins
+
+List pods
+	terminal --> kubectl get pods -n kube-system
+
+# result:
+NAME                                   READY   STATUS    RESTARTS   AGE
+coredns-77d6fd4654-44pdp               1/1     Running   0          6m3s
+coredns-77d6fd4654-dzzhs               1/1     Running   0          6m3s
+etcd-controlplane                      1/1     Running   0          6m9s
+kube-apiserver-controlplane            1/1     Running   0          6m9s		# list details for kube-apiserver pod
+kube-controller-manager-controlplane   1/1     Running   0          6m9s
+kube-proxy-5r4ff                       1/1     Running   0          6m3s
+kube-scheduler-controlplane            1/1     Running   0          6m9s
+
+
+Show details for kube-apiserver-controlplane
+	terminal --> kubectl exec -it kube-apiserver-controlplane -n kube-system -- kube-apiserver -h | grep 'enable-admission-plugin'
+
+# result: --enable-admission-plugins strings       admission plugins that should be enabled in addition to default enabled ones (NamespaceLifecycle, LimitRanger, ServiceAccount, TaintNodesByCondition, PodSecurity, Priority, DefaultTolerationSeconds, DefaultStorageClass, StorageObjectInUseProtection, PersistentVolumeClaimResize, RuntimeClass, CertificateApproval, CertificateSigning, ClusterTrustBundleAttest, CertificateSubjectRestriction, DefaultIngressClass, MutatingAdmissionWebhook, ValidatingAdmissionPolicy, ValidatingAdmissionWebhook, ResourceQuota)
+
+	# This is the list of default enabled admission plugins
+
+- choose 'NamespaceAutoProvision' as asnwer
+
+
+
+
+3. Which admission controller is enabled in this cluster which is normally disabled?
+------------------------------------------------------------------------------------
+
+Print the kubeapi server config
+	terminal --> cat /etc/kubernetes/manifests/kube-apiserver.yaml
+
+	# result: - --enable-admission-plugins=NodeRestriction		# these are additional elabled admission plugins
+
+Or show the enabled plugins from file
+	terminal --> grep enable-admission-plugins /etc/kubernetes/manifests/kube-apiserver.yaml
+
+	# result:     - --enable-admission-plugins=NodeRestriction	# these are additional elabled admission plugins
+
+- choose 'NodeRestriction' as answer
+
+
+
+
+4. Try to create nginx pod in the blue namespace. The blue namespace does not already exist. Dont create the blue namespace yet.
+--------------------------------------------------------------------------------------------------------------------------------
+Run below command to deploy a pod with the nginx image in the blue namespace
+
+Try to create the pod
+	terminal --> kubectl run nginx --image nginx -n blue
+
+	# result: Error from server (NotFound): namespaces "blue" not found
+
+
+- click 'Ok' button
+
+
+
+
+5. The previous step failed because kubernetes have NamespaceExists admission controller enabled which rejects requests to namespaces that do not exist. So, to create a namespace that does not exist automatically, we could enable the NamespaceAutoProvision admission controller
+--------------------------------------------------------------------------------------------------------------------
+
+Enable the NamespaceAutoProvision admission controller
+
+Note: Once you update kube-apiserver yaml file, please wait for a few minutes for the kube-apiserver to restart completely.
+
+
+Edit the api-server manifests file and enable NamespaceAutoProvision controller
+	terminal --> vi /etc/kubernetes/manifests/kube-apiserver.yaml
+
+kube-apiserver.yaml
+-----------------------------------------------------------
+...
+spec:
+  containers:
+  - command:
+    - kube-apiserver
+    - --advertise-address=192.168.100.154
+    - --allow-privileged=true
+    - --authorization-mode=Node,RBAC
+    - --client-ca-file=/etc/kubernetes/pki/ca.crt
+    - --enable-admission-plugins=NodeRestriction,NamespaceAutoProvision	     # added admission controller NamespaceAutoProvision
+...
+-----------------------------------------------------------
+save changes- escape, :wq!, enter
+
+Verify changes
+	terminal --> cat /etc/kubernetes/manifests/kube-apiserver.yaml
+
+Wait a few minutes for api-server to restart
+
+- click 'Check' button
+
+
+
+
+
+6. Now, let's run the nginx pod in blue namespace and check if it succeeds.
+---------------------------------------------------------------------------
+Pod image: nginx
+
+Try to create the pod
+	terminal --> kubectl run nginx --image nginx -n blue
+
+List namespaces
+	terminal --> kubectl get namespaces
+
+# result:
+NAME              STATUS   AGE
+blue              Active   46s		# automatically created 'blue' namespace
+default           Active   23m
+kube-flannel      Active   23m
+kube-node-lease   Active   23m
+kube-public       Active   23m
+kube-system       Active   23m
+
+
+- click 'Check' button
+
+
+
+7. Note that the NamespaceExists and NamespaceAutoProvision admission controllers are deprecated and now replaced by NamespaceLifecycle admission controller.
+-------------------------------------------------------------------------------------------------------------------
+The NamespaceLifecycle admission controller will make sure that requests
+to a non-existent namespace is rejected and that the default namespaces such as
+default, kube-system and kube-public cannot be deleted.
+
+
+- click 'Ok' button
+
+
+
+
+8. Disable DefaultStorageClass admission controller
+---------------------------------------------------
+This admission controller observes creation of PersistentVolumeClaim objects that do not request any specific storage class and automatically adds a default storage class to them. This way, users that do not request any special storage class do not need to care about them at all and they will get the default one.
+
+Note: Once you update kube-apiserver yaml file then please wait few mins for the kube-apiserver to restart completely.
+
+
+Edit kube-apiserver manifests file
+	terminal --> vi /etc/kubernetes/manifests/kube-apiserver.yaml
+
+kube-apiserver.yaml
+-----------------------------------------------------------
+...
+spec:
+  containers:
+  - command:
+    - kube-apiserver
+    - --advertise-address=192.168.100.154
+    - --allow-privileged=true
+    - --authorization-mode=Node,RBAC
+    - --client-ca-file=/etc/kubernetes/pki/ca.crt
+    - --enable-admission-plugins=NodeRestriction,NamespaceAutoProvision
+    - --disable-admission-plugins=DefaultStorageClass				# added
+...
+-----------------------------------------------------------
+save changes - escape, :wq!, enter
+
+Verify changes
+	terminal --> cat /etc/kubernetes/manifests/kube-apiserver.yaml
+
+Wait few minutes for server to restart
+
+- click 'Check' button
+
+
+
+9. Since the kube-apiserver is running as pod you can check the process to see enabled and disabled plugins.
+------------------------------------------------------------------------------------------------------------
+
+List admission plugins
+	terminal --> ps -ef | grep kube-apiserver | grep admission-plugins
+
+	# result: --enable-admission-plugins=NodeRestriction,NamespaceAutoProvision --disable-admission-plugins=DefaultStorageClass
+
+- click 'Ok' button
+
+
+
+
+
+================================================================
+Section 3 84. 2025 Validating and Mutating Admission Controllers
+================================================================
+
+kubectl	-> Authentication -> Authorization -> Admission Controller -> Create Object
+
+Type of admission controller
+	- NamespaceExists 	- Validating admission controller - validate the request and allow or deny it
+	- DefaultStorageClass	- Mutating admission controller - enabled by default - can change the request (change object before creation - adding default storage class to i)
+
+Admission controllers are executed in order - mutating, validating - so if any mutation is not permitted or mutation is required, the request will be rejected.
+
+
+
+How we can create adn add custom admission contrllers?
+------------------------------------------------------
+
+There are special admission controllers that allow external admission controllers
+	- MutatingAdmissionWebhook
+	- ValidatingAdmissionWebhook
+
+After all build in and enabled admission controllers, the request goes true admission webhooks and execute our own admission controllers placed on Admission Webhook Server. The communication is in JSON format.
+
+
+How to set up a admission webhook configuration?
+------------------------------------------------
+1. Set up a Admission Webhook Server and host it
+2. Configure a webhook on Kubernetes by creating a webhook cofiguration object
+
+
+1. Deploy Webhook Server
+	- set source code - https://github.com/kubernetes/kubernetes/blob/v1.13.0/test/images/webhook/main.go
+	- set deployment and service on kubernetes cluster for the admission webhook server
+
+2. Creating a webhook cofiguration object
+
+-----------------------------------------------
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration 			#  MutatingWebhookConfiguration for mutating admission controller
+metadata:
+  name: "pod-policy.example.com"
+
+webhooks:
+- name: "pod-policy.example.com"
+  clientConfig:						# config the location of admission webhook server
+      # url: "https://external-server.example.com"	# for external server that is not part of our Kubernetes cluster
+      service:						# specify the service if the server is part of our kub cluster
+	namespace: "webhook-namespace"			# specify the namespace
+	name: "webhook-service"				# name of the taget service
+      caBundle: "Ci0tLS0tQk.....tLS0K"			# certificate bundel for secure communication
+
+  rules:						# specify when to call the server for validation - not for all requests
+    - apiGroups: [""]
+      apiVersion: ["v1"] 
+      operations: ["CREATE"]				# call when creating pods
+      resources: ["pods"]
+      scope: "Namespaced"
+-----------------------------------------------
+
+
+
+
+
+================================================================================
+Section 3 84. 2025 Validating and Mutating Admission Controllers - Practice Test
+================================================================================
+
+1. Which of the below combination is correct for Mutating and validating admission controllers ?
+------------------------------------------------------------------------------------------------
+
+We know that first controller have to be mutating and second have to be validationg
+
+- choose 'NamespaceAutoProvision- Mutating, NamespaceExists - Validating' as answer
+
+
+
+2. What is the flow of invocation of admission controllers?
+-----------------------------------------------------------
+
+We know that first mutating controllers have to take effect and the validation controller have to validate the configurations
+
+- choose 'First Mutating then Validating' as answer
+
+
+
+
+3. Create namespace webhook-demo where we will deploy webhook components
+------------------------------------------------------------------------
+
+Create namespace webhook-demo
+	terminal --> kubectl create ns webhook-demo
+
+	# result: namespace/webhook-demo created
+
+Validate namespace creation
+	terminal --> kubectl get ns
+
+# result:
+NAME              STATUS   AGE
+default           Active   9m41s
+kube-flannel      Active   9m36s
+kube-node-lease   Active   9m41s
+kube-public       Active   9m41s
+kube-system       Active   9m41s
+webhook-demo      Active   58s		# created
+
+- click 'Check' button
+
+
+
+
+4. Create TLS secret webhook-server-tls for secure webhook communication in webhook-demo namespace.
+---------------------------------------------------------------------------------------------------
+We have already created below cert and key for webhook server which should be used to create secret.
+
+Certificate : /root/keys/webhook-server-tls.crt
+Key : /root/keys/webhook-server-tls.key
+
+
+Create the secret
+	terminal --> kubectl create secret tls webhook-server-tls --cert "/root/keys/webhook-server-tls.crt" --key "/root/keys/webhook-server-tls.key" -n webhook-demo
+
+	# kubectl					- common kubernetes command
+	# create					- action
+	# secret tls					- object type
+	# webhook-server-tls				- name of the object
+	# --cert "/root/keys/webhook-server-tls.crt"	- set certificate
+	# --key "/root/keys/webhook-server-tls.key"	- set key
+	# -n webhook-demo				- specify the namespace
+
+	# result: secret/webhook-server-tls created
+
+- click 'Check' button
+
+
+
+
+5. Create webhook deployment now.
+---------------------------------
+We have already added sample deployment definition under /root/webhook-deployment.yaml so just create deployment with that definition.
+
+Print the deployment
+	terminal --> cat /root/webhook-deployment.yaml
+
+Apply the deployment
+	terminal --> kubectl apply -f /root/webhook-deployment.yaml
+
+	# result: deployment.apps/webhook-server created
+
+- click 'Check' button
+
+
+
+6. Create webhook service now so that admission controller can communicate with webhook.
+----------------------------------------------------------------------------------------
+We have already added sample service definition under /root/webhook-service.yaml so just create service with that definition.
+
+Print the service configuration
+	terminal --> cat /root/webhook-service.yaml
+
+webhook-service.yaml
+------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: webhook-server
+  namespace: webhook-demo
+spec:
+  selector:
+    app: webhook-server
+  ports:
+    - port: 443
+      targetPort: webhook-api
+------------------------------------------
+
+Create the service
+	terminal --> kubectl apply -f /root/webhook-service.yaml
+
+	# result: service/webhook-server created
+
+- click 'Check' button
+
+
+
+7. We have added MutatingWebhookConfiguration under /root/webhook-configuration.yaml.
+-------------------------------------------------------------------------------------
+If we apply this configuration which resource and actions it will affect?
+
+Print the configuration
+	terminal --> cat /root/webhook-configuration.yaml
+
+webhook-configuration.yaml
+----------------------------------------------
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: demo-webhook
+webhooks:
+  - name: webhook-server.webhook-demo.svc
+    clientConfig:
+      service:
+        name: webhook-server
+        namespace: webhook-demo
+        path: "/mutate"
+      caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURQekNDQWllZ0F3SUJBZ0lVTm1zTUZRbXJOT0xZSlNwTUhhVFpXd1RXRkM4d0RRWUpLb1pJaHZjTkFRRUwKQlFBd0x6RXRNQ3NHQTFVRUF3d2tRV1J0YVhOemFXOXVJRU52Ym5SeWIyeHNaWElnVjJWaWFHOXZheUJFWlcxdgpJRU5CTUI0WERUSTFNREl4TVRBNU1qTXlNbG9YRFRJMU1ETXhNekE1TWpNeU1sb3dMekV0TUNzR0ExVUVBd3drClFXUnRhWE56YVc5dUlFTnZiblJ5YjJ4c1pYSWdWMlZpYUc5dmF5QkVaVzF2SUVOQk1JSUJJakFOQmdrcWhraUcKOXcwQkFRRUZBQU9DQVE4QU1JSUJDZ0tDQVFFQWwyc2RBYUZYUWlyQUUwTU5VYy9obm8xZ1U5L21WZDZ2bUpVcQpXYVV3dHJyWTlxdmZHNDRXak5YbUJKQmhKWnJacnZKbGpYZkRsWkZDTlE4bm5XQ1d6NFk4WUJaaGNmZ0lGbitnCmdjZm9qaVlsVkw5U3VOam42NDVIRUZuT3ZjRVc2T3FKZGxpYVJ3OUNGRzNFZ3c2WVB4SFFpaWN2WWRnQldsS0QKY2QxemNQQm1SMkFPTEVJeURZR2Zpc3dvNkZWbDVLbmU3bVhySlhobmZHY2VwQituYWRoOUJjSTRoSjVsQmpscgpXNnFCNGZtaEp6S2N5OW9JSndLbThKY2xScnQ5YWhOdmQvRWl6bkdDOVNFTUZNMitydzd3WEYvU0RzZkQvcG9ZCmJTYnlpMkhkZUNYWEIwYzc5aVplWGpBTzI2bDRCM1JVbENZTEhCVFlsUC9wdkRicStRSURBUUFCbzFNd1VUQWQKQmdOVkhRNEVGZ1FVbnJJVExhZ2kzS25ic1FySzg1OTZJWklvTkZNd0h3WURWUjBqQkJnd0ZvQVVucklUTGFnaQozS25ic1FySzg1OTZJWklvTkZNd0R3WURWUjBUQVFIL0JBVXdBd0VCL3pBTkJna3Foa2lHOXcwQkFRc0ZBQU9DCkFRRUFWeXVJWkVhczZidExwNlEvVTYyWjhkd3NET1hxSzBQWUJZdkIvUmZNR3ovbnVLOWZnWFJVbVpTWTE0dWMKMDJhTWZ0M2FnVi9NZDJHeXl5VXZ5dVJsS3N0alR1R3VVZFF1cDRNakN4bFBXRk5qc3huUkdjU1FpZXJvaUZ4Wgo3QzdMc21PZ1JJZkxMOW1SWU9ZT1JEem1hZ01ka0J6YWFKd0NWbi8wcDRTMFJrSDVnVG5WQXNyc1ltUll4Wm1VClRWdlJ2TmVXY3JYTkhRV2lRNEprdzQrbUI5Rld6YzMwT0tVUVpYNW5RMWNOTUtzaXNmdU1tb0xaTE9wMFR4YkEKV2ExL2FoMitFbExTVkI5bklMRzlvWWNWQ2UrYWhpdXNmTzNoR2c5MG1reGNpdkF4M0NmTGd2b3JJTXdsOXg5ZAo5NlNRRWtZeVpkRUROcjNwQUhMSlNoTEtvUT09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+    rules:
+      - operations: [ "CREATE" ]			# create pods
+        apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
+    admissionReviewVersions: ["v1beta1"]
+    sideEffects: None
+----------------------------------------------
+
+- choose 'Pod with CREATE operations' as answer
+
+
+
+
+8. Now lets deploy MutatingWebhookConfiguration in /root/webhook-configuration.yaml
+-----------------------------------------------------------------------------------
+
+Print mutating controller configuration
+	terminal --> cat /root/webhook-configuration.yaml
+
+/webhook-configuration.yaml
+---------------------------------------------------
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: demo-webhook
+webhooks:
+  - name: webhook-server.webhook-demo.svc
+    clientConfig:
+      service:
+        name: webhook-server
+        namespace: webhook-demo
+        path: "/mutate"
+      caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURQekNDQWllZ0F3SUJBZ0lVTm1zTUZRbXJOT0xZSlNwTUhhVFpXd1RXRkM4d0RRWUpLb1pJaHZjTkFRRUwKQlFBd0x6RXRNQ3NHQTFVRUF3d2tRV1J0YVhOemFXOXVJRU52Ym5SeWIyeHNaWElnVjJWaWFHOXZheUJFWlcxdgpJRU5CTUI0WERUSTFNREl4TVRBNU1qTXlNbG9YRFRJMU1ETXhNekE1TWpNeU1sb3dMekV0TUNzR0ExVUVBd3drClFXUnRhWE56YVc5dUlFTnZiblJ5YjJ4c1pYSWdWMlZpYUc5dmF5QkVaVzF2SUVOQk1JSUJJakFOQmdrcWhraUcKOXcwQkFRRUZBQU9DQVE4QU1JSUJDZ0tDQVFFQWwyc2RBYUZYUWlyQUUwTU5VYy9obm8xZ1U5L21WZDZ2bUpVcQpXYVV3dHJyWTlxdmZHNDRXak5YbUJKQmhKWnJacnZKbGpYZkRsWkZDTlE4bm5XQ1d6NFk4WUJaaGNmZ0lGbitnCmdjZm9qaVlsVkw5U3VOam42NDVIRUZuT3ZjRVc2T3FKZGxpYVJ3OUNGRzNFZ3c2WVB4SFFpaWN2WWRnQldsS0QKY2QxemNQQm1SMkFPTEVJeURZR2Zpc3dvNkZWbDVLbmU3bVhySlhobmZHY2VwQituYWRoOUJjSTRoSjVsQmpscgpXNnFCNGZtaEp6S2N5OW9JSndLbThKY2xScnQ5YWhOdmQvRWl6bkdDOVNFTUZNMitydzd3WEYvU0RzZkQvcG9ZCmJTYnlpMkhkZUNYWEIwYzc5aVplWGpBTzI2bDRCM1JVbENZTEhCVFlsUC9wdkRicStRSURBUUFCbzFNd1VUQWQKQmdOVkhRNEVGZ1FVbnJJVExhZ2kzS25ic1FySzg1OTZJWklvTkZNd0h3WURWUjBqQkJnd0ZvQVVucklUTGFnaQozS25ic1FySzg1OTZJWklvTkZNd0R3WURWUjBUQVFIL0JBVXdBd0VCL3pBTkJna3Foa2lHOXcwQkFRc0ZBQU9DCkFRRUFWeXVJWkVhczZidExwNlEvVTYyWjhkd3NET1hxSzBQWUJZdkIvUmZNR3ovbnVLOWZnWFJVbVpTWTE0dWMKMDJhTWZ0M2FnVi9NZDJHeXl5VXZ5dVJsS3N0alR1R3VVZFF1cDRNakN4bFBXRk5qc3huUkdjU1FpZXJvaUZ4Wgo3QzdMc21PZ1JJZkxMOW1SWU9ZT1JEem1hZ01ka0J6YWFKd0NWbi8wcDRTMFJrSDVnVG5WQXNyc1ltUll4Wm1VClRWdlJ2TmVXY3JYTkhRV2lRNEprdzQrbUI5Rld6YzMwT0tVUVpYNW5RMWNOTUtzaXNmdU1tb0xaTE9wMFR4YkEKV2ExL2FoMitFbExTVkI5bklMRzlvWWNWQ2UrYWhpdXNmTzNoR2c5MG1reGNpdkF4M0NmTGd2b3JJTXdsOXg5ZAo5NlNRRWtZeVpkRUROcjNwQUhMSlNoTEtvUT09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+    rules:
+      - operations: [ "CREATE" ]
+        apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
+    admissionReviewVersions: ["v1beta1"]
+    sideEffects: None
+---------------------------------------------------
+	
+Deploy the controller
+	terminal --> kubectl apply -f /root/webhook-configuration.yaml
+
+	# result: mutatingwebhookconfiguration.admissionregistration.k8s.io/demo-webhook created
+
+- click 'Check' button
+
+
+
+
+
+9. In previous steps we have deployed demo webhook which does below
+-------------------------------------------------------------------
+- Denies all request for pod to run as root in container if no securityContext is provided.
+- If no value is set for runAsNonRoot, a default of true is applied, and the user ID defaults to 1234
+- Allow to run containers as root if runAsNonRoot set explicitly to false in the securityContext
+
+In next steps we have added some pod definitions file for each scenario. Deploy those pods with existing definitions file and validate the behaviour of our webhook
+
+- clic 'Ok' button
+
+
+
+
+10. Deploy a pod with no securityContext specified.
+---------------------------------------------------
+We have added pod definition file under /root/pod-with-defaults.yaml
+
+Print the configuration
+	terminal --> cat /root/pod-with-defaults.yaml
+
+/root/pod-with-defaults.yaml
+-----------------------------------------
+# A pod with no securityContext specified.
+# Without the webhook, it would run as user root (0). The webhook mutates it
+# to run as the non-root user with uid 1234.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-with-defaults
+  labels:
+    app: pod-with-defaults
+spec:
+  restartPolicy: OnFailure
+  containers:
+    - name: busybox
+      image: busybox
+      command: ["sh", "-c", "echo I am running as user $(id -u)"]
+-----------------------------------------
+
+Deploy the pod
+	terminal --> kubectl apply -f /root/pod-with-defaults.yaml
+
+	# result: pod/pod-with-defaults created
+
+- clic 'Check' button
+
+
+
+
+11. What are runAsNonRoot and runAsUser values for previously created pods securityContext?
+-------------------------------------------------------------------------------------------
+We did not specify any securityContext values in pod definition so check out the changes done by mutation webhook in pod
+
+List pods
+	terminal --> kubectl get pods
+
+# result:
+NAME                READY   STATUS      RESTARTS   AGE
+pod-with-defaults   0/1     Completed   0          106s		# this is our pod
+simple-webapp-1     1/1     Running     0          17m
+
+Show security context for pod-with-defaults pod
+	terminal --> kubectl get pod pod-with-defaults -o yaml
+
+------------------------------------
+...
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1234
+...
+------------------------------------
+
+- choose 'runAsNonRoot: true, runAsUser: 1234' as answer
+
+
+
+
+12. Deploy pod with a securityContext explicitly allowing it to run as root
+---------------------------------------------------------------------------
+We have added pod definition file under /root/pod-with-override.yaml
+
+Validate securityContext after you deploy this pod
+
+
+Print the pod configuration
+	terminal --> cat /root/pod-with-override.yaml
+
+pod-with-override.yaml
+--------------------------------------
+# A pod with a securityContext explicitly allowing it to run as root.
+# The effect of deploying this with and without the webhook is the same. The
+# explicit setting however prevents the webhook from applying more secure
+# defaults.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-with-override
+  labels:
+    app: pod-with-override
+spec:
+  restartPolicy: OnFailure
+  securityContext:
+    runAsNonRoot: false			# security setting
+  containers:
+    - name: busybox
+      image: busybox
+      command: ["sh", "-c", "echo I am running as user $(id -u)"]
+--------------------------------------
+
+
+Deploy the pod
+	terminal --> kubectl apply -f /root/pod-with-override.yaml
+
+	# result: pod/pod-with-override created
+
+- clic 'Check' button
+
+
+
+
+13. Deploy a pod with a conflicting securityContext i.e. pod running with a user id of 0 (root)
+-----------------------------------------------------------------------------------------------
+We have added pod definition file under /root/pod-with-conflict.yaml
+
+Mutating webhook should reject the request as its asking to run as root user without setting runAsNonRoot: false
+
+Print the pod configuration
+	terminal --> cat /root/pod-with-conflict.yaml
+
+pod-with-conflict.yaml
+--------------------------------------------
+# A pod with a conflicting securityContext setting: it has to run as a non-root
+# user, but we explicitly request a user id of 0 (root).
+# Without the webhook, the pod could be created, but would be unable to launch
+# due to an unenforceable security context leading to it being stuck in a
+# 'CreateContainerConfigError' status. With the webhook, the creation of
+# the pod is outright rejected.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-with-conflict
+  labels:
+    app: pod-with-conflict
+spec:
+  restartPolicy: OnFailure
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 0
+  containers:
+    - name: busybox
+      image: busybox
+      command: ["sh", "-c", "echo I am running as user $(id -u)"]
+--------------------------------------------
+
+
+Try to deploy the pod as root user
+	terminal --> kubectl apply -f /root/pod-with-conflict.yaml
+
+	# result: Error from server: error when creating "/root/pod-with-conflict.yaml": admission webhook "webhook-server.webhook-demo.svc" denied the request: runAsNonRoot specified, but runAsUser set to 0 (the root user)
+
+
+- clic 'Check' button
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,936 @@
+CONTENT
+
+Section 11 252. Introduction to Deployment with Kubeadm
+Section 11 253. Ewaources
+Section 11 254. Deploy with Kubeadm - Provision VMs with Vagrant
+Section 11 255. Deployment with Kubeadm - DEMO
+Section 11 257. Deploy a Kubernetes Cluster using kubeadm - Practice Test
+
+
+=======================================================
+Section 11 252. Introduction to Deployment with Kubeadm
+=======================================================
+
+Setup - kubeadm
+
+
+kubeadm 
+---------------------------------------------------------------------------
+Master Node		Woekr Node 1			Worker Node 2
+---------------------------------------------------------------------------
+
+kube-apiserver		kubelet				kubelet
+etcd
+node-controller
+replica-controller	Container Runtime		Container Runtime
+
+
+
+Steps to setup Kubernetes Cluster with kubeadm
+----------------------------------------------
+1. Ready to go VMs - 1 master node and 2 worker nodes
+2. Install Container Runtime (containerd) on all Nodes
+3. Install kubeadm tool on all Nodes
+4. Initialize Master Server (Node)
+5. Set POD Network
+6. Worker Nodes Join Master Node
+7. Deploy application on Kubernetes environment
+
+
+
+=========================
+Section 11 253. Ewaources
+=========================
+
+The vagrant file used in the next video is available here:
+	- https://github.com/kodekloudhub/certified-kubernetes-administrator-course
+
+Here's the link to the documentation for kubeadm:
+	- https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/
+
+
+
+
+
+================================================================
+Section 11 254. Deploy with Kubeadm - Provision VMs with Vagrant
+================================================================
+
+Software Used
+	- VirtualBox		- managing Virtual Machines
+	- Vagrant		- automate configuration of VMs
+
+Download and Install VirtualBox:
+	- https://www.virtualbox.org/wiki/Downloads
+
+Download and install Vegrant
+	- https://developer.hashicorp.com/vagrant/install
+	- verify vagrant instalation	
+		terminal --> vagrant -v
+
+Clone the repo
+	- create folder on the desktop and open it in VSCode
+	terminal --> git clone https://github.com/kodekloudhub/certified-kubernetes-administrator-course.git
+
+Open Vengartfile file in folder and look over it
+	terminal --> cd certified-kubernetes-administrator-course\kubeadm-clusters\virtualbox\
+	terminal --> ls
+	# don't worry if the file looks different from this on the video
+
+Initialize Vagrant by asking for status
+	terminal --> vagrant status
+
+# result:
+-------------------------------------------------------------------------
+Current machine states:
+
+controlplane              not created (virtualbox)
+node01                    not created (virtualbox)
+node02                    not created (virtualbox)
+
+This environment represents multiple VMs. The VMs are all listed
+above with their current state. For more information about a specific
+VM, run `vagrant status NAME`.
+-------------------------------------------------------------------------
+
+Start VMs 
+	terminal --> vagrant up
+
+	# this will take some time to create and boot the VMs
+
+Verify start of the VMs
+	terminal --> vagrant status
+
+# result:
+-------------------------------------------------------------------------
+Current machine states:
+
+controlplane              running (virtualbox)
+node01                    running (virtualbox)
+node02                    running (virtualbox)
+
+This environment represents multiple VMs. The VMs are all listed
+above with their current state. For more information about a specific
+VM, run `vagrant status NAME`.
+-------------------------------------------------------------------------
+
+
+Connect to all nodes to check connections
+-----------------------------------------
+Login to Master Node
+	terminal --> vagrant ssh controlplane
+	terminal --> ls -la
+	terminal --> logout
+
+Login to Node01
+	terminal --> vagrant ssh node01
+	terminal --> ls -la
+	terminal --> logout
+
+Login to Node02
+	terminal --> vagrant ssh node02
+	terminal --> ls -la
+	terminal --> logout
+
+
+
+
+
+==============================================
+Section 11 255. Deployment with Kubeadm - DEMO
+==============================================
+
+Steps to setup Kubernetes Cluster with kubeadm
+----------------------------------------------
+1. Ready to go VMs - 1 master node and 2 worker nodes		# DONE
+2. Install Container Runtime (containerd) on all Nodes
+3. Install kubeadm tool on all Nodes
+4. Initialize Master Server (Node)
+5. Set POD Network
+6. Worker Nodes Join Master Node
+7. Deploy application on Kubernetes environment
+
+Set 3 terminal sessions
+	- master node
+		terminal --> cd certified-kubernetes-administrator-course\kubeadm-clusters\virtualbox\
+		terminal --> vagrant ssh controlplane
+	- node01
+		terminal --> cd certified-kubernetes-administrator-course\kubeadm-clusters\virtualbox\
+		terminal --> vagrant ssh node01
+	- node02
+		terminal --> cd certified-kubernetes-administrator-course\kubeadm-clusters\virtualbox\
+		terminal --> vagrant ssh node02
+
+
+Show network interface of masetr node
+	master node terminal --> ip add
+
+# result - This is the interface we will use for master node - enp0s8 with IP 192.168.1.215/24
+------------------------------------------------------------------------------------
+3: enp0s8: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    link/ether 08:00:27:c0:13:fa brd ff:ff:ff:ff:ff:ff
+    inet 192.168.1.252/24 metric 100 brd 192.168.1.255 scope global dynamic enp0s8
+       valid_lft 86064sec preferred_lft 86064sec
+    inet6 fe80::a00:27ff:fec0:13fa/64 scope link 
+       valid_lft forever preferred_lft forever
+------------------------------------------------------------------------------------
+
+
+
+Show network interface of node01
+	node01 terminal --> ip add
+
+# result - This is the interface we will use for node01 - enp0s8 with IP 192.168.1.30/24
+------------------------------------------------------------------------------------
+3: enp0s8: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    link/ether 08:00:27:5f:d7:aa brd ff:ff:ff:ff:ff:ff
+    inet 192.168.1.74/24 metric 100 brd 192.168.1.255 scope global dynamic enp0s8
+       valid_lft 86123sec preferred_lft 86123sec
+    inet6 fe80::a00:27ff:fe5f:d7aa/64 scope link
+       valid_lft forever preferred_lft forever
+------------------------------------------------------------------------------------
+
+
+Show network interface of node02
+	node02 terminal --> ip add
+
+# result - This is the interface we will use for node02 - enp0s8 with 192.168.1.172/24
+------------------------------------------------------------------------------------
+3: enp0s8: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    link/ether 08:00:27:de:a0:e9 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.1.39/24 metric 100 brd 192.168.1.255 scope global dynamic enp0s8
+       valid_lft 86185sec preferred_lft 86185sec
+    inet6 fe80::a00:27ff:fede:a0e9/64 scope link
+       valid_lft forever preferred_lft forever
+------------------------------------------------------------------------------------
+
+
+Open Documentation tab - Install Kubeadm
+	- https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/
+
+Open Documentation tab - Creating a cluster with kubeadm
+	- https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/
+
+If we create a High Available Cluster
+	- https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/
+
+
+
+
+
+Installing kubeadm, kubelet and kubectl
+=======================================
+
+3. Install kubeadm tool on all Nodes
+------------------------------------
+
+Kubernetes Docuemntation:
+https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#installing-kubeadm-kubelet-and-kubectl
+- install kubeadm - step 2
+- add apt repo - step 3
+- Update the apt  - step 4
+
+
+
+Install kubeadm on master node, add apt repository and update apt packages
+--------------------------------------------------------------------------
+	Master Node terminal --> curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+	Master Node terminal --> echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+	Master Node terminal --> sudo apt-get update
+	Master Node terminal --> sudo apt-get install -y kubelet kubeadm kubectl
+	Master Node terminal --> sudo apt-mark hold kubelet kubeadm kubectl
+
+Verify kubeadm installation
+	Master Node terminal --> kubeadm version
+
+# result:
+kubeadm version: &version.Info{Major:"1", Minor:"32", GitVersion:"v1.32.1", GitCommit:"e9c9be4007d1664e68796af02b8978640d2c1b26", GitTreeState:"clean", BuildDate:"2025-01-15T14:39:14Z", GoVersion:"go1.23.4", Compiler:"gc", Platform:"linux/amd64"}
+
+
+
+Install Kubeadm on node01, add apt repository and update apt packages
+---------------------------------------------------------------------
+	node01 terminal --> curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+	node01 terminal --> echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+	node01 terminal --> sudo apt-get update
+	node01 terminal --> sudo apt-get install -y kubelet kubeadm kubectl
+	node01 terminal --> sudo apt-mark hold kubelet kubeadm kubectl
+
+Verify kubeadm installation
+	node01 terminal --> kubeadm version
+
+# result:
+kubeadm version: &version.Info{Major:"1", Minor:"32", GitVersion:"v1.32.1", GitCommit:"e9c9be4007d1664e68796af02b8978640d2c1b26", GitTreeState:"clean", BuildDate:"2025-01-15T14:39:14Z", GoVersion:"go1.23.4", Compiler:"gc", Platform:"linux/amd64"}
+
+
+
+Install Kubeadm on node02, add apt repository and update apt packages
+---------------------------------------------------------------------
+	node02 terminal --> curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+	node02 terminal --> echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+	node02 terminal --> sudo apt-get update
+	node02 terminal --> sudo apt-get install -y kubelet kubeadm kubectl
+	node02 terminal --> sudo apt-mark hold kubelet kubeadm kubectl
+
+Verify kubeadm installation
+	node02 terminal --> kubeadm version
+
+# result:
+kubeadm version: &version.Info{Major:"1", Minor:"32", GitVersion:"v1.32.1", GitCommit:"e9c9be4007d1664e68796af02b8978640d2c1b26", GitTreeState:"clean", BuildDate:"2025-01-15T14:39:14Z", GoVersion:"go1.23.4", Compiler:"gc", Platform:"linux/amd64"}
+
+
+
+
+Creating a cluster with kubeadm
+===============================
+
+Kubernetes Documentation
+	- https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/
+
+
+2. Install Container Runtime (containerd) on all Nodes
+------------------------------------------------------
+
+Kubernetes Documentation 
+	- https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#installing-runtime
+	- https://kubernetes.io/docs/setup/production-environment/container-runtimes/
+		using containerd - https://kubernetes.io/docs/setup/production-environment/container-runtimes/#containerd
+
+Install containerd documentation
+	- https://github.com/containerd/containerd/blob/main/docs/getting-started.md
+
+
+Configure systemd drivers 
+- set permissions for pods to use only configured resources
+- we use systemd driver (default) after v1.22. We have to configure the same driver on kubelet and container runtime
+	- https://kubernetes.io/docs/setup/production-environment/container-runtimes/#containerd-systemd
+
+
+4. Initialize Master Server (Node)
+----------------------------------
+If more than one master node, pick first and then do it for the rest.
+
+Initialize your control-plane node
+- https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/#initializing-your-control-plane-node
+
+Step 1 - pass --control-plane-endpoint option to the load balancer for HA cluster			# not our case
+Step 2 - pass --pod-network-cidr option for subnet that our pods IPs is going to be pooled of
+Step 3 - pass --cri-socket option if the default locations of the container runtime is changed		# not our case
+	-https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#installing-runtime
+
+Step 4 - pass --apiserver-advertise-address option to specify the IP of our kube-apiserver
+- https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/#considerations-about-apiserver-advertise-address-and-controlplaneendpoint
+	- in our case we can see this with 
+		terminal --> ip add 
+		# result: master node - enp0s8 with 192.168.1.252  # this is the IP we will use to specify kube-apiserver
+
+5. Set POD Network
+------------------
+Install network plugin - flannel in this case
+kubernetes documentation - https://kubernetes.io/docs/concepts/cluster-administration/addons/#networking-and-network-policy
+flannel repo - https://github.com/flannel-io/flannel#deploying-flannel-manually
+
+Optional
+# if we are not using default pods IP range "10.244.0.0/16", we need to modify the flannel config file
+Download the file
+	master node terminal --> wget https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+Edit the file
+	master node terminal --> vi kube-flannel.yml
+---------------------------------------
+...
+net-conf-json: |
+  {
+    "Network": "10.244.0.0/16",			# modify this address
+    "EnableNFTables": false,
+    "Backend": {
+      "Type": "vxlan"
+    }
+  }
+...
+---------------------------------------
+
+
+
+
+
+
+
+Install containerd, set systemd drivers and initialize the master node
+----------------------------------------------------------------------
+	Master Node terminal --> sudo apt update
+	Master Node terminal --> sudo apt install -y containerd
+
+Check what driver is installed on our system
+	Master Node terminal --> ps -p 1
+
+# result:
+    PID TTY          TIME CMD
+      1 ?        00:00:04 systemd		# systemd
+
+Create directory for systemd driver
+	Master Node terminal --> sudo mkdir -p /etc/containerd
+
+Generate systemd driver config file and set it as default
+	Master Node terminal --> containerd config default | sed 's/SystemdCgroup = false/SystemdCgroup = true/' | sudo tee /etc/containerd/config.toml
+
+Verify the created settings and the section that they are in
+	Master Node terminal --> cat /etc/containerd/config.toml | grep -i SystemdCgroup -B 50
+
+Restart containerd container runtime
+	Master Node terminal --> sudo systemctl restart containerd
+
+Set net.ipv4.ip_forward=1
+	Master Node terminal --> sudo nano /etc/sysctl.conf
+	- enable line 'net.ipv4.ip_forward=1'
+	- save changes
+Reload changes
+	Master Node terminal --> sudo sysctl -p
+	# result: net.ipv4.ip_forward = 1
+
+Initialize master node
+	Master Node terminal --> sudo kubeadm init --apiserver-advertise-address 192.168.1.252 --pod-network-cidr "10.244.0.0/16" --upload-certs
+
+# result:
+-----------------------------------------------------------------------------
+Your Kubernetes control-plane has initialized successfully!
+
+To start using your cluster, you need to run the following as a regular user:
+
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+Alternatively, if you are the root user, you can run:
+
+  export KUBECONFIG=/etc/kubernetes/admin.conf
+
+You should now deploy a pod network to the cluster.
+Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
+  https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+Then you can join any number of worker nodes by running the following on each as root:
+
+kubeadm join 192.168.1.252:6443 --token aglnvh.w1nsio26idycbm5c \
+        --discovery-token-ca-cert-hash sha256:2ffe58d095a9f3e7d36c0f65f3c6b09ee4e74a7e67312eed1620d8cdccd3800b
+-----------------------------------------------------------------------------
+
+# if we run HA cluster there will be a command to run on other master nodes to join the cluster like the worker node command.
+
+Show config file for cluster connection
+	Master Node terminal --> sudo cat /etc/kubernetes/admin.conf
+
+Set the config file in the master node
+	Master Node terminal --> mkdir -p $HOME/.kube
+	Master Node terminal --> sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+	Master Node terminal --> sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+Show nodes to verify master node initialization
+	Master Node terminal --> kubectl get nodes
+
+# result:
+NAME           STATUS     ROLES           AGE     VERSION
+controlplane   NotReady   control-plane   6m12s   v1.32.1	# need a configured network plugin to be READY
+
+
+Install network plugin 'flannel'
+	Master Node terminal --> kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+
+# result:
+namespace/kube-flannel created
+serviceaccount/flannel created
+clusterrole.rbac.authorization.k8s.io/flannel created
+clusterrolebinding.rbac.authorization.k8s.io/flannel created
+configmap/kube-flannel-cfg created
+daemonset.apps/kube-flannel-ds created
+
+
+Verify network plugin installation
+	Master Node terminal --> kubectl get pod -n kube-flannel
+
+# result:
+NAME                    READY   STATUS    RESTARTS      AGE
+kube-flannel-ds-9blmh   1/1     Running   4 (56s ago)   2m4s
+
+# If error
+	Load module br_netfilter
+		Master Node terminal --> sudo modprobe br_netfilter
+	Set loading module across reboots
+		Master Node terminal --> echo "br_netfilter" | sudo tee /etc/modules-load.d/k8s.conf
+	Restart the flannel pod
+		Master Node terminal --> kubectl delete pod -n kube-flannel <pod_name>
+
+
+Check if the master node is in READY status
+	Master Node terminal --> kubectl get node
+
+# result:
+NAME           STATUS   ROLES           AGE   VERSION
+controlplane   Ready    control-plane   27m   v1.32.1		# the status is "READY"
+
+
+6. Worker Nodes Join Master Node
+--------------------------------
+Join Worker nodes to the cluster.
+
+
+Wait few minutes after the Worker nodes are joined and list the nodes
+	Master Node terminal --> kubectl get node
+
+# result:
+NAME           STATUS   ROLES           AGE     VERSION
+controlplane   Ready    control-plane   42m     v1.32.1
+node01         Ready    <none>          2m28s   v1.32.1
+node02         Ready    <none>          115s    v1.32.1
+
+
+List flannel pods
+	Master Node terminal --> kubectl get pod -n kube-flannel
+
+
+
+
+
+
+
+Install containerd on node01
+----------------------------
+Update OS
+	node01 terminal --> sudo apt update
+
+Install Container Runtime 'containerd'
+	node01 terminal --> sudo apt install -y containerd
+
+Check what driver is installed on our system
+	node01 terminal --> ps -p 1
+
+# result:
+    PID TTY          TIME CMD
+      1 ?        00:00:04 systemd		# systemd
+
+Create directory for systemd driver
+	node01 terminal --> sudo mkdir -p /etc/containerd
+
+Generate systemd driver config file and set it as default
+	node01 terminal --> containerd config default | sed 's/SystemdCgroup = false/SystemdCgroup = true/' | sudo tee /etc/containerd/config.toml
+
+Verify the created settings and the section that they are in
+	node01 terminal --> cat /etc/containerd/config.toml | grep -i SystemdCgroup -B 50
+
+Restart containerd container runtime
+	node01 terminal --> sudo systemctl restart containerd
+
+
+6. Worker Nodes Join Master Node
+--------------------------------
+Set net.ipv4.ip_forward=1
+	node01 terminal --> sudo nano /etc/sysctl.conf
+	- enable line 'net.ipv4.ip_forward=1'
+	- save changes
+Reload changes
+	node01 terminal --> sudo sysctl -p
+	# result: net.ipv4.ip_forward = 1
+
+Join the node01 to Master node after network plugin on the master node is installed
+	node01 terminal --> sudo kubeadm join 192.168.1.252:6443 --token aglnvh.w1nsio26idycbm5c --discovery-token-ca-cert-hash sha256:2ffe58d095a9f3e7d36c0f65f3c6b09ee4e74a7e67312eed1620d8cdccd3800b
+
+# result:
+---------------------------------------------------------------------------------------
+[preflight] Running pre-flight checks
+[preflight] Reading configuration from the "kubeadm-config" ConfigMap in namespace "kube-system"...
+[preflight] Use 'kubeadm init phase upload-config --config your-config.yaml' to re-upload it.
+[kubelet-start] Writing kubelet configuration to file "/var/lib/kubelet/config.yaml"
+[kubelet-start] Writing kubelet environment file with flags to file "/var/lib/kubelet/kubeadm-flags.env"
+[kubelet-start] Starting the kubelet
+[kubelet-check] Waiting for a healthy kubelet at http://127.0.0.1:10248/healthz. This can take up to 4m0s
+[kubelet-check] The kubelet is healthy after 1.010709629s
+[kubelet-start] Waiting for the kubelet to perform the TLS Bootstrap
+
+This node has joined the cluster:
+* Certificate signing request was sent to apiserver and a response was received.
+* The Kubelet was informed of the new secure connection details.
+
+Run 'kubectl get nodes' on the control-plane to see this node join the cluster.
+---------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+Install containerd on node02
+----------------------------
+	node02 terminal --> sudo apt update
+	node02 terminal --> sudo apt install -y containerd
+
+Check what driver is installed on our system
+	node02 terminal --> ps -p 1
+
+# result:
+    PID TTY          TIME CMD
+      1 ?        00:00:04 systemd		# systemd
+
+Create directory for systemd driver
+	node02 terminal --> sudo mkdir -p /etc/containerd
+
+Generate systemd driver config file and set it as default
+	node02 terminal --> containerd config default | sed 's/SystemdCgroup = false/SystemdCgroup = true/' | sudo tee /etc/containerd/config.toml
+
+Verify the created settings and the section that they are in
+	node02 terminal --> cat /etc/containerd/config.toml | grep -i SystemdCgroup -B 50
+
+Restart containerd container runtime
+	node02 terminal --> sudo systemctl restart containerd
+
+
+6. Worker Nodes Join Master Node
+--------------------------------
+Set net.ipv4.ip_forward=1
+	node02 terminal --> sudo nano /etc/sysctl.conf
+	- enable line 'net.ipv4.ip_forward=1'
+	- save changes
+Reload changes
+	node02 terminal --> sudo sysctl -p
+	# result: net.ipv4.ip_forward = 1
+
+Join the node02 to Master node after network plugin on the master node is installed
+	node02 terminal --> sudo kubeadm join 192.168.1.252:6443 --token aglnvh.w1nsio26idycbm5c --discovery-token-ca-cert-hash sha256:2ffe58d095a9f3e7d36c0f65f3c6b09ee4e74a7e67312eed1620d8cdccd3800b
+
+# result:
+---------------------------------------------------------------------------------------
+[preflight] Running pre-flight checks
+[preflight] Reading configuration from the "kubeadm-config" ConfigMap in namespace "kube-system"...
+[preflight] Use 'kubeadm init phase upload-config --config your-config.yaml' to re-upload it.
+[kubelet-start] Writing kubelet configuration to file "/var/lib/kubelet/config.yaml"
+[kubelet-start] Writing kubelet environment file with flags to file "/var/lib/kubelet/kubeadm-flags.env"
+[kubelet-start] Starting the kubelet
+[kubelet-check] Waiting for a healthy kubelet at http://127.0.0.1:10248/healthz. This can take up to 4m0s
+[kubelet-check] The kubelet is healthy after 1.008003092s
+[kubelet-start] Waiting for the kubelet to perform the TLS Bootstrap
+
+This node has joined the cluster:
+* Certificate signing request was sent to apiserver and a response was received.
+* The Kubelet was informed of the new secure connection details.
+
+Run 'kubectl get nodes' on the control-plane to see this node join the cluster.
+---------------------------------------------------------------------------------------
+
+
+Error:
+vagrant@controlplane:~$ kubectl get pod -n kube-flannel
+NAME                    READY   STATUS             RESTARTS      AGE
+kube-flannel-ds-lvwn4   1/1     Running            0             39m
+kube-flannel-ds-r948q   0/1     CrashLoopBackOff   5 (56s ago)   4m8s
+kube-flannel-ds-zx459   0/1     CrashLoopBackOff   5 (64s ago)   4m8s
+
+vagrant@controlplane:~$ k logs kube-flannel-ds-zx459 -n kube-flannel
+Defaulted container "kube-flannel" out of: kube-flannel, install-cni-plugin (init), install-cni (init)
+Error from server (NotFound): the server could not find the requested resource ( pods/log kube-flannel-ds-zx459)
+vagrant@controlplane:~$
+
+
+
+
+
+
+
+
+=========================================================================
+Section 11 257. Deploy a Kubernetes Cluster using kubeadm - Practice Test
+=========================================================================
+
+
+1. Install the kubeadm and kubelet packages on the controlplane and node01 nodes.
+---------------------------------------------------------------------------------
+Use the exact version of 1.31.0-1.1 for both.
+
+
+kubeadm installed on controlplane?
+kubelet installed on controlplane?
+Kubeadm installed on worker node01?
+Kubelet installed on worker node01 ?
+
+Open second terminal and connect to node01
+	new terminal --> ssh node01
+
+
+Enable Forwarding rules on both Nodes
+-----------------------------------------------------
+Kubernetes dockumentation
+	- https://kubernetes.io/docs/setup/production-environment/container-runtimes/#prerequisite-ipv4-forwarding-optional
+
+Set Forwarding rules on master node
+	master node terminal --> cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+net.ipv4.ip_forward = 1
+EOF
+
+Set Forwarding rules on node01
+	node01 terminal --> cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+net.ipv4.ip_forward = 1
+EOF
+-----------------------------------------------------
+
+
+
+Install kubeadm and kubelet on both nodes
+----------------------------------------------------------------------------------
+Kubernetes dockumentation
+	- https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#installing-kubeadm-kubelet-and-kubectl
+
+Verify our OS distribution
+	master node terminal --> cat /etc/*-release
+	node01 terminal --> cat /etc/*-release
+
+# result:
+---------------------------------------
+DISTRIB_ID=Ubuntu				# We have Linux Ubuntu OS
+DISTRIB_RELEASE=22.04
+DISTRIB_CODENAME=jammy
+DISTRIB_DESCRIPTION="Ubuntu 22.04.5 LTS"
+PRETTY_NAME="Ubuntu 22.04.5 LTS"
+NAME="Ubuntu"
+VERSION_ID="22.04"
+VERSION="22.04.5 LTS (Jammy Jellyfish)"
+VERSION_CODENAME=jammy
+ID=ubuntu
+ID_LIKE=debian
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+UBUNTU_CODENAME=jammy
+---------------------------------------
+
+MASTER NODE
+-----------
+Install kubead on master node
+	master node terminal --> sudo apt-get update
+	master node terminal --> sudo apt-get install -y apt-transport-https ca-certificates curl gpg
+
+Create directory for public signing key (optional if error on the next command)
+	master node terminal --> mkdir /etc/apt/keyrings
+
+Download the public signing key for the Kubernetes package repositories on master node for version 1.31.0-1.1
+	master node terminal --> curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+Add the appropriate Kubernetes apt repository for version 1.31.0-1.1
+	master node terminal --> echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+Update opt
+	master node terminal --> sudo apt-get update
+
+Install kubeadm, kubelet and kubectl with specific version 1.31.0-1.1
+	master node terminal --> sudo apt-get install -y kubeadm=1.31.0-1.1 kubelet=1.31.0-1.1 kubectl=1.31.0-1.1
+	master node terminal --> sudo apt-mark hold kubelet kubeadm kubectl
+
+NODE01
+------
+Install kubead on master node01
+	node01 terminal --> sudo apt-get update
+	node01 terminal --> sudo apt-get install -y apt-transport-https ca-certificates curl gpg
+
+Create directory for public signing key (optional if error on the next command)
+	node01 terminal --> mkdir /etc/apt/keyrings
+
+Download the public signing key for the Kubernetes package repositories on node01 for v1.31
+	node01 terminal --> curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+Add the appropriate Kubernetes apt repository for v1.31
+	node01 terminal --> echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+Update opt
+	node01 terminal --> sudo apt-get update
+
+Install kubeadm, kubelet and kubectl with specific version 1.31.0-1.1
+	node01 terminal --> sudo apt-get install -y kubeadm=1.31.0-1.1 kubelet=1.31.0-1.1 kubectl=1.31.0-1.1
+	node01 terminal --> sudo apt-mark hold kubelet kubeadm kubectl
+
+----------------------------------------------------------------------------------
+
+
+
+
+2. What is the version of kubelet installed?
+--------------------------------------------
+
+Show kubelet version
+	terminal --> kubelet --version
+
+# result: Kubernetes v1.31.0
+
+- choose '1.31.0' as answer
+
+
+
+
+3. How many nodes are part of kubernetes cluster currently?
+-----------------------------------------------------------
+Are you able to run kubectl get nodes?
+
+List nodes
+	terminal --> kubectl get node		# error beacuse the master is not initialized
+
+- choose '0' as answer
+
+
+
+
+4. Lets now bootstrap a kubernetes cluster using kubeadm.
+---------------------------------------------------------
+The latest version of Kubernetes will be installed.
+
+- click 'Ok' button
+
+
+
+5. Initialize Control Plane Node (Master Node). Use the following options:
+--------------------------------------------------------------------------
+apiserver-advertise-address - Use the IP address allocated to eth0 on the controlplane node
+
+apiserver-cert-extra-sans - Set it to controlplane
+
+pod-network-cidr - Set to 10.244.0.0/16
+
+Once done, set up the default kubeconfig file and wait for node to be part of the cluster.
+
+Show network interfaces
+	master node terminal --> ip add
+
+# result:	we will use IP of eth0: 192.7.113.11
+--------------------------------------------------------------
+7911: eth0@if7912: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1450 qdisc noqueue state UP group default 
+    link/ether 02:42:c0:07:71:0b brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 192.7.113.11/24 brd 192.7.113.255 scope global eth0
+       valid_lft forever preferred_lft forever
+--------------------------------------------------------------
+
+Initialize the Master Node
+	master node terminal --> kubeadm init --apiserver-advertise-address=192.7.113.11 --apiserver-cert-extra-sans=controlplane --pod-network-cidr=10.244.0.0/16
+
+# result:
+--------------------------------------------------------------
+Your Kubernetes control-plane has initialized successfully!
+
+To start using your cluster, you need to run the following as a regular user:
+
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+Alternatively, if you are the root user, you can run:
+
+  export KUBECONFIG=/etc/kubernetes/admin.conf
+
+You should now deploy a pod network to the cluster.
+Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
+  https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+Then you can join any number of worker nodes by running the following on each as root:
+
+kubeadm join 192.7.113.11:6443 --token 5sc64c.sq14b4ajfj6esd9o \
+        --discovery-token-ca-cert-hash sha256:9822b5f6136608a83ffe7bab0a256a2b5e5241dc73cbeeda5b490672c26ef7fd 
+--------------------------------------------------------------
+
+Set config file
+	master node terminal --> mkdir -p $HOME/.kube
+	master node terminal --> sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+	master node terminal --> sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+List nodes
+	master node terminal --> kubectl get nodes
+
+# result:
+
+NAME           STATUS     ROLES           AGE     VERSION
+controlplane   NotReady   control-plane   2m17s   v1.31.0	# expected NOTREADY status
+
+- click 'Check' button
+
+
+
+
+6. Generate a kubeadm join token
+--------------------------------
+Or copy the one that was generated by kubeadm init command
+
+
+We have the token from the previous task, after the master node initialization
+---------------------------------------------------------------------
+kubeadm join 192.7.113.11:6443 --token 5sc64c.sq14b4ajfj6esd9o \
+        --discovery-token-ca-cert-hash sha256:9822b5f6136608a83ffe7bab0a256a2b5e5241dc73cbeeda5b490672c26ef7fd 
+---------------------------------------------------------------------
+
+
+
+
+7. Join node01 to the cluster using the join token
+--------------------------------------------------
+
+Join node01 to the cluster
+	node01 terminal --> kubeadm join 192.7.113.11:6443 --token 5sc64c.sq14b4ajfj6esd9o \
+        --discovery-token-ca-cert-hash sha256:9822b5f6136608a83ffe7bab0a256a2b5e5241dc73cbeeda5b490672c26ef7fd
+
+# result:
+------------------------------
+This node has joined the cluster:
+* Certificate signing request was sent to apiserver and a response was received.
+* The Kubelet was informed of the new secure connection details.
+
+Run 'kubectl get nodes' on the control-plane to see this node join the cluster.
+------------------------------
+
+- click 'Çheck' button
+
+
+
+
+8. To install a network plugin, we will go with Flannel as the default choice. For inter-host communication, we will utilize the eth0 interface.
+-------------------------------------------------------------------------------------
+
+Please ensure that the Flannel manifest includes the appropriate options for this configuration.
+
+Refer to the official documentation for the procedure.
+
+
+Kubernetes documentation
+All network plugins - https://kubernetes.io/docs/concepts/cluster-administration/addons/
+Flannel plugin - https://github.com/flannel-io/flannel#deploying-flannel-manually
+
+Download flannel manifests file
+	terminal --> wget https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+
+Edit the file
+	terminal --> vi kube-flannel.yml
+--------------------------------------------
+...
+      containers:
+      - args:
+        - --ip-masq
+        - --kube-subnet-mgr
+        - --iface=eth0			# add this line
+        command:
+        - /opt/bin/flanneld
+...
+--------------------------------------------
+
+Verify changes
+	terminal --> cat kube-flannel.yml
+
+Deploy flannel
+	terminal --> kubectl apply -f kube-flannel.yml
+
+# result:
+---------------------------------------------------
+namespace/kube-flannel created
+serviceaccount/flannel created
+clusterrole.rbac.authorization.k8s.io/flannel created
+clusterrolebinding.rbac.authorization.k8s.io/flannel created
+configmap/kube-flannel-cfg created
+daemonset.apps/kube-flannel-ds created
+---------------------------------------------------
+
+- click 'Check' button
+
+
+
+

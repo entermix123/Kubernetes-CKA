@@ -1,0 +1,1950 @@
+CONTENT
+
+Section 6 126. Cluster Maintenance Intro
+Section 6 128. OS Upgrade
+Section 6 129. Practice Test - OS Upgrade
+Section 6 131. Kubernetes Software Versioning
+Section 6 132. References
+Section 6 133. Cluster Upgrade Process
+Section 6 134. Demo - Cluster Upgrade with kubeadm tool
+Section 6 135. Practice Test - Cluster Upgrade with kubeadm tool
+Section 6 137. Backup and Restore Methods
+Section 6 138. Working with ETCDCTL
+Section 6 139. Practice Test - Backup and Restore
+Section 6 141. Practice Test - Backup and Restore 2
+Section 6 143. Certification Exam Tips
+Section 6 144. References
+
+
+========================================
+Section 6 126. Cluster Maintenance Intro
+========================================
+
+- Cluster Upgrade Process
+- Operating System Upgrades
+- Backup and Restore Methodologies
+
+
+=========================
+Section 6 128. OS Upgrade
+=========================
+
+How we can take down nodes for maintenance or upgrade?
+
+If Node is down for less than 5 minutes, the Kubelet process start and the pods come back online.
+
+If Node is down for more than 5 minutes, the pods in the Node are terminated from that Node.
+	- If terminated pod are part of a ReplicaSet, they are recreated on other Nodes.
+	
+	# Pod is considered dead over eviction timeout period set on the controller manager with default value of 5 minutes
+		kube-controller-manager --pod-eviction-timeout=5m0s...
+
+	- If Node comes online after 5 minutes, no pods are running on it. The Node is blank.
+
+
+This last case is risk when we manage updates or upgrades on the system. 
+
+We can move running pods from target Node to other Nodes  before statrt update/upgrade on it
+	terminal --> kubectl drain node-1
+
+	# kubectl 				- common kubernetes account
+	# drain					- recreate pods on other Nodes
+	# node-1				- name of the target Node
+
+The Node is marked as not schedulable. It means that no pods can be started on this Node unless we remove the restriction.
+
+After we make updates/upgrades on the Node, we have to remove the restriction and make it schedulable again
+	terminal --> kubectl uncordon node-1
+
+	# kubectl 				- common kubernetes account
+	# uncordon				- set the node to be usable / schedulable
+	# node-1				- name of the target Node
+	
+
+The Pods recreated on othe Nodes will NOT be moved / recreated on the updated / upgraded Node. We have to do it manually.
+
+We can set Node as unchedulable. This action nesure that on the Node are not created or changed any Pods
+	terminal --> kubectl cordon node-2
+
+	# kubectl 				- common kubernetes account
+	# cordon				- set the node to be unschedulable
+	# node-1				- name of the target Node
+
+
+
+=========================================
+Section 6 129. Practice Test - OS Upgrade
+=========================================
+
+We can set alias for short syntax for kubectl
+	terminal --> alias k=kubectl
+
+
+1. Let us explore the environment first. How many nodes do you see in the cluster?
+----------------------------------------------------------------------------------
+Including the controlplane and worker nodes.
+
+
+List all nodes
+	terminal --> k get nodes
+
+OR 
+
+Show count of the Nodes
+	terminal --> k get nodes --no-headers | wc -l
+
+- choose '2' as answer
+
+
+
+2. How many applications do you see hosted on the cluster?
+----------------------------------------------------------
+Check the number of deployments in the default namespace.
+
+List deployments
+	terminal --> k get deploy
+
+- choose '1' as answer
+
+
+3. Which nodes are the applications hosted on?
+----------------------------------------------
+
+List pods with detailed informatin
+	terminal --> k get pods -o wide
+
+	# we can see that all pods are eather on controlplane or node01 Node
+
+- choose 'controlplane,node01' as answer
+
+
+
+4. We need to take node01 out for maintenance. Empty the node of all applications and mark it unschedulable.
+------------------------------------------------------------------------------------------------------------
+
+Drain all pods from node01
+	terminal --> k drain node01
+
+	We receive messages: 
+	node/node01 cordoned
+	error: unable to drain node "node01" due to error: cannot delete DaemonSet-managed Pods (use --ignore-daemonsets to 	ignore): kube-flannel/kube-flannel-ds-swfvj, kube-system/kube-proxy-zgjqp, continuing command...
+	There are pending nodes to be drained:
+ 	node01
+	cannot delete DaemonSet-managed Pods (use --ignore-daemonsets to ignore): kube-flannel/kube-flannel-ds-swfvj, kube-	system/kube-proxy-zgjqp
+
+
+Drain all pods from node01 and set additional option
+	terminal --> k drain node01 --ignore-daemonsets
+
+	We receive messages:
+	node/node01 already cordoned
+	Warning: ignoring DaemonSet-managed Pods: kube-flannel/kube-flannel-ds-swfvj, kube-system/kube-proxy-zgjqp
+	evicting pod default/blue-56dd475db5-v7bf8
+	evicting pod default/blue-56dd475db5-gn9c7
+	pod/blue-56dd475db5-gn9c7 evicted
+	pod/blue-56dd475db5-v7bf8 evicted
+	node/node01 drained
+
+- click 'Check' button
+
+
+
+5. What nodes are the apps on now?
+----------------------------------
+
+List pods with detailed informatin
+	terminal --> k get pods -o wide
+
+	# all pods are on 'controlplane' Node
+
+- choose 'controlplane' as answer
+
+
+
+6. The maintenance tasks have been completed. Configure the node node01 to be schedulable again.
+------------------------------------------------------------------------------------------------
+
+List nodes
+	terminal --> k get nodes
+	
+	# we can see that the state of node01 is 'Ready,SchedulingDisabled'
+
+Set node01 to be usable / schedulable again
+	terminal --> k uncordon node01
+
+	# we can see that the state of node01 is 'Ready'
+
+- click 'Check' button
+
+
+
+7. How many pods are scheduled on node01 now in the default namespace?
+----------------------------------------------------------------------
+
+List pods with detailed informatin
+	terminal --> k get pods -o wide
+
+	# we see all pods are on 'controlplane' Node
+
+- choose '0' as answer
+
+
+
+8. Why are there no pods on node01?
+-----------------------------------
+
+- choose 'Only when new pods are created they will be scheduled' as answer
+
+
+
+9. Why are the pods placed on the controlplane node?
+----------------------------------------------------
+Check the controlplane node details.
+
+
+Show details about controlplane node
+	terminal --> k describe node controlplane
+
+	# we can see that the controlplane Node have no taints - Taints: none
+
+- choose 'controlplane node doesn't have any taints' as answer
+
+
+
+10. Time travelling to the next maintenance window…
+----------------------------------------------------
+
+- click 'Ok' button
+
+
+
+11. We need to carry out a maintenance activity on node01 again. Try draining the node again using the same command as before: kubectl drain node01 --ignore-daemonsets
+--------------------------------------------------------------------------------------------------------
+Did that work?
+
+Use the command
+	terminal --> kubectl drain node01 --ignore-daemonsets
+
+	We receive the messages:
+	node/node01 cordoned
+	error: unable to drain node "node01" due to error: cannot delete cannot delete Pods that declare no controller (use --	force to override): default/hr-app, continuing command...
+	There are pending nodes to be drained:
+ 	node01
+	cannot delete cannot delete Pods that declare no controller (use --force to override): default/hr-app
+
+
+- choose 'No' as answer
+
+
+
+12. Why did the drain command fail on node01? It worked the first time!
+-----------------------------------------------------------------------
+
+List pods with additional information
+	terminal --> k get pods -o wide
+
+	# we can see that pod 'hr-app' is scheduled on node01
+
+- choose 'there is a pod in node01 which is not part of a replicaset' as answer
+
+
+
+13. What is the name of the POD hosted on node01 that is not part of a replicaset?
+----------------------------------------------------------------------------------
+
+List pods with additional information
+	terminal --> k get pods -o wide
+
+	# we can see that pod 'hr-app' is scheduled on node01
+
+- choose 'hr-app' as answer
+
+
+
+14. What would happen to hr-app if node01 is drained forcefully?
+----------------------------------------------------------------
+Try it and see for yourself.
+
+Drain the Node forcefuly
+	terminal --> kubectl drain node01 --ignore-daemonsets --force
+
+	We receive this messages:
+	node/node01 already cordoned
+	Warning: deleting Pods that declare no controller: default/hr-app; ignoring DaemonSet-managed Pods: kube-flannel/kube-	flannel-ds-swfvj, kube-system/kube-proxy-zgjqp
+	evicting pod default/hr-app
+
+- choose 'hr-pod will be lost forever' as answer
+
+
+
+15. Oops! We did not want to do that! hr-app is a critical application that should not be destroyed. We have now reverted back to the previous state and re-deployed hr-app as a deployment.
+----------------------------------------------------------------------------------------------
+
+List deployments
+	terminal --> k get deploy
+
+	# we can see thath the hr-app is deployed as deployment
+
+List pods with additional information
+	terminal --> k get pods -o wide
+
+
+- click 'Ok' button
+
+
+
+16. hr-app is a critical app and we do not want it to be removed and we do not want to schedule any more pods on node01.
+Mark node01 as unschedulable so that no new pods are scheduled on this node.
+----------------------------------------------------------------------------------------------
+Make sure that hr-app is not affected.
+
+
+Cordon node01
+	terminal --> k cordon node01
+
+	# the hr-app will not be stopped or terminated
+	# node01 will not be schedulable
+
+- click 'Check' button
+
+
+
+=============================================
+Section 6 131. Kubernetes Software Versioning
+=============================================
+
+We can see current version as
+	terminal --> k get nodes
+	
+	# 'VERSION' column 1.11.3
+
+
+	v1	.	11	.	3
+
+	Major		Minor		Patches
+			- features	- bug fixes
+			- functionalities
+
+
+Components with same versioning (controlplane components)
+	- kube-apiserver
+	- controller-manager
+	- kube-scheduler
+	- kubelet
+	- kube-proxy
+	- kubectl
+
+Components with different versioning
+	- ETCD CLUSTER
+	- CoreDNS
+
+
+References
+==========
+
+Kubernetes APIs - https://kubernetes.io/docs/concepts/overview/kubernetes-api/
+
+Here is a link to kubernetes documentation if you want to learn more about this topic (You don't need it for the exam though):
+
+GitHub API Conventions - https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md
+
+Changes in Kubernetes API - https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api_changes.md
+
+
+
+======================================
+Section 6 133. Cluster Upgrade Process
+======================================
+
+We will cover compnents with common versioning (in controlplance node - master node)
+
+Because kube-apiserver is the main component in the controlplane node and all other components communicate with it, no other component should be with higher version that kube-apiserver. Only kubectl can be 1 version higher or 1 version lower than kube-apiserver to be able to upgrade/update versions.
+
+Acceptable versioning can be as follow:
+
+
+							kube-apiserver
+							  Version: X
+
+	Controller-manager		kube-scheduler						kubectl
+	 Version: X - 1                 Version: X - 1						Version: X + 1 > X - 1
+
+
+	kubelet				kube-proxy
+	Version: X - 2			Version: X - 2
+
+
+
+Kubernetes supports only last 3 minor version. 
+
+For example if we have kube-apiserver v1.10 and there are releases - v1.11 and v1.12, when new version is released - v1.13, the last one v1.10 is no longger supported.
+
+The time before v1.13 is released is good time to upgrade our kube-apiserver.
+
+How is the right approach to update / upgrade kube-api server?
+	- Is good practice to upgrade / update with one minor version at a time.
+	# from v1.10 to v1.11, from v1.11 to v1.12 and so on...
+
+If we deployed the cluster manually, we need to upgrade all components manually as well.
+
+If our cluster is deployed on some of the cloud providers (AWS, Azure, GCP), there is few steps (clicks) process for upgrade / update.
+
+If our cluster is deployed with kubeadm, we craete a plan and the apply it
+	terminal --> kubeadm upgrade plan
+	terminal --> kubeadm upgrade apply
+
+
+kubeadm cluster upgrade process
+===============================
+
+How the upgrade is executed?
+
+step 1 - upgrade the master node (v1.10 --> v1.11)
+--------------------------------------------------
+	- no kubectl services (can't access the cluster with kubectl, can't create, can't modify or delete pods or nodes on the cluster)
+	- controller manager and schedulers are not working (if pod fails, new one will not be hosted at the time)
+	- all worker nodes are working properly with no downtime
+
+Step 2 - upgrade the worker nodes
+
+We have few strategies for upgrading the worker nodes
+
+
+Strategy 1: upgrade all worker nodes at once with downtime
+----------------------------------------------------------
+	- applications are not accessable by the users - NOT RECCOMENDED ! 
+
+Strategy 2: upgrade nodes one by one
+	- workload from upgraded node is tranfered to toher working nodes
+	- when the upgraded node finishes the upgrade, the applications are hosted. 
+	- upgraded node can take load from the node that is in upgrade process
+
+Strategy 3: - deploy new nodes with higher version (one by one)
+	- new node with higher version are hosted
+	- the load is transefred from old node to the new node
+	- the old (node with lower version) is deleted
+	- next node
+
+
+How to get info about cluster versioning
+	terminal --> kubeadm upgrade plan
+
+This command will list information about
+	- cluster version
+	- kubeadm version
+	- latest stable version
+
+Also show all controlplane components
+	- API Server
+	- Controller Manager	
+	- Scheduler
+	- Kube Proxy
+
+Give us the command to to execute the upgrade
+	terminal --> kubeadm upgarde apply v1.13.4
+
+Give us a note that we have to upgrade kubelets manually before performing the nodes upgrade.
+
+Important - kubeadm DO NOT upgrade kubelets on each node. We have to do that manually before the nodes upgrade.
+---------
+
+
+How to upgrade cluster?
+=======================
+
+Example upgrading v1.11 --> v1.12
+
+
+STEP 1 - UPGRADE MASTER NODE
+----------------------------
+Show versioning information
+	terminal --> kubeadm upgrade plan
+
+	# this command should show us information about all components versioning
+	# give us the command to upgrade to the next minor version
+
+Upgrade kubeadm tool
+	terminal --> apt-get upgrade -y kubeadm=1.12.0-00
+
+	# this command will upgrade kubeadm tool itself
+
+Upgrade the cluster components (controlplane - master node) with next minor version
+	terminal --> kubeadm upgrade apply v1.12.0		# command from versioning information
+
+Show nodes infomation
+	terminal --> kubectl get nodes
+
+	# this will show a version lower, because presented version is the version of the kubelets on the nodes
+	# we may have or not have kubelets, depending on what is our cluster architecture
+
+Upgrade kubelet on the master node
+	terminal --> apt-get upgrade -y kubelet=1.12.0-00
+
+Restart the kubelet service
+	terminal --> systemctl restart kubelet
+
+Show nodes infomation
+	terminal --> kubectl get nodes
+
+	# now we should see only the master node version is updated to v1.12.0
+	# all worker nodes should be will the old version v1.11.0
+
+
+STEP 2 - UPGRADE WORKER NODES
+-----------------------------
+
+We have worker nodes: node-01, node-02 and node-03. We will use the strategy where we update one node at a time (Strategy 2).
+
+Move the load from node-01 to other node
+	terminal --> kubectl drain node-01
+
+	# this command will move all pods from node-01 to other nodes
+	# also cordens the node and makes it unschedulable (no new pods are scheduled on it)
+
+Access node01
+	terminal --> ssh node01
+	
+Upgrade kubeadm tool on node-01
+	terminal --> apt-get upgrade -y kubeadm=1.12.0-00
+
+Upgrade kubelet on node-01
+	terminal --> apt-get upgrade -y kubelet=1.12.0-00
+
+Upgrade node configuration
+	terminal --> kubeadm upgrade node config --kubelet-version v1.12.0
+
+Restat the kubelet service
+	terminal --> systemctl restart kubelet
+
+Exit node01
+	terminal --> exit
+
+Restore node availability
+	terminal --> kubectl uncordon node01
+
+	# this command will not move back the pods that was previously on this node
+	# it will allow new pods to be scheduled on this node only
+
+STEP 2 is repeated for node-02 and node-03
+
+
+
+=======================================================
+Section 6 134. Demo - Cluster Upgrade with kubeadm tool
+=======================================================
+
+This demo will show upgrade from v1.27 to v1.28 fowllowing the kubernetes documentation - https://kubernetes.io/docs/home/
+
+Upgrading kubeadm cluster documentation - https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/
+	- different instructions for every minor version upgrade are provided (almost identical)
+
+Step 1 - Update package repository
+----------------------------------
+We must make sure our system uses the correct package repository and update it if necessary.
+	- in the isntruction for the specific version we can find link for changing the package repository in the 'Changing the package repository' section
+	- for this example - https://v1-28.docs.kubernetes.io/blog/2023/08/15/pkgs-k8s-io-introduction/
+
+Find OS information
+	terminal --> cat /etc/*release*
+	# this example uses Deabian/Ubuntu 20.04
+
+Find the commands for Ubuntu OS in the documentations 
+	- https://v1-28.docs.kubernetes.io/blog/2023/08/15/pkgs-k8s-io-introduction/#how-to-migrate-deb
+
+Modufy and execute the command with the specific minor version and set package repository for (in this case v1.29)
+	master node terminal --> echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+	# kubeadm should be one version above our target system upgrade version - v1.29
+
+Modufy and execute the command for Download the public signing key for the Kubernetes package repositories and set package repository for (in this case v1.29)
+	master node terminal --> curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+	master node terminal --> y
+
+	# kubeadm should be one version above our target system upgrade versio - v1.29
+
+Step 1.1 - Same command should be executed on each worker nodes
+---------------------------------------------------------------
+This process must be performed in all worker nodes:
+
+Connect to worker node
+	terminal --> ssh node01
+
+Execute the command for Download the public signing key for the Kubernetes package repositories
+	worker node terminal --> echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+	# kubeadm should be one version above our target system upgrade versio - v1.29
+
+Execute the command for Download the public signing key for the Kubernetes package repositories
+	worker node terminal --> curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+	worker node terminal --> y
+
+	# kubeadm should be one version above our target system upgrade versio - v1.29
+
+
+Step 1.2 - Determine which version to upgrade to
+------------------------------------------------
+
+Info: https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#determine-which-version-to-upgrade-to
+
+Update apt on master node
+	terminal --> sudo apt update
+
+Show available minor update versions
+	terminal --> sudo apt-cache madison kubeadm
+
+	# save the version which we want to upgrade to: 1.29.3-1.1
+
+
+Step 2 - Upgrade controlplane nodes (master nodes)
+--------------------------------------------------
+Info : https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#upgrading-control-plane-nodes
+
+Upgrade kubeadm tool on the master node
+	# replace x in 1.28.x-* with the latest patch version - 1.29.3-1.1
+	terminal --> apt-mark unhold kubeadm && apt-get update && apt-get install -y kubeadm='1.29.3-1.1' && apt-mark hold kubeadm
+
+Verify the updated kubeadm tool
+	terminal --> kubeadm version
+
+	# in the result should be the version we upgraded to 'GItVersion:"1.29.3"'
+
+Verify the upgrade plan
+	terminal --> kubeadm upgrade plan
+
+	# in the result we can see the plan for the specific version we want to upgrade to
+	# we can take the command fot he upgrade
+
+Upgrade to the choosen version (in this case - 1.29.3)
+	terminal --> sudo kubeadm upgrade apply v1.29.3
+
+
+Manually upgrade your CNI provider plugin if needed.
+	Your Container Network Interface (CNI) provider may have its own upgrade instructions to follow. Check the addons page to 	find your CNI provider and see whether additional upgrade steps are required.
+
+	This step is not required on additional control plane nodes if the CNI provider runs as a DaemonSet
+
+Step 2 is repeated for all other controlplance nodes in the system with some small differences in the command. Use
+		terminal --> sudo kubeadm upgrade node
+	instead of
+		terminal --> sudo kubeadm upgrade apply 
+	Also calling kubeadm upgrade plan and upgrading the CNI provider plugin is no longer needed.
+
+
+
+Step 2.1 - Upgrade kubelet on the controlplane node (master node)
+-----------------------------------------------------------------
+
+Drane the controlplane node (masternode)
+Info: https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#drain-the-node
+	terminal --> kubectl drain controlplane --ignore-daemonsets
+
+Upgrade kubelet and kubectl
+Info: https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#upgrade-kubelet-and-kubectl
+	# replace x in 1.28.x-* with the latest patch version - 1.29.3-1.1
+	terminal --> apt-mark unhold kubelet kubectl && apt-get update && apt-get install -y kubelet='1.29.3-1.1' kubectl='1.29.3-1.1' && apt-mark hold kubelet kubectl
+
+Restart the kubelet
+	terminal --> sudo systemctl daemon-reload
+	terminal --> sudo systemctl restart kubelet
+
+Uncordon controlplane (master) node
+Info: https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#uncordon-the-node
+	terminal --> kubectl uncordon controlplance
+
+Verify controlplane (master) node upgrade
+	terminal --> kubectl get nodes
+
+	# the controlplane should be version v1.29.3
+	# the satus of the controlplance node should be 'Ready'
+
+Step 2.1 is repeated for all other controlplane nodes in the system
+
+
+Step 3 - Upgrade worker nodes
+-----------------------------
+Info: https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#upgrade-worker-nodes
+
+Choose instructions fot the OS you are working on. In this case we use Linux
+	- https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/upgrading-linux-nodes/
+
+There is a step in the instruction that we need to chnage package manager repository, but we did that in Step 1
+	- check if update of the package manager is performed and if it is not, repeat the section for worker nodes in Step 1.1
+
+
+Upgrade kubeadm on a worker node
+Info: https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/upgrading-linux-nodes/#upgrade-kubeadm
+	# replace x in 1.28.x-* with the latest patch version - 1.29.3-1.1
+	worker node terminal --> apt-mark unhold kubeadm && apt-get update && apt-get install -y kubeadm='1.29.3-1.1' && apt-mark hold kubeadm
+
+Upgrades the local kubelet configuration
+Info: https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/upgrading-linux-nodes/#call-kubeadm-upgrade
+	worker node terminal --> sudo kubeadm upgrade node
+
+Drain the worker node
+Info: https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/upgrading-linux-nodes/#drain-the-node
+	worker node terminal --> kubectl drain node01 --ignore-daemonsets
+
+Upgrade kubelet and kubectl
+Info: https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/upgrading-linux-nodes/#upgrade-kubelet-and-kubectl
+	# replace x in 1.28.x-* with the latest patch version - 1.29.3-1.1
+	worker node terminal --> apt-mark unhold kubelet kubectl && apt-get update && apt-get install -y kubelet='1.29.3-1.1' kubectl='1.29.3-1.1' && apt-mark hold kubelet kubectl
+
+Restart the kubelet
+	worker node terminal --> sudo systemctl daemon-reload
+	worker node terminal --> sudo systemctl restart kubelet
+
+Uncordon the worker node
+Info: https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#uncordon-the-node
+	terminal --> kubectl uncordon node01
+
+Step 3 is repeated for all other worker nodes.
+
+Verify worker node upgrade
+	terminal --> kubectl get nodes
+
+	# the node01 should be version v1.29.3
+	# the satus of the node01 should be 'Ready'
+
+
+
+================================================================
+Section 6 135. Practice Test - Cluster Upgrade with kubeadm tool
+================================================================
+
+Set alias
+	terminal --> alias k=kubectl
+
+
+1. This lab tests your skills on upgrading a kubernetes cluster. We have a production cluster with applications running on it. Let us explore the setup first.
+---------------------------------------------------------------------------------
+What is the current version of the cluster?
+
+Show nodes info
+	terminal --> k get nodes
+
+- choose '1.30.0' as answer
+
+
+
+2. How many nodes are part of this cluster?
+-------------------------------------------
+Including controlplane and worker nodes
+
+Show nodes info
+	terminal --> k get nodes
+
+- choose '2' as answer
+
+
+3. How many nodes can host workloads in this cluster?
+-----------------------------------------------------
+Inspect the applications and taints set on the nodes.
+
+Show taints in all nodes
+	terminal --> k describe node | grep Taints
+
+	# if no taints are available then all the nodes can take load
+
+- choose '2' as answer
+
+
+
+4. How many applications are hosted on the cluster?
+---------------------------------------------------
+Count the number of deployments in the default namespace.
+
+
+Show deploys
+	terminal --> k get deploy
+
+	# result: 	  NAME   READY   UP-TO-DATE   AVAILABLE   AGE
+			  blue   5/5     5            5           4m52s
+
+- choose '1' as answer
+
+
+
+5. What nodes are the pods hosted on?
+-------------------------------------
+
+Show detailed information about pods
+	terminal --> k get pods -o wide
+
+	# in the 'NODE' column we can see only 2 different nodes (node01 and controlplane)
+
+- choose 'controlplane,node01' as answer
+
+
+6. You are tasked to upgrade the cluster. Users accessing the applications must not be impacted, and you cannot provision new VMs. What strategy would you use to upgrade the cluster?
+----------------------------------------------------------------------------------------------
+
+Since we can provision new VMs the correct answer to upgrade the nodes without downtime is to upgrade all nodes one by one and mofe load on the free node durring the upgrade
+
+- choose 'Upgrade one node at a time while moving the workload to the other' as answer
+
+
+
+7. What is the latest version available for an upgrade with the current version of the kubeadm tool installed?
+--------------------------------------------------------------------------------------------------------------
+Use the kubeadm tool
+
+Show available versions
+	terminal --> kubeadm upgrade plan
+
+	# in the result we should see 'Note: Before you can perform this upgrade, you have to update kubeadm to v1.30.8.'
+
+- choose 'v1.30.8' as answer
+
+
+8. We will be upgrading the controlplane node first. Drain the controlplane node of workloads and mark it UnSchedulable
+-----------------------------------------------------------------------------------------------------------------------
+
+Drain controlplane (master) node 
+	terminal --> k drain controlplane --ignore-daemonsets
+
+
+- click 'Check' button
+
+
+9. Upgrade the controlplane components to exact version v1.31.0
+---------------------------------------------------------------
+Upgrade the kubeadm tool (if not already), then the controlplane components, and finally the kubelet. Practice referring to the Kubernetes documentation page.
+
+Determine which version to upgrade to
+Info:https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#determine-which-version-to-upgrade-to
+	terminal --> apt update
+	terminal --> apt-cache madison kubeadm
+
+	# we have to upgrade to '1.31.0' if kubeadm is lower version
+	# the higher version tin the result is 1.30.8-1.1 so we use this version instead
+
+Show OS
+	terminal --> cat /etc/*release*
+	# this example uses Deabian/Ubuntu 22.04
+
+Find the commands for Ubuntu OS in the documentations 
+	- https://v1-28.docs.kubernetes.io/blog/2023/08/15/pkgs-k8s-io-introduction/#how-to-migrate-deb
+
+Show kubeadm tool version
+	terminal --> kubeadm version
+
+	# result: GitVersion:"v1.30.0"
+
+Show kubeadm tool available versions
+	terminal --> apt-cache madison kubeadm
+
+Upgrade kubeadm tool on the master node if needed 
+	# replace x in 1.28.x-* with the latest patch version - 1.30.8-1.1
+	terminal --> apt-mark unhold kubeadm && apt-get update && apt-get install -y kubeadm='1.30.8-1.1' && apt-mark hold kubeadm
+
+Verify the updated kubeadm tool
+	terminal --> kubeadm version
+
+Verify the upgrade plan
+	terminal --> kubeadm upgrade plan
+
+	# in the result we can see the plan for the specific version we want to upgrade to
+	# we can take the command fot he upgrade
+
+Upgrade to the choosen version (in this case - 1.30.8)
+	terminal --> sudo kubeadm upgrade apply v1.30.8
+	terminal --> y
+
+
+Upgrade kubelet on the controlplane node (master node)
+------------------------------------------------------
+
+Drane the controlplane node (masternode)
+Info: https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#drain-the-node
+	terminal --> kubectl drain controlplane --ignore-daemonsets
+
+Upgrade kubelet and kubectl
+Info: https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#upgrade-kubelet-and-kubectl
+	# replace x in 1.28.x-* with the latest patch version - 1.30.8
+	terminal --> apt-mark unhold kubelet kubectl && apt-get update && apt-get install -y kubelet='1.30.8-*' kubectl='1.30.8-*' && apt-mark hold kubelet kubectl
+
+Restart the kubelet
+	terminal --> sudo systemctl daemon-reload
+	terminal --> sudo systemctl restart kubelet
+
+Can't be upgradet to v1.31.0 - the latest version is v1.30.8
+
+- choose 'Check' button
+
+
+
+10. Mark the controlplane node as "Schedulable" again
+-----------------------------------------------------
+
+Uncordon controlplane (master) node
+Info: https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#uncordon-the-node
+	terminal --> kubectl uncordon controlplane
+
+Verify controlplane (master) node upgrade
+	terminal --> kubectl get nodes
+
+	# the controlplane should be version v1.30.8
+	# the satus of the controlplance node should be 'Ready'
+
+- choose 'Check' button
+
+
+11. Next is the worker node. Drain the worker node of the workloads and mark it UnSchedulable
+---------------------------------------------------------------------------------------------
+
+Drain node01
+	terminal --> kubectl drain node01 --ignore-daemonsets
+
+- click 'Check' button
+
+
+
+12. Upgrade the worker node to the exact version v1.31.0
+--------------------------------------------------------
+
+Conect to nmode01
+	termiinal --> ssh node01
+
+Show kubeadm version on node01
+	terminal --> kubeadm version
+
+Upgrade kubeadm on a worker node
+Info: https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/upgrading-linux-nodes/#upgrade-kubeadm
+	# replace x in 1.28.x-* with the latest patch version - 1.30.8-1.1
+	terminal --> apt-mark unhold kubeadm && apt-get update && apt-get install -y kubeadm='1.30.8-1.1' && apt-mark hold kubeadm
+
+Upgrades the local kubelet configuration
+Info: https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/upgrading-linux-nodes/#call-kubeadm-upgrade
+	worker node terminal --> sudo kubeadm upgrade node
+
+Drain the worker node
+Info: https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/upgrading-linux-nodes/#drain-the-node
+	worker node terminal --> kubectl drain node01 --ignore-daemonsets
+
+Upgrade kubelet and kubectl
+Info: https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/upgrading-linux-nodes/#upgrade-kubelet-and-kubectl
+	# replace x in 1.28.x-* with the latest patch version - 1.30.8-1.1
+	worker node terminal --> apt-mark unhold kubelet kubectl && apt-get update && apt-get install -y kubelet='1.30.8-1.1' kubectl='1.30.8-1.1' && apt-mark hold kubelet kubectl
+
+Restart the kubelet
+	worker node terminal --> sudo systemctl daemon-reload
+	worker node terminal --> sudo systemctl restart kubelet
+
+Exit node01
+	terminal --> exit
+
+Verify worker node upgrade
+	terminal --> kubectl get nodes
+
+	# the node01 should be version v1.29.3
+	# the satus of the node01 should be 'Ready'
+
+- choose 'Check' button
+
+
+13. Remove the restriction and mark the worker node as schedulable again.
+-------------------------------------------------------------------------
+
+Uncordon the worker node
+Info: https://v1-28.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#uncordon-the-node
+	terminal --> kubectl uncordon node01
+
+Verify worker node upgrade
+	terminal --> kubectl get nodes
+
+	# the node01 should be version v1.29.3
+	# the satus of the node01 should be 'Ready'
+
+- choose 'Check' button
+
+
+
+
+=========================================
+Section 6 137. Backup and Restore Methods
+=========================================
+
+What we should backup? What options we have?
+	- Resource Configuration
+	- ETCD Cluster
+	- Persistent Volumes
+
+
+
+Option 1: Backup Resource Configuration
+=======================================
+
+Using Imperative approach (make changes only with commands and not with configuration files) do not allow us to save easily resource configuration. This approach is not recommended.
+
+Using Declarative approach (we configure definition files for every resource and apply them) give us opportunity easily to backup our resources configuration files. This is the recommended approach.
+
+With Declarative approach we can set GitHub (or other versioning system) repository that can be maintained by a team.
+
+Best way to backup resources configuration is to query the kube-apiserver.
+
+Create a file with all resources in yaml format
+	piserver terminal --> kubectl get all --all-namespaces -o yaml > all-deploy-services.yaml
+
+Providers like VELERO by HeptIO can manage kubernetes cluster backups.
+
+
+
+Option 2: Backup ETCD Cluster
+=============================
+
+ETCD saves information about the state of the cluster (created nodes and every other resources).
+
+ETCD servers are located on master nodes.
+
+When we configure ETCD cluster we can configure the etcd folder to be backuped by our backup tool.
+
+etcd.service
+-------------------------------------------------------
+ExecStart=/usr/local/bin/etcd \\
+  --name ${ETCD_NAME} \\
+...
+  --data-dir=/var/lib/etcd			# this is the config for the etcd directory
+-------------------------------------------------------
+
+ETCD comes with his own snapshot solution. Taking snapshot of the etcd cluster.
+
+Take snapshot command
+	terminal --> ETCDCTL_API=3 etcdctl snapshot save snapshot.db \
+				--endpoints=https://127.0.0.1:2379 \		# endpoint to the etcd cluster
+				--cacert=/etc/etcd/ca.crt \			# auth certification
+				--cert=/etc/kubernetes/pki/etcd/server.crt \	# etcd certificate
+				--key=/etc/etcd/etcd-server.key			# key
+
+List files
+	terminal --> ls   	# result: snapshot.db
+
+Show status command
+	terminal --> ETCDCTL_API=3 etcdctl sanpshot status snapshot.db
+	
+	# this will present a table with snapshot information
+
+
+
+Restore ETCD cluster from snapshot file
+=======================================
+
+1. Stop api server
+	terminal --> service kube-apiserver stop		# result: Service kube-apiserver stopped
+
+2. Restore from backup file
+	terminal --> ETCDCTL_API=3 etcdctl shanpshot restore snapshot.db --data-dir /var/lib/etcd--backup-file-dir
+
+	# ETCDCTL_API=3						- ETCD api version
+	# etcdctl						- ETCD common command
+	# snashot restore					- used action 
+	# snapshot.db						- used file
+	# --data-dir /var/lib/etcd-from-backup			- created directory for the resored ETCD
+
+	# result: I | mvcc: restore compact to 475629
+
+When we restore etcd  cluster - a new cluster is created and placed in the set directory in the command. This approach is used to prevent new objects to join etcd cluster by mistake.
+
+
+3. Reload ETCD daemon
+	terminal --> systemctl daemon-reload
+
+4. Restart ETCD service
+	terminal --> service etcd restart		# result: Service etcd restarted
+
+5. Start apiserver service
+	terminal --> service kube-apiserver start	# Service kube-apiserver started
+
+Our cluster should be now in the original state
+
+
+
+===================================
+Section 6 138. Working with ETCDCTL
+===================================
+
+ETCDCTL is a command line client for ETCD. Repository: https://github.com/etcd-io/etcd
+
+In all our Kubernetes Hands-on labs, the ETCD key-value database is deployed as a static pod on the master. The version used is v3.
+
+To make use of etcdctl for tasks such as back up and restore, make sure that you set the ETCDCTL_API to 3.
+
+	- You can do this by exporting the variable ETCDCTL_API prior to using the etcdctl client. This can be done as follows:
+		master node terminal --> export ETCDCTL_API=3
+
+	- Verify version changes
+		master node terminal --> etcdctl version
+
+
+For example, if you want to take a snapshot of etcd, use:
+	terminal --> etcdctl snapshot save -h 		# and keep a note of the mandatory global options
+
+
+Since our ETCD database is TLS-Enabled, the following options are mandatory:
+
+--cacert                    		verify certificates of TLS-enabled secure servers using this CA bundle
+
+--cert                                  identify secure client using this TLS certificate file
+
+--endpoints=[127.0.0.1:2379]         	This is the default as ETCD is running on master node and exposed on localhost 2379.
+
+--key                                   identify secure client using this TLS key file
+
+
+Similarly use the help option for snapshot restore to see all available options for restoring the backup.
+	terminal --> etcdctl snapshot restore -h
+
+For a detailed explanation on how to make use of the etcdctl command line tool and work with the -h flags, check out the solution video for the Backup and Restore Lab.
+
+
+
+=================================================
+Section 6 139. Practice Test - Backup and Restore
+=================================================
+
+
+1. We have a working Kubernetes cluster with a set of web applications running. Let us first explore the setup.
+---------------------------------------------------------------------------------------------------------------
+How many deployments exist in the cluster in default namespace?
+
+List deployments
+	terminal --> kubectl get deploy
+
+- choose '2' as answer
+
+
+2. What is the version of ETCD running on the cluster?
+------------------------------------------------------
+Check the ETCD Pod or Process
+
+Check etcd pod in the server namespace
+	terminal --> k get pods -n kube-system
+
+	# we can see etcd pod: etcd-controlplane
+
+Show details for etcd pod
+	terminal --> k describe pod etcd-controlplane -n kube-system
+
+	# k					- common kubernetes command
+	# describe 				- used action
+	# pod 					- object kind
+	# etcd-controlplane			- name of the object
+	# -n kube-system			- namespace of the target object
+
+Under section Containers / etcd / Image, we have registry.k8s.io/etcd:3.5.15-0
+
+- choose '3.5.15' as answer
+
+
+
+3. At what address can you reach the ETCD cluster from the controlplane node?
+-----------------------------------------------------------------------------
+Check the ETCD Service configuration in the ETCD POD
+
+Check etcd pod in the server namespace
+	terminal --> k get pods -n kube-system
+
+	# we can see etcd pod: etcd-controlplane
+
+Show details for etcd pod
+	terminal --> k describe pod etcd-controlplane -n kube-system
+
+	# k					- common kubernetes command
+	# describe 				- used action
+	# pod 					- object kind
+	# etcd-controlplane			- name of the object
+	# -n kube-system			- namespace of the target object
+
+Under section Containers / Command / etcd / --listen-client-urls=https://127.0.0.1:2379,https://192.168.63.137:2379
+
+- choose 'https://127.0.0.1:2379' as answer
+
+
+
+4. Where is the ETCD server certificate file located?
+-----------------------------------------------------
+Note this path down as you will need to use it later
+
+Check etcd pod in the server namespace
+	terminal --> k get pods -n kube-system
+
+	# we can see etcd pod: etcd-controlplane
+
+Show details for etcd pod
+	terminal --> k describe pod etcd-controlplane -n kube-system
+
+	# k					- common kubernetes command
+	# describe 				- used action
+	# pod 					- object kind
+	# etcd-controlplane			- name of the object
+	# -n kube-system			- namespace of the target object
+
+Under section Containers / Command / etcd / --cert-file=/etc/kubernetes/pki/etcd/server.crt
+
+- choose '/etc/kubernetes/pki/etcd/server.crt' as answer
+
+
+
+5. Where is the ETCD CA Certificate file located?
+-------------------------------------------------
+Note this path down as you will need to use it later.
+
+Check etcd pod in the server namespace
+	terminal --> k get pods -n kube-system
+
+	# we can see etcd pod: etcd-controlplane
+
+Show details for etcd pod
+	terminal --> k describe pod etcd-controlplane -n kube-system
+
+	# k					- common kubernetes command
+	# describe 				- used action
+	# pod 					- object kind
+	# etcd-controlplane			- name of the object
+	# -n kube-system			- namespace of the target object
+
+Under section Containers / Command / etcd / --trusted-ca-file=/etc/kubernetes/pki/etcd/ca.crt
+
+- choose '/etc/kubernetes/pki/etcd/ca.crt' as answer
+
+
+
+6. The master node in our cluster is planned for a regular maintenance reboot tonight. While we do not anticipate anything to go wrong, we are required to take the necessary backups. Take a snapshot of the ETCD database using the built-in snapshot functionality.
+----------------------------------------------------------------------
+Store the backup file at location /opt/snapshot-pre-boot.db
+
+Check etcd pod in the server namespace
+	terminal --> k get pods -n kube-system
+
+	# we can see etcd pod: etcd-controlplane
+
+Show details for etcd pod
+	terminal --> k describe pod etcd-controlplane -n kube-system
+
+	# k					- common kubernetes command
+	# describe 				- used action
+	# pod 					- object kind
+	# etcd-controlplane			- name of the object
+	# -n kube-system			- namespace of the target object
+
+We have help information under section
+	- Containers / Command / etcd / --cert-file=/etc/kubernetes/pki/etcd/server.crt		# cert file
+	- Containers / Command / etcd / --data-dir=/var/lib/etcd				# data directory
+	- Containers / Command / etcd / --key-file=/etc/kubernetes/pki/etcd/server.key		# jey file
+	- Containers / Command / etcd / --trusted-ca-file=/etc/kubernetes/pki/etcd/ca.crt	# ca file
+	- ... --listen-client-urls=https://127.0.0.1:2379,https://192.168.63.137:2379		# endpoint
+
+
+List static pods (etcd pod is a static pod in the master node)
+	terminal --> ls /etc/kubernetes/manifests
+	# result: etcd.yaml kube-apiserver.yaml kube-controllermanager.yaml kube-scheduler.yaml
+
+Show configuration of the static etcd pod and see the directory mappings
+	terminal --> cat /etc/kubernetes/manifests/etcd.yaml
+---------------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    kubeadm.kubernetes.io/etcd.advertise-client-urls: https://192.168.63.137:2379
+  creationTimestamp: null
+  labels:
+    component: etcd
+    tier: control-plane
+  name: etcd
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+    - etcd
+    - --advertise-client-urls=https://192.168.63.137:2379
+    - --cert-file=/etc/kubernetes/pki/etcd/server.crt
+    - --client-cert-auth=true
+    - --data-dir=/var/lib/etcd					# data-dir should match data path in the container
+    - --experimental-initial-corrupt-check=true
+    - --experimental-watch-progress-notify-interval=5s
+    - --initial-advertise-peer-urls=https://192.168.63.137:2380
+    - --initial-cluster=controlplane=https://192.168.63.137:2380
+    - --key-file=/etc/kubernetes/pki/etcd/server.key
+    - --listen-client-urls=https://127.0.0.1:2379,https://192.168.63.137:2379
+    - --listen-metrics-urls=http://127.0.0.1:2381
+    - --listen-peer-urls=https://192.168.63.137:2380
+    - --name=controlplane
+    - --peer-cert-file=/etc/kubernetes/pki/etcd/peer.crt
+    - --peer-client-cert-auth=true
+    - --peer-key-file=/etc/kubernetes/pki/etcd/peer.key
+    - --peer-trusted-ca-file=/etc/kubernetes/pki/etcd/ca.crt
+    - --snapshot-count=10000
+    - --trusted-ca-file=/etc/kubernetes/pki/etcd/ca.crt
+    image: registry.k8s.io/etcd:3.5.15-0
+    imagePullPolicy: IfNotPresent
+    livenessProbe:
+      failureThreshold: 8
+      httpGet:
+        host: 127.0.0.1
+        path: /livez
+        port: 2381
+        scheme: HTTP
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 15
+    name: etcd
+    readinessProbe:
+      failureThreshold: 3
+      httpGet:
+        host: 127.0.0.1
+        path: /readyz
+        port: 2381
+        scheme: HTTP
+      periodSeconds: 1
+      timeoutSeconds: 15
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    startupProbe:
+      failureThreshold: 24
+      httpGet:
+        host: 127.0.0.1
+        path: /readyz
+        port: 2381
+        scheme: HTTP
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 15
+    volumeMounts:
+    - mountPath: /var/lib/etcd			# this is data path in the container
+      name: etcd-data
+    - mountPath: /etc/kubernetes/pki/etcd	# this dir path is in the container. same as in the master node	(host)
+      name: etcd-certs
+  hostNetwork: true
+  priority: 2000001000
+  priorityClassName: system-node-critical
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault
+  volumes:
+  - hostPath:
+      path: /etc/kubernetes/pki/etcd		# this dir path is in on the master node (host). same as in the container
+      type: DirectoryOrCreate
+    name: etcd-certs
+  - hostPath:
+      path: /var/lib/etcd			# this is data path in the master node (host)
+      type: DirectoryOrCreate
+    name: etcd-data				# mapped with the container with this label
+status: {}
+---------------------------------------------------------
+
+List ETCD data directory
+	terminal --> ls /var/lib/etcd		# result: meber
+
+List sertificates
+	terminal --> ls /etc/kubernetes/pki/etcd/
+
+	# result: ca.crt  ca.key  healthcheck-client.crt  healthcheck-client.key  peer.crt  peer.key  server.crt  server.key
+
+OPTIONAL:
+Set environment variable
+	terminal --> export ETCDCTL_API=3		# this is done if we want not write ETCDCTL_API=3 on every command
+
+Show mandatory arguments we need to pass to take a snapshot
+	terminal --> ETCDCTL_API=3 etcdctl snapshot
+
+Take a snapshot of the etcd.yaml file
+	terminal --> ETCDCTL_API=3 etcdctl snapshot save --endpoints=127.0.0.1:2379 --cacert=/etc/kubernetes/pki/etcd/ca.crt --cert=/etc/kubernetes/pki/etcd/server.crt --key=/etc/kubernetes/pki/etcd/server.key /opt/snapshot-pre-boot.db
+
+	# ETCDCTL_API=3							- ETCDCTL_API version
+	# etcdctl							- common etcd command
+	# snapshot save							- used action
+	# --endpoints=127.0.0.1:2379					- endpoint of the etcd
+	# --cacert=/etc/kubernetes/pki/etcd/ca.crt			- auth certificate location
+	# --cert=/etc/kubernetes/pki/etcd/server.crt			- server certificate
+	# --key=/etc/kubernetes/pki/etcd/server.key			- server key file
+	# /opt/snapshot-pre-boot.db					- location dir saving the snapshot
+				
+	# result: Snapshot saved at /opt/snapshot-pre-boot.db
+
+Verify snapshot creation
+	terminal --> ls /opt/snapshot-pre-boot.db
+
+- click 'Check' button
+
+
+
+7. Great! Let us now wait for the maintenance window to finish. Go get some sleep. (Don't go for real)
+------------------------------------------------------------------------------------------------------
+
+- Click 'Ok' button
+
+
+
+8. Wake up! We have a conference call! After the reboot the master nodes came back online, but none of our applications are accessible. Check the status of the applications on the cluster. What's wrong?
+------------------------------------------------------------------------------------------------------
+
+Show deploys
+	terminal --> kubectl get deploy
+	# result: No resources found in default namespace.
+
+Show pods
+	terminal --> kubectl get pods
+	# result: No resources found in default namespace.
+
+Show service
+	terminal --> kubectl get svc
+	# result: kubernetes   ClusterIP   172.20.0.1   <none>        443/TCP   2m44s		# only system service
+
+- choose 'All of the above' as answer
+
+
+9. Luckily we took a backup. Restore the original state of the cluster using the backup file.
+---------------------------------------------------------------------------------------------
+We will restore the ETCD cluster in specific folder and then modify the path of the etcd data in the server
+
+Restore the cluster using the backup file in sepcific directory
+	terminal --> ETCDCTL_API=3 etcdctl snapshot restore --data-dir /var/lib/etcd-from-backup /opt/snapshot-pre-boot.db
+
+	# ETCDCTL_API=3							- ETCDCTL_API version
+	# etcdctl							- common etcd command
+	# snapshot restore						- used action
+	# --data-dir /var/lib/etcd-from-backup				- directory for the restore
+	# /opt/snapshot-pre-boot.db					- used file
+
+	# result: 2025-01-15 16:23:17.720652 I | etcdserver/membership: added member 8e9e05c52164694d [http://localhost:2380] to 		  cluster cdf818194e3a8c32
+
+Show restored directory
+	terminal --> ls /var/lib/etcd-from-backup	# result: member - this is normal result
+
+Edit etcd configuration file and modify the mapped directory
+	terminal --> vi /etc/kubernetes/manifests/etcd.yaml
+
+etcd.yaml
+---------------------------------------------------------
+...
+  - hostPath:
+      path: /var/lib/etcd-from-backup		# modify this path
+      type: DirectoryOrCreate
+    name: etcd-data
+status: {}
+---------------------------------------------------------
+save changes - escape, :wq!, enter
+
+The etcd pod will be recreated with the modified mount path automatically. This can take few minutes time!
+
+Verify modification
+	terminal --> cat /etc/kubernetes/manifests/etcd.yaml
+
+List pods and wait until etcd pod is READY
+	terminal --> kubectl get pods -n kube-system
+
+If the pod do not go into READY state again, delete it and it will be recreated
+	terminal --> kubectl delete pod etcd-controlplane -n kube-system --force
+	
+	# result: pod "etcd-controlplane" deleted
+
+List pods and check if etcd pod is READY
+	terminal --> kubectl get pods -n kube-system
+
+List deployments
+	terminal --> kubectl get deploy
+
+# result:
+	NAME   READY   UP-TO-DATE   AVAILABLE   AGE
+	blue   3/3     3            3           26m
+	red    2/2     2            2           26m
+
+- click 'Check' button
+
+
+
+===================================================
+Section 6 141. Practice Test - Backup and Restore 2
+===================================================
+
+
+1. In this lab environment, you will get to work with multiple kubernetes clusters where we will practice backing up and restoring the ETCD database.
+------------------------------------------------------------------------------------------------------
+
+- click 'Ok' button
+
+
+
+2. You will notice that, you are logged in to the student-node (instead of the controlplane).
+---------------------------------------------------------------------------------------------
+The student-node has the kubectl client and has access to all the Kubernetes clusters that are configured in this lab environment.
+
+Before proceeding to the next question, explore the student-node and the clusters it has access to.
+
+List nodes
+	terminal --> k get nodes
+
+	# result: 
+	NAME                    STATUS   ROLES           AGE   VERSION
+	cluster1-controlplane   Ready    control-plane   30m   v1.29.0
+	cluster1-node01         Ready    <none>          29m   v1.29.0		# this is the node
+
+Show configurations
+	terminal --> k config view
+
+--------------------------------------------------------------
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: DATA+OMITTED
+    server: https://cluster1-controlplane:6443
+  name: cluster1
+- cluster:
+    certificate-authority-data: DATA+OMITTED
+    server: https://192.14.127.22:6443
+  name: cluster2
+contexts:
+- context:
+    cluster: cluster1
+    user: cluster1
+  name: cluster1
+- context:
+    cluster: cluster2
+    user: cluster2
+  name: cluster2
+current-context: cluster1
+kind: Config
+preferences: {}
+users:
+- name: cluster1
+  user:
+    client-certificate-data: DATA+OMITTED
+    client-key-data: DATA+OMITTED
+- name: cluster2
+  user:
+    client-certificate-data: DATA+OMITTED
+    client-key-data: DATA+OMITTED
+--------------------------------------------------------------
+
+- click 'Ok' button
+
+
+
+3. How many clusters are defined in the kubeconfig on the student-node?
+-----------------------------------------------------------------------
+You can make use of the kubectl config command.
+
+Show configurations
+	terminal --> k config view
+
+We can see under 'cluster' we have two entities
+
+- choose '2' as answer
+
+
+4. How many nodes (both controlplane and worker) are part of cluster1?
+----------------------------------------------------------------------
+Make sure to switch the context to cluster1:
+
+Set used context to cluster1
+	terminal --> kubectl config use-context cluster1	# result: Switched to context "cluster1".
+
+List nodes
+	terminal --> k get nodes
+
+- choose '2' as answer
+
+
+
+5. What is the name of the controlplane node in cluster2?
+---------------------------------------------------------
+Make sure to switch the context to cluster2:
+
+Set used context to cluster2
+	terminal --> kubectl config use-context cluster2	# result: Switched to context "cluster2".
+
+List nodes
+	terminal --> k get nodes
+
+# result: 
+	NAME                    STATUS   ROLES           AGE   VERSION
+	cluster2-controlplane   Ready    control-plane   38m   v1.29.0	# this is the controlplane (master) node
+	cluster2-node01         Ready    <none>          37m   v1.29.0	
+
+- choose 'cluster2-controlplane' as answer
+
+
+
+6. You can SSH to all the nodes (of both clusters) from the student-node.
+-------------------------------------------------------------------------
+
+--------------------------------------------------------------------
+student-node ~ ➜  ssh cluster1-controlplane
+Welcome to Ubuntu 18.04.6 LTS (GNU/Linux 5.4.0-1086-gcp x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+This system has been minimized by removing packages and content that are
+not required on a system that users do not log into.
+
+To restore this content, you can run the 'unminimize' command.
+
+cluster1-controlplane ~ ➜
+--------------------------------------------------------------------
+
+To get back to the student node, use the logout or exit command, or, hit Control + D
+
+--------------------------------------------------------------------
+cluster1-controlplane ~ ➜  logout
+Connection to cluster1-controlplane closed.
+
+student-node ~ ➜
+--------------------------------------------------------------------
+
+- click 'Ok' button
+
+
+
+7. How is ETCD configured for cluster1?
+---------------------------------------
+Remember, you can access the clusters from student-node using the kubectl tool. You can also ssh to the cluster nodes from the student-node.
+
+Make sure to switch the context to cluster1:
+	terminal --> kubectl config use-context cluster1
+
+List pods in main namespace
+	terminal --> k get pods -n kube-system		# we can see pod: etcd-cluster1-controlplane
+
+Show details for master node in cluster1 in main namespace - kube-apiserver-cluster1-controlplane
+	terminal --> k describe pod kube-apiserver-cluster1-controlplane -n kube-system
+
+	# we can see '--etcd-servers=https://127.0.0.1:2379' the address of the server is localhost
+
+- choose 'Stacked ETCD' as answer 	# stacked etcd is local hosted, run on the controlplane itself
+
+
+
+
+8. How is ETCD configured for cluster2?
+---------------------------------------
+Remember, you can access the clusters from student-node using the kubectl tool. You can also ssh to the cluster nodes from the student-node.
+
+Make sure to switch the context to cluster2:
+	terminal --> kubectl config use-context cluster2
+
+List pods in main namespace
+	terminal --> k get pods -n kube-system		# we can see pod: etcd-cluster1-controlplane
+
+Show details for master node in cluster1 in main namespace - kube-apiserver-cluster2-controlplane
+	terminal --> k describe pod kube-apiserver-cluster2-controlplane -n kube-system
+
+	# we can see '--etcd-servers=https://192.14.127.11:2379' the address of the server is external
+
+- choose 'External ETCD' as answer
+
+
+
+9. What is the IP address of the External ETCD datastore used in cluster2?
+--------------------------------------------------------------------------
+
+Make sure to switch the context to cluster2:
+	terminal --> kubectl config use-context cluster2
+
+List pods in main namespace
+	terminal --> k get pods -n kube-system		# we can see pod: etcd-cluster1-controlplane
+
+Show details for master node in cluster1 in main namespace - kube-apiserver-cluster2-controlplane
+	terminal --> k describe pod kube-apiserver-cluster2-controlplane -n kube-system
+
+	# we can see '--etcd-servers=https://192.14.127.11:2379' is the address 
+
+- choose '192.14.127.11' as answer
+
+
+
+10. What is the default data directory used the for ETCD datastore used in cluster1? - SHOW DATA DIR ON INTERNAL ETCD SERVER
+------------------------------------------------------------------------------------
+Remember, this cluster uses a Stacked ETCD topology.
+
+Make sure to switch the context to cluster1:
+	terminal --> kubectl config use-context cluster1
+
+List pods in main namespace
+	terminal --> k get pods -n kube-system		# we can see pod: etcd-cluster1-controlplane
+
+Show details for master node in cluster1 in main namespace - etcd-cluster1-controlplane
+	terminal --> k describe pod etcd-cluster1-controlplane -n kube-system
+
+	# we can see '--data-dir=/var/lib/etcd' the directory for etcd data
+
+- choose '/var/lib/etcd' as answer 	# stacked etcd is local hosted, run on the controlplane itself
+
+
+
+
+11. For the subsequent questions, you would need to login to the External ETCD server.
+--------------------------------------------------------------------------------------
+To do this, open a new terminal (using the + button located above the default terminal).
+
+From the new terminal you can now SSH from the student-node to either the IP of the ETCD datastore (that you identified in the previous questions) OR the hostname etcd-server:
+
+Open a new terminal tab and connect to etcd-server
+	terminal_2 --> ssh etcd-server
+
+- click 'Ok' button
+
+
+12. What is the default data directory used the for ETCD datastore used in cluster2? - SHOW DATA DIR ON EXTERNAL ETCD SERVER
+------------------------------------------------------------------------------------
+Remember, this cluster uses an External ETCD topology.
+
+Open a new terminal tab and connect to etcd-server
+	terminal_2 --> ssh etcd-server
+
+Show information about etcd in the etcd-server
+	etcd-server terminal --> ps -ef | grep -i etcd
+
+We can see '--data-dir=/var/lib/etcd-data'
+
+- choose '/var/lib/etcd-data' as answer
+
+
+
+13. How many nodes are part of the ETCD cluster that etcd-server is a part of?
+------------------------------------------------------------------------------
+
+Open a new terminal tab and connect to etcd-server
+	terminal_2 --> ssh etcd-server
+
+Show information about etcd in the etcd-server
+	etcd-server terminal --> ps -ef | grep -i etcd
+
+# we need some of result data
+	--listen-client-urls https://192.14.127.11:2379,https://127.0.0.1:2379	# this is the '--endpoints' param, use localhost
+	--trusted-ca-file=/etc/etcd/pki/ca.pem				# this is '--cacert' param
+	--cert-file=/etc/etcd/pki/etcd.pem				# this is '--cert' param
+	--key-file=/etc/etcd/pki/etcd-key.pem				# this is '--key' param
+
+OPTIONAL:
+Set environment variable
+	etcd-server terminal --> export ETCDCTL_API=3		# this is done if we want not write ETCDCTL_API=3 on every command
+
+List nodes that the external etcd-server is part of
+	etcd-server terminal --> ETCDCTL_API=3 etcdctl member list --endpoints=127.0.0.1:2379 --cacert=/etc/etcd/pki/ca.pem --cert=/etc/etcd/pki/etcd.pem --key=/etc/etcd/pki/etcd-key.pem member list
+
+	# result: 731dea4978d7dfd5, started, etcd-server, https://192.14.127.11:2380, https://192.14.127.11:2379, false
+
+We can see in the result only one entity
+
+- choose '1' as answer
+
+
+
+14. Take a backup of etcd on cluster1 and save it on the student-node at the path /opt/cluster1.db - BACKUP EXTERNAL ETCD
+--------------------------------------------------------------------------------------------------
+If needed, make sure to set the context to cluster1 (on the student-node):
+
+Go to student-node terminal and set current context to cluster1
+	student-node terminal -->  kubectl config use-context cluster1	
+
+	# result: Switched to context "cluster1".
+
+
+List nodes
+	terminal --> k get nodes
+
+	# result: 
+		cluster1-controlplane   Ready    control-plane   63m   v1.29.0
+		cluster1-node01         Ready    <none>          62m   v1.29.0
+
+Connect to the controlplane node
+	terminal --> ssh cluster1-controlplane
+
+List pods in main namepsace
+	cluster1-controlplane terminal --> k get pods -n kube-system
+
+	# we can see 'etcd-cluster1-controlplane' pod
+
+Show details for etcd pod in cluster1 in main namespace - etcd-cluster1-controlplane
+	cluster1-controlplane terminal --> k describe pod etcd-cluster1-controlplane -n kube-system
+
+We need some of result data
+	--advertise-client-urls=https://192.15.139.20:2379		# this is the '--endpoints' param, use localhost
+	--trusted-ca-file=/etc/kubernetes/pki/etcd/ca.crt		# this is '--cacert' param
+	--cert-file=/etc/kubernetes/pki/etcd/server.crt			# this is '--cert' param
+	--key-file=/etc/kubernetes/pki/etcd/server.key			# this is '--key' param
+
+OPTIONAL:
+Set environment variable
+	terminal --> export ETCDCTL_API=3		# this is done if we want not write ETCDCTL_API=3 on every command
+
+Take snapshot of the ETCD
+	cluster1-controlplane terminal --> ETCDCTL_API=3 etcdctl --endpoints=https://192.15.139.20:2379 --cacert=/etc/kubernetes/pki/etcd/ca.crt --cert=/etc/kubernetes/pki/etcd/server.crt --key=/etc/kubernetes/pki/etcd/server.key snapshot save /opt/cluster1.db
+
+Verify snapshot creation
+	cluster1-controlplane terminal --> ls /opt 		# result: cluster1.db  cni  containerd
+
+Exit cluster1-controlplane 
+	cluster1-controlplane terminal --> exit
+
+Copy the file from cluster1-controlplane pod /opt/ to student-node /opt/ folder
+	student-node terminal --> scp cluster1-controlplane:/opt/cluster1.db /opt/
+
+Verify file existatnce in student-node
+	student-node terminal --> ls /opt/	# result: cluster1.db
+
+- click 'Çheck' button	
+
+
+
+16. An ETCD backup for cluster2 is stored at /opt/cluster2.db. Use this snapshot file to carryout a restore on cluster2 to a new path /var/lib/etcd-data-new. - MAKE RESTORE WITH SPECIFIC FILE OF DIFFERENT CLUSTER
+---------------------------------------------------------------------------------------------------------------
+Once the restore is complete, ensure that the controlplane components on cluster2 are running.
+
+The snapshot was taken when there were objects created in the critical namespace on cluster2. These objects should be available post restore.
+
+If needed, make sure to set the context to cluster2 (on the student-node):
+
+Set current context as cluster2
+	student-node terminal -->  kubectl config use-context cluster2
+	# result: Switched to context "cluster2".
+
+List restore files
+	student-node terminal --> ls /opt/	# result: cluster1.db  cluster2.db
+
+Copy file cluster2.db to etcd-server machine in root folder
+	student-node terminal --> scp /opt/cluster2.db etcd-server:/root
+
+Open a new terminal tab and connect to etcd-server
+	terminal_2 --> ssh etcd-server
+
+Verify file existance on etcd-server
+	etcd-server terminal --> ls 		# result: cluster2.db
+
+OPTIONAL:
+Set environment variable
+	etcd-server terminal --> export ETCDCTL_API=3		# this is done if we want not write ETCDCTL_API=3 on every command
+
+Make a restore on etcd cluster on etcd-server
+	etcd-server terminal --> ETCDCTL_API=3 etcdctl snapshot restore /root/cluster2.db --data-dir /var/lib/etcd-data-new
+
+Verify restore and set permissions
+	etcd-server terminal --> ls -la /var/lib/
+
+	# we should see all permissions
+	# drwx------ 3 root root 4096 Jan 15 19:06 etcd-data-new		# owned by root
+
+Modify the permissions
+	etcd-server terminal --> cd /var/lib/
+	etcd-server /var/lib/ terminal --> chown -R etcd:etcd etcd-data-new/
+
+Verify changed permission
+	etcd-server /var/lib/ terminal --> ls -la
+	
+	# drwx------ 3 etcd etcd 4096 Jan 15 19:06 etcd-data-new	# owned by etcd
+
+Change the mapped path to the restored etcd path
+	etcd-server /var/lib/ terminal --> vi /etc/systemd/system/etcd.service
+	
+----------------------------------------------------------------
+[Unit]
+Description=etcd key-value store
+Documentation=https://github.com/etcd-io/etcd
+After=network.target
+
+[Service]
+User=etcd
+Type=notify
+ExecStart=/usr/local/bin/etcd \
+  --name etcd-server \
+  --data-dir=/var/lib/etcd-data-new \			# modify this line - add '-new' at the end
+  --cert-file=/etc/etcd/pki/etcd.pem \
+  --key-file=/etc/etcd/pki/etcd-key.pem \
+  --peer-cert-file=/etc/etcd/pki/etcd.pem \
+  --peer-key-file=/etc/etcd/pki/etcd-key.pem \
+  --trusted-ca-file=/etc/etcd/pki/ca.pem \
+  --peer-trusted-ca-file=/etc/etcd/pki/ca.pem \
+  --peer-client-cert-auth \
+  --client-cert-auth \
+  --initial-advertise-peer-urls https://192.15.139.13:2380 \
+  --listen-peer-urls https://192.15.139.13:2380 \
+  --advertise-client-urls https://192.15.139.13:2379 \
+  --listen-client-urls https://192.15.139.13:2379,https://127.0.0.1:2379 \
+  --initial-cluster-token etcd-cluster-1 \
+  --initial-cluster etcd-server=https://192.15.139.13:2380 \
+  --initial-cluster-state new
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=40000
+
+[Install]
+WantedBy=multi-user.target
+----------------------------------------------------------------
+save changes - escape, :wq!, enter
+
+
+Reload daemos
+	etcd-server /var/lib/ terminal --> systemctl daemon-reload
+
+Restart etcd service
+	etcd-server /var/lib/ terminal --> systemctl restart etcd
+
+Verify status
+	etcd-server /var/lib/ terminal --> systemctl status etcd	# should be up and running
+
+Set current context as cluster2
+	student-node terminal -->  kubectl config use-context cluster2
+	# result: Switched to context "cluster2".
+
+Show pods
+	sudent-node terminal --> kubectl get pods -n kube-system
+
+	# we need to restart
+
+Restart all controlplane conponents
+	sudent-node terminal --> kubectl delete pods kube-controller-manager-cluster2-controlplane kube-scheduler-cluster2-controlplane -n kube-system --force
+
+Connect to cluster2 controlplane
+	terminal --> ssh cluster2-controlplane
+
+Restart kubelet
+	cluster2-controlplane terminal --> systemctl restart kubelet
+
+Check kubelet status
+	cluster2-controlplane terminal --> systemctl status kubelet	# should be running
+
+- click 'Çheck' button
+
+
+
+
+======================================
+Section 6 143. Certification Exam Tips
+======================================
+
+Here's a quick tip. In the exam, you won't know if what you did is correct or not as in the practice tests in this course. You must verify your work yourself. For example, if the question is to create a pod with a specific image, you must run the the 'terminal --> kubectl describe pod' command to verify the pod is created with the correct name and correct image.
+
+
+
+=========================
+Section 6 144. References
+=========================
+
+Backup and ETCD cluster
+	- https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/#backing-up-an-etcd-cluster
+
+Recovery Guide
+	- https://github.com/etcd-io/website/blob/main/content/en/docs/v3.5/op-guide/recovery.md
+
+Disaster Recovery for your Kubernetes Clusters [I] - Andy Goldstein & Steve Kriss, Heptio - video
+	- https://www.youtube.com/watch?v=qRPNuT080Hk&ab_channel=CNCF%5BCloudNativeComputingFoundation%5D
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

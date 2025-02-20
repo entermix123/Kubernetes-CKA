@@ -1,0 +1,5540 @@
+CONTENT
+
+Section 7 155. Download Kubernetes Certificate Health Check Spreadsheet
+Section 7 156. Practice Test - View Certificates
+Section 7 158. Certificates API
+Section 7 159. Practice Test - Certificates API
+Section 7 161. KubeConfig
+Section 7 162. Practice Test - KubeConfig
+Section 7 164. Persistent Key/Value Store
+Section 7 165. API Groups
+Section 7 166. Authorization
+Section 7 167. Role Based Access Control (RBAC)
+Section 7 168. Practice Test Role Based Access Control (RBAC)
+Section 7 170. Cluster Roles and Role Bindings
+Section 7 171. Practice Test - Cluster Roles and Role Bindings
+Section 7 173. Service Accounts
+Section 7 174. Practice Test - Service Accounts
+Section 7 176. Image Security
+Section 7 177. Practice Test - Image Security
+Section 7 179. Pre-requisite - Security in Docker
+Section 7 180. Security Context
+Section 7 181. Practice Test - Security Context
+Section 7 183. Network Policy
+Section 7 184. Developing Network Policies
+Section 7 186. Kubectx and Kubens – Command line Utilities
+Section 7 187. Practice Test - Network Policies
+Section 7 188. 2025 Custom Resource Definitions (CRD)
+Section 7 189. 2025 Custom Controllers
+Section 7 190. 2025 Operator Framework
+
+
+
+
+====================================
+Section 7 145. Security Introduction
+====================================
+
+Main topics
+	- Kubernetes Security Primitives
+	- Authentication
+	- TSL Certificates for Cluster Components
+	- Security Persistent Key Value Store
+	- Authorization
+	- Image Security
+	- Security Context
+	- Network Policies
+
+
+=============================================
+Section 7 147. Kubernetes Security Primitives
+=============================================
+
+Secure Host
+	- password based authentication disabled
+	- SSH key based authentication only
+
+We should set rules over kube-api server to ensure proper work.
+
+Who can access kube-apiserver? What can they do?
+
+
+How can access kube-apiserver?
+------------------------------
+	- Files - Username and Password
+	- Files - Username and Tokens
+	- Certificates
+	- External Authentication providers - LDAP
+	- Service Accounts (for machines)
+
+
+What can they do?
+-----------------
+	- RBAC Authorization	(RBAC - Role Based Access Control)
+	- ABAC Authorization	(ABAC - Attribute Based Access Control)
+	- Node Authorization
+	- Webhook Mode
+
+
+All cluster componenst use TLS Certificates to communicate with kube-apiserver.
+
+Restrictions about access between applications can be set with netwrok policies.
+
+
+
+=============================
+Section 7 148. Authentication
+=============================
+
+Types of roles that exists
+	- Admins 	- Executes administrative tasks
+	- Developers 	- Access the cluster to test or deploy applications 
+	- End Users 	- Uses applications (end users auth is managed by the applications, so we will not discuss them)
+	- Bots		- Third party users for integration puproses
+
+We will focus on authentication mechanisms for accessing to the kubernetes cluster.
+
+Kubernetes CAN manage Service Accounts.
+---------------------------------------
+How to create sevice account
+	terminal --> kubectl create seviceaccount sa1
+
+List service accounts
+	terminal --> kubectl get service accounts
+
+
+Kubernetes CAN'T manage users of types Admins and Developers.
+------------------------------------------------------------
+
+
+When admin or developer make a requeest to kube-apiserver, the server auhenticate user and them process the request.
+
+How kube-apiserver authenticate admins and developers?
+======================================================
+
+Kubernetes have Static Password File, Static Token File, Certificates or Identity Service (third party auth protocols like LDAP)
+
+
+Static Password File and Static Token File - the basic auth
+-----------------------------------------------------------
+
+How to set basic authentication?
+
+In kubernetes is created csv file with list of users and their passwords that is used for source of information.
+
+user-details.csv
+pass      usenrame  ID  GROUP
+-------------------------------
+password123,user1,u0001.group1
+password123,user2,u0002.group2
+password123,user3,u0003.group3
+-------------------------------
+
+user-token-details.csv
+---------------------------------
+KSfdasfikjada,user10,u0010,group1
+KSfdsfsdhggfa,user11,u0011,group2
+KSdfsdsdhggha,user11,u0012,group3
+---------------------------------
+
+We can pass this auth option to the kube-apiserver
+	--basic-auth-file=user-details.csv
+
+We can pass token details to the kube-apiserver
+	--token-auth-file=user-token-details.csv
+
+Option 1:
+If we manage the system manuallyWe we have to restart the kube-apiserver for this options to take effect.
+
+Option 2:
+If we manage the system with kubeadm tool, we have to change the kube-apiserver pod definition file and the kubeadm tool will automatically restart the kube-apiserver once we update this file - /etc/kubernetes/manifests/kube-apiserver.yaml
+
+
+How we can use basic authentication?
+------------------------------------
+
+Specify the username and password in the request
+	terminal --> curl -v -k https://master-node-ip:6443/api/v1/pods -u "user1:password123"
+
+	# -u "user1:password123"			- specify user credentials
+
+Specify the token and isername in the request
+	terminal --> curl -v -k https://master-node-ip:6443/api/v1/pods --header "Authoriztion: Bearer KSdfsdsdh5ggh3ads8fdsef"
+
+Conclusion
+- Basic authentication that stores passwords in plane text is not recommended approach.
+- Consider volume mount while providing the auth file in a kubernetes setup (when use kubeadm tool)
+- Setup Role Based Authorization for the new users
+
+
+
+=========================================================
+Section 7 149. Article to Setting up Basic Authentication
+=========================================================
+
+Setup basic authentication on Kubernetes (Deprecated in 1.19)
+Note: This is not recommended in a production environment. This is only for learning purposes. Also note that this approach is deprecated in Kubernetes version 1.19 and is no longer available in later releases
+----------------------------------------------------------------------------------
+
+Follow the below instructions to configure basic authentication in a kubeadm setup
+
+- Create a file with user details locally at /tmp/users/user-details.csv
+
+user-details.csv
+-----------------------
+password123,user1,u0001
+password123,user2,u0002
+password123,user3,u0003
+password123,user4,u0004
+password123,user5,u0005
+-----------------------
+
+
+Edit the kube-apiserver static pod configured by kubeadm to pass in the user details. The file is located at
+
+/etc/kubernetes/manifests/kube-apiserver.yaml
+---------------------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kube-apiserver
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+    - kube-apiserver
+      <content-hidden>
+    image: k8s.gcr.io/kube-apiserver-amd64:v1.11.3
+    name: kube-apiserver
+    volumeMounts:
+    - mountPath: /tmp/users
+      name: usr-details
+      readOnly: true
+  volumes:
+  - hostPath:
+      path: /tmp/users
+      type: DirectoryOrCreate
+    name: usr-details
+---------------------------------------------------------------
+
+
+Modify the kube-apiserver startup options to include the basic-auth file
+---------------------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  name: kube-apiserver
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+    - kube-apiserver
+    - --authorization-mode=Node,RBAC
+      <content-hidden>
+    - --basic-auth-file=/tmp/users/user-details.csv
+---------------------------------------------------------------
+
+
+
+Create the necessary roles and role bindings for these users:
+---------------------------------------------------------------
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: default
+  name: pod-reader
+rules:
+- apiGroups: [""] # "" indicates the core API group
+  resources: ["pods"]
+  verbs: ["get", "watch", "list"]
+ 
+---
+# This role binding allows "jane" to read pods in the "default" namespace.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: read-pods
+  namespace: default
+subjects:
+- kind: User
+  name: user1 # Name is case sensitive
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role #this must be Role or ClusterRole
+  name: pod-reader # this must match the name of the Role or ClusterRole you wish to bind to
+  apiGroup: rbac.authorization.k8s.io
+---------------------------------------------------------------
+
+Once created, you may authenticate into the kube-api server using the users credentials
+	terminal --> curl -v -k https://localhost:6443/api/v1/pods -u "user1:password123"
+
+
+
+============================================
+Section 7 150. TLS Certificates Introduction
+============================================
+
+What we should know after next few lectures
+	- What are TLS Certificates?
+	- How does Kubernetes use Certificates?
+	- How to generate Certificates?
+	- How to configure Certificates?
+	- How to view Certificates?
+	- How to troubleshoot issues related to Certificates?
+
+
+======================================
+Section 7 151. TLS Certificates Basics
+======================================
+
+TSL Certificate ensure that the server is exactly who he say it is and the data is encrypted.
+
+We will go over two types of encryption. Symmetric and Asymmetric
+
+Symmetric encryption - allow us to encrypt and decrypt data with one key (symmetric key)
+--------------------
+
+Asymmetric encryption  - uses two keys to ensure encrypted and secure data over network.  
+---------------------
+	- Public Key - used to encrypt data, and to decrypt data encrypted with the Pivate key
+	- Privet Key - used to encrypt data, and to decrypt data encrypted with the Public key
+
+How Asymmetric encrytpion works - Anyone can get the public key and encrypt data. But data can be decrypted only with the private key.
+
+Example with SSH key pair
+-----------------------------------------------------------------
+Generate ssh private and public keys (asymmetric key pair)
+	terminal --> ssh-keygen
+
+	# result: id_rsa id_rsa.pub
+	# id_rsa 			- privet key
+	# id_rsa.pub 			- public key (lock)
+	
+Show authorized public keys
+	terminal --> cat ~/.ssh/authorized_keys
+
+	# result: ssh-sra 8dfgdaf7DSGSFSD&gs8f7F&Fsfg8sgf78F user1
+
+Connect to server true ssh
+	terminal --> ssh -i id_rsa user1@server1	# specify the location of the private key
+
+	# result Successfully Logged In!
+-----------------------------------------------------------------
+
+We can use same public key (lock) and private key for more than one server.
+
+We can configure access of another (more users) asymmetric pair (public and privet keys) to our servers. Add another public key to the server ssh authorization file
+
+~/.ssh/authorized_keys
+--------------------------------------------------------
+ssh-sra 8dfgdaf7DSGSFSD&gs8f7F&Fsfg8sgf78F user1
+ssh-sra 8dfgdaassaaSas89asdDAad8ad7daDfASD user2		# added
+--------------------------------------------------------
+
+
+To set encryption we have to send the symmetric or private key (encryption and decryption tool) over the newtwork to the server in order to ensure that the server can decrypt user's data.
+
+There is a risk that a hacker can steal our symmetric or private key from the communication. To prevent this scenario we must secure transaction for server to receive user's keys with Asymmetric encryption.
+
+Asymmetric encryption is set as the server send a public key to the user. The user encrypts his symmetric (private) key with the public key of the server. Now the user's symmantic (private) key can be decrypted only by the private key of the server.
+
+Now the hacker cannot decrypt user's keys or data.
+
+Example with openssl key pair
+-----------------------------------------------------------------------------
+Generate openssl privet key
+	terminal --> openssl genrsa -out my-bank.key 1024		# result: my-bank.key
+
+	# openssl			- common command
+	# genrsa			- generate privet key
+	# -out my-bank.key 1024		- file name and key length
+
+Generate openssl public key
+	terminal --> openssl rsa -in my-bank.key -pubout > mybank.pem	# result: my-bank.key mybank.pem
+
+	# openssl			- common command
+	# rsa -in my-bank.key		- use privet key
+	# -out my-bank.key 1024		- file name and key length
+	# -pubout > mybank.pem		- save publik key to mybank.pem file
+-----------------------------------------------------------------------------
+
+
+We have another scenario with a hacker. A hacker can simulate (replicate) our server with the same Asymmetric encryption and send login form to the user. The user can send his credentials to the hacker's server securely. The hacker now can decrypt the user's credentials.
+
+To prevent this scenario Certificates come in place. Serificate contains information about its kind, server details (locaton and owner) and the public key. Certificates must be signed by third trusted site - CERTIFICATE AUTHORITY (CA) (Symantec, GlobalSign, digicert etc) to nesure that they are safe. Every browser have self certificate verification (https:// - s - secure sites)
+
+Generate Certificate Signing Request (CSR)
+	terminal -->  openssl req -new my-bank.key -out my-bank.csr --subj "/C=US/ST=CA/O=MyOrg, Inc./CN=my-bank.com"
+
+	# openssl							- common command
+	# req -new my-bank.key						- generate singning request
+	# -out my-bank.csr						- save request to my-bank.csr file
+	# --subj "/C=US/ST=CA/O=MyOrg, Inc./CN=my-bank.com"		- include subject for the singning
+
+	# result: my-bank.key my-bank.csr
+	
+When the CERTIFICATE AUTHORITY (CA) receive the certificate request, checks the details and if they are proper, the certificate is signed and sent back to the server. All CERTIFICATE AUTHORITY (CA) have build in public keys to most used browsers that can asure that the CERTIFICATE AUTHORITY (CA) is not fake. We can use CERTIFICATE AUTHORITY (CA) signing service for private servers.
+
+Secured communication in steps:
+	- server generate Certificate Signing Request (CSR) and send it to the CERTIFICATE AUTHORITY (CA)
+	- CERTIFICATE AUTHORITY (CA) perform validations, encrypt server's public key (sign the certificate) with CA's private key
+	- CERTIFICATE AUTHORITY (CA) send signed certificate back to the server
+	- server configures tha application with the signed certificate
+	- on request the server send signed certificate to the user
+	- user validates the certificate with the CERTIFICATE AUTHORITY (CA) public key and retrieve the server's public key
+	- user generate and encrypt symmetric (private) key with the server's public key and send it back to the server
+	- server decrypt user's  symmetric (privet) key with server's privet key
+	- further communication is secured with symmetric encryption
+
+
+The encryption process is called PKI - Public Key Infrastructure
+	- Administrator generates key pair to secure SSH
+	- Web Server generate key pair to secure the website with https
+	- CERTIFICATE AUTHORITY (CA) generate thir own key pair to sign certificates
+	- The user generates a sinle symmetric key and CA signed certificates for user validation
+
+Ones the user establish secure connection with the website, he uses username and password to authenticate to the web server.
+
+Certificates for Public Keys are named with *.crt, *.pem extentions
+
+Certificates for Privet Keys are named with *.key, *-key.pem extentions
+
+
+
+================================
+Section 7 152. TLS in Kubernetes
+================================
+
+Recap of the main communication certificates
+	- server certificates
+	- root certificates - CERTIFICATE AUTHORITY (CA) certificates
+	- client sertificates
+
+Naming conventions
+------------------
+Certificates for Public Keys are named with *.crt, *.pem extentions
+Certificates for Privet Keys are named with *.key, *-key.pem extentions
+
+
+In Kubernetes
+=============
+
+We have 2 types of certificates used in kubernetes
+	- Server Certificates for Servers
+	- Client Certificates for Clients
+
+We must secure communication between
+	- admin and master node
+	- master node and worker nodes
+	- kube-apiserver and kube-scheduler
+
+
+There are the servers in Kubernetes
+	- Kube-API Server
+		- apiserver.crt			- public key certificate
+		- apiserver.key			- private key certificate
+
+	- ETCD Server
+		- etcdserver.crt		- public key certificate
+		- etcdserver.key		- private key certificate
+
+	- Kubelet Server
+		- kubelet.crt			- public key certificate
+		- kubelet.key			- private key certificate
+
+There are the clients in Kubernetes
+	- admin - kubectl (REST API)
+		- admin.crt			- public key certificate
+		- admin.key			- private key certificate
+
+	- kube-scheduller
+		- scheduler.crt			- public key certificate
+		- scheduler.key			- private key certificate		
+	
+	- kube-controlle-manager
+		- controlle-manager.crt		- public key certificate
+		- controlle-manager.key		- private key certificate		
+
+	- kube-proxy
+		- kube-proxy.crt		- public key certificate
+		- kube-proxy.key		- private key certificate
+
+	- kube-api server 
+		- client for ETCD server. Can use the served certificates or cteate new pair for etcd server
+			- apiserver.crt			- server public key certificate
+			- apiserver.key			- server private key certificate
+			or
+			- apiserver-etcd-client.crt	- clinet public key certificate
+			- apiserver-etcd-client.key	- clinet private key certificate
+
+		- client for Kubelet serverCan use the served certificates or cteate new pair for etcd server
+			- apiserver.crt			- server public key certificate
+			- apiserver.key			- server private key certificate
+			or
+			- apiserver-kubelet-client.crt	- clinet public key certificate
+			- apiserver-kubelet-client.key	- clinet private key certificate
+
+	- kubelet server
+		- client for ETCD server. Can use the served certificates or cteate new pair for etcd server
+			- kubelet.crt			- server public key certificate
+			- kubelet.key			- server private key certificate
+			or
+			- kubelet-client.crt		- clinet public key certificate
+			- kubelet-client.key		- clinet      private key certificate
+
+
+Kubernetes requires at least one CERTIFICATE AUTHORITY (CA) certificates to verify certificates. Good practice is to have one CERTIFICATE AUTHORITY (CA) and another one specificaly for ETCD server.
+
+We will look over system with one CERTIFICATE AUTHORITY (CA).
+			- ca.crt			- public key certificate
+			- ca.key			- private key certificate
+
+
+========================================================
+Section 7 153. TLS in Kubernetes - Certificates Creation
+========================================================
+
+We can create certificates with tools like 'EASYRSA', 'OPENSSL', 'CFSSL' and more.
+
+We will use OPENSSL to generate the certificates
+
+
+Generate Kubernetes CERTIFICATE AUTHORITY (CA) certificate
+----------------------------------------------------------
+	- generate private key
+		terminal --> openssl genrsa -out ca.key 2048	
+
+		# openssl				- common openssl command
+		# genrsa				- generate private key
+		# -out ca.key				- specify name of the result file
+		# 2048					- key size
+	
+		# result: ca.key - privet key
+	
+	- generate certificate signing request
+		terminal --> openssl req -new -key ca.key -subj "/CN=KUBERNETES-CA" -out ca.csr
+
+		# openssl				- common openssl command
+		# -req					- object - request
+		# -new					- create request
+		# -key ca.key				- use key for encryption
+		# -subj "/CN=KUBERNETES-CA"		- name the component
+		# -out ca.csr				- specify request result file name  
+
+		# result: ca.csr
+
+
+	- sign certificates as CA (self signed)
+		terminal --> openssl x509 -req -in ca.csr -singkey ca.key -out ca.crt
+
+		# openssl				- common openssl command
+		# x509					- signing command
+		# -req					- object - request
+		# -in ca.csr				- used request file
+		# -singkey ca.key			- signed with self pivate key
+		# -out ca.crt				- certificate result name
+		
+Now we have generated Kubernetes CA private key and root certificate.
+
+
+Generate Kubernetes Admin certificate
+-------------------------------------
+	- generate private key
+		terminal --> openssl genrsa -out admin.key 2048	
+
+		# openssl				- common openssl command
+		# genrsa				- generate private key
+		# -out admin.key			- specify name of the result file
+		# 2048					- key size
+	
+		# result: admin.key - privet key
+
+	- generate certificate signing request
+		terminal --> openssl req -new -key admin.key -subj "/CN=kube-admin/O=system.masters" -out admin.csr
+
+		# openssl				- common openssl command
+		# -req					- object - request
+		# -new					- create request
+		# -key admin.key			- use key for encryption
+		# -subj "/CN=kube-admin			- name the component
+		# /O=system.masters"			- group details for admin writes
+		# -out admin.csr			- specify request result file name  
+
+		# result: admin.csr
+
+	- sign certificates as with CA key pair
+		terminal --> openssl x509 -req -in admin.csr -CA ca.crt -CAkey ca.key -out admin.crt
+
+		# openssl				- common openssl command
+		# x509					- signing command
+		# -req					- object - request
+		# -in admin.csr				- used request file
+		# -CA ca.crt				- CA sertificate
+		# -CAkey ca.key				- CA key used
+		# -out admin.crt			- certificate result name
+
+		# result: admin.crt 
+		
+Now we have generated Kubernetes admin private key and admin certificate.
+
+How we can use the admin key and certificate to connect to kube-apiserver
+	Option 1:
+	- use curl command with additional options
+		terminal --> curl https://kube-apiserver:6443/api/v1/pods --key admin.key --cert admin.crt
+	Option 2:
+	- create a kube-config.yaml
+---------------------------------------------------
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority: ca.crt
+    server: https://kube-apiserver:6443
+  name: kubernetes
+kind: Config
+users:
+- name: kubernetes-admin
+  user:
+    client-certificate: admin.crt
+    client-key: admin.key
+---------------------------------------------------
+
+
+Generate Kubernetes kube-proxy certificate
+------------------------------------------
+	- generate private key
+		terminal --> openssl genrsa -out kube-proxy.key 2048	
+
+		# openssl				- common openssl command
+		# genrsa				- generate private key
+		# -out kube-proxy.key			- specify name of the result file
+		# 2048					- key size
+
+		# result: kube-proxy.key		- privet key
+
+	- generate certificate signing request
+		terminal --> openssl req -new -key kube-proxy.key -subj "/CN=kube-proxy" -out kube-proxy.csr
+
+		# openssl				- common openssl command
+		# -req					- object - request
+		# -new					- create request
+		# -key kube-proxy.key			- use key for encryption
+		# -subj "/CN=kube-proxy"		- name the component
+		# -out kube-proxy.csr			- specify request result file name  
+
+		# result: kube-proxy.csr
+
+	- sign certificates as with CA key pair
+		terminal --> openssl x509 -req -in kube-proxy.csr -CA ca.crt -CAkey ca.key -out kube-proxy.crt
+
+		# openssl					- common openssl command
+		# x509						- signing command
+		# -req						- object - request
+		# -in kube-shceduler.csr			- used request file
+		# -CA ca.crt					- CA sertificate
+		# -CAkey ca.key					- CA key used
+		# -out kube-proxy.crt				- certificate result name
+
+		# result: kube-proxy.crt
+
+Now we have generated Kubernetes proxy private key and certificate.
+
+Same procedure is used to create controller-manager and scheduler certificates, but they should be prefixed witht 'system', beacuse they are system components.
+
+Generate Kubernetes kube-shceduler certificate
+----------------------------------------------
+	- generate private key
+		terminal --> openssl genrsa -out kube-shceduler.key 2048	
+
+		# openssl				- common openssl command
+		# genrsa				- generate private key
+		# -out kube-shceduler.key		- specify name of the result file
+		# 2048					- key size
+
+		# result: kube-shceduler.key		- privet key
+
+	- generate certificate signing request
+		terminal --> openssl req -new -key kube-shceduler.key -subj "/CN=kube-shceduler" -out kube-shceduler.csr
+
+		# openssl				- common openssl command
+		# -req					- object - request
+		# -new					- create request
+		# -key kube-shceduler.key		- use key for encryption
+		# -subj "/CN=kube-shceduler"		- name the component
+		# -out kube-shceduler.csr		- specify request result file name  
+
+		# result: kube-shceduler.csr
+
+	- sign certificates as with CA key pair (certificate name is prefixed with 'system')
+		terminal --> openssl x509 -req -in kube-shceduler.csr -CA ca.crt -CAkey ca.key -out systemkube-scheduler.crt
+
+		# openssl					- common openssl command
+		# x509						- signing command
+		# -req						- object - request
+		# -in kube-shceduler.csr			- used request file
+		# -CA ca.crt					- CA sertificate
+		# -CAkey ca.key					- CA key used
+		# -out systemkube-shceduler.crt			- certificate result name
+
+		# result: systemkube-scheduler.crt
+
+Generate Kubernetes kube-contriller-manager certificate
+-------------------------------------------------------
+	- generate private key
+		terminal --> openssl genrsa -out kube-controller-manager.key 2048	
+
+		# openssl				- common openssl command
+		# genrsa				- generate private key
+		# -out kube-controller-manager.key	- specify name of the result file
+		# 2048					- key size
+	
+		# result: kube-controller-manager.key	- privet key
+
+	- generate certificate signing request
+		terminal --> openssl req -new -key kube-controller-manager.key -subj "/CN=kube-contriller-manager" -out kube-contriller-manager.csr
+
+		# openssl				- common openssl command
+		# -req					- object - request
+		# -new					- create request
+		# -key admin.key			- use key for encryption
+		# -subj "/CN=kube-contriller-manager"	- name the certificate sgining request
+		# -out kube-contriller-manager.csr	- specify request result file name  
+
+		# result: kube-contriller-manager.csr
+
+	- sign certificates as with CA key pair
+		terminal --> openssl x509 -req -in kube-contriller-manager.csr -CA ca.crt -CAkey ca.key -out systemkube-contriller-manager.crt
+
+		# openssl					- common openssl command
+		# x509						- signing command
+		# -req						- object - request
+		# -in contriller-manager.csr			- used request file
+		# -CA ca.crt					- CA sertificate
+		# -CAkey ca.key					- CA key used
+		# -out systemkube-contriller-manager.crt	- certificate result name
+
+		# result: systemkube-contriller-manager.crt
+
+
+In the configuration of every component (server, controller, scheduler, kubelet) we must specify the CERTIFICATE AUTHORITY (CA) certificate. The CA certificate is needed to verify servers or clients in every communication.
+
+
+
+Server Certificates
+===================
+
+
+ETCD Server
+-----------
+
+Generate two pairs of ETCD Server certificate and key
+	- server certificate
+		- etcdserver.crt		- server side certificate
+		- etcdserver.key		- server side private key
+
+	- client certificate and key (client to kube-apiserver)
+		- etcdpeer1.crt			- client side certificate
+		- etcdpeer1.key			- client side private key
+
+
+When we configuring ETCD server we need to specify those 2 pairs
+	terminal --> cat etcd.yaml
+
+etcd.yaml
+------------------------------------------------------
+- etcd
+   - --advertise-client-urls=https://127.0.0.1:2379
+   - --key-file=/path-to-certs/etcdserver.key				# etcd server side private key
+   - --cert-file=/path-to-certs/etcdserver.crt				# etcd server side certificate
+   - --client-cert-auth=true
+   - --data-dir=/var/lib/etcd	
+   - --initial-advertise-peer-urls=https://127.0.0.1:2380
+   - --initial-cluster=master=urls:https://127.0.0.1:2380
+   - --listen-client-urls=https://127.0.0.1:2379
+   - --listen-peer-urls=https://127.0.0.1:2380
+   - --name=master
+   - --peer-cert-file=/path-to-cert/etcdpeer1.crt			# etcd client side certificate
+   - --peer-client-cert-auth=true					# client authorization enabled
+   - --peer-key-file=/etc/kubernetes/pki/etcd/ca.crt			# ca certificate
+   - --snapshot-count=10000
+   - --trusted-ca-file=/etc/kubernetes/pki/etcd/ca.crt			# ca certificate
+------------------------------------------------------
+
+
+
+Kube-API Server
+---------------
+
+kube-apiserver communicates with all other components. Some of them are refering to the kube-apiserver with different aliases like
+	- kubernetes
+	- kubernetes.default
+	- kubernetes.default.svc
+	- kubernetese.default.svc.cluster.local
+
+All of these naems should be included in the kube-api server side certificates
+
+Generate kube-apiserver private key
+	terminal --> openssl genrsa -out apiserver.key 2048
+
+	# openssl 					- common openssl command	
+	# genrsa					- generate private key
+	# -out apiserver.key				- name the result file
+	# 2048						- key length
+
+	# result: apiserver.key
+
+To specify all alias names we have to create openssl config file
+
+openssl.cnf
+------------------------------------------------------------
+[req]
+req_extentions = v3_req
+distinguished_name = req_distinguished_name
+[ v3_req ]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation,
+subjectAltName = @alt_names
+[alt_names]						# alias names
+DNS.1 = kubernetes					# first
+DNS.2 = kubernetes.default
+DNS.3 = kubernetes.default.svc
+DNS.4 = kubernetese.default.svc.cluster.local		# last
+IP.1 = 10.96.0.1
+IP.2 = 172.17.0.87
+------------------------------------------------------------
+
+Generate signing request
+	terminal --> openssl req -new -key apiserver.key -subj "/CM=kube-apiserver" -out apiserver.csr -config openssl.cnf
+
+	# openssl 					- common openssl command	
+	# req -new					- generate singning request
+	# -key apiserver.key				- used key for encryption
+	# -subj "/CM=kube-apiserver"			- name the component
+	# -out apiserver.key				- name the result file
+	# -config openssl.cnf				- specify openssl config file with all alias names
+
+	# result: apiserver.csr
+
+
+Sing the kube-api server certificate with CA key
+	terminal --> openssl x509 -req -in apiserver.csr -CA ca.crt -CAkey ca.key -out apiserver.crt
+
+	# openssl 					- common openssl command	
+	# x509						- signing command
+	# -req -in apiserver.csr			- used request
+	# -CA ca.crt					- CA sertificate used
+	# -CAkey ca.key					- CA key used
+	# -out apiserver.crt				- name the result certificate
+
+	# result: apiserver.crt
+
+
+Client side of kube-apiserver (client to ETCD server) are passed in executable command ot in the pod-definition file
+
+------------------------------------------------------
+ExecStart=/usr/local/bin/kube-apiserver \\
+  --advertise-address=${INTERNAL_IP} \
+  --allow-privileged=true \
+  --apiserver-count=3 \
+  --authorization-mode=Node,RBAC \
+  --bind-address=0.0.0.0 \
+  --enable-swagger-ui=true \
+  --etcd-cafile=/var/lib/kubernetes/ca.pem \				# etcd connection with CA certificate
+  --etcd-certfile=/etc/kubernetes/pki/apiserver-etcd-client.crt \	# client side certificate (client to ETCD server)
+  --etcd-keyfile=/etc/kubernetes/pki/apiserver-etcd-client.key \	# client side private key (client to ETCD server)
+  --etcd-servers=https://127.0.0.1:2379 \
+  --event-ttl=1h \
+  --kubelet-certificate-authority=/var/lib/kubernetes/ca.pem \		# kubelets connection with CA cetificate
+  --kubelet-client-certificate=/etc/kubernetes/pki/apiserver-kubelet-client.crt \  # client side cert (client to kubelets)
+  --kubelet-client-key=/var/lib/kubernetes/apiserver-kubelet-client.key \	# client side private key (client to kubelets)
+  --kubelet-https=true \
+  --runtime-config=api/all \
+  --service-account-key-file=/var/lib/kubernetes/service-account.pem \
+  --service-cluster-ip-range=10.32.0.0/24 \
+  --service-node-port-range=30000-32767 \
+  --client-ca-file=/var/lib/kubernetes/ca.pem \			# this is CA certificate (public key)
+  --tls-cert-file=/var/lib/kubernetes/apiserver.crt \		# this is server side certificate 
+  --tls-private-key-file=/var/lib/kubernetes/apiserver.key \	# this is server side private key
+  --v=2
+------------------------------------------------------
+
+
+
+
+Kubelet Server - https server running on each node
+--------------
+
+Certificates for each kubelet server are named after their node
+	- node01, node02, node03, nodeX
+
+Generate kubelet server side certificate.
+...
+
+Once certificates are created we need to specify the in the kubelet server config-file
+
+kubelet-config.yaml (node01)
+------------------------------------------------------
+kind: KubeletConfiguration
+apiVersion: kubelet.config/k8s.io/v1beta1
+authentication:
+  x509
+    clientCAFile: "/var/lib/kubernetes/ca.pem"			# specify CA public key
+authorization:
+  mode: Webhook
+clusterDomain: "cluster.local"
+clusterDNS:
+  - "10.32.0.10"
+podCIDR: "${POD_CIDR}"
+resolvConf: "/run/systemd/resolve/resolv.conf"
+runtimeRequestTimeout: "15m"
+tslCertFile: "/var/lib/kubelet/kubelet-node01.crt"		# specify kubelet certificate file
+tslPrivateKey: "/var/lib/kubelet/kubelet-node01.key"		# specify kubelet private key
+------------------------------------------------------
+
+This configuration have to be done for each node. 
+
+
+Generate kubelet client side certificate (client to kube-apiserver)
+	- kubelet client certificate must be named with prefix 'system' (they are system components) to authenticate to kube-apiserver
+	- groups with previleges (like in admin certificates) must be passed
+
+Example - system:node:node01, system:node:node02, system:node:node03, system:node:nodeX etc. 
+
+All data is passed in kubelet-config file.
+
+
+
+=======================================
+Section 7 154. View Certificate Details
+=======================================
+
+How to perform health check to the certificate environment?
+
+1. We need to know how the cluster was created
+	- manually (not recommended)		- we need to create all certificate smanually
+	- with kubeadm tool (recommended)
+
+If the cluster is created manually, we need to create all certificated manually also
+	terminal --> cat /etc/systemd/system/kube-apiserver.service
+------------------------------------------------------
+[Service]
+ExecStart=/usr/local/bin/kube-apiserver \
+  --advertise-address=172.17.0.32 \
+  --allow-privileged=true \
+  --apiserver-count=3 \
+  --authorization-mode=Node,RBAC \
+  --bind-address=0.0.0.0 \
+  --client-ca-file=/var/lib/kubernetes/ca.pem \
+  --enable-swagger-ui=true \
+  --etcd-cafile=/var/lib/kubernetes/ca.pem \				
+  --etcd-certfile=/var/lib/kubernetes/kubernetes.pem \		
+  --etcd-keyfile=/var/lib/kubernetes/kubernetes-key.pem \		
+  --event-ttl=1h \
+  --kubelet-certificate-authority=/var/lib/kubernetes/ca.pem \		
+  --kubelet-client-key=/var/lib/kubernetes/kubernetes-key.pem \		
+  --kubelet-https=true \
+  --service-node-port-range=30000-32767 \
+  --tls-cert-file=/var/lib/kubernetes/kubernetes.pem \			# public key
+  --tls-private-key-file=/var/lib/kubernetes/kubernetes-key.pem \	# private key
+  --v=2
+------------------------------------------------------
+
+
+If the cluster is created by kubeadm tool, the certificates are handeled by the kubeadm itself
+	terminal --> cat /etc/kubernetes/manifests/kube-apiserver.yaml
+
+We will go over a cluster provisioned by kubeadm as example
+
+There is a prepared excel sheet in the course resources for this table 'kubernetes-certs-checker.xlsx'
+
+How to find kube-apiserver used certificates
+	terminal --> cat /etc/kubernetes/manifests/kube-apiserver.yaml
+
+kube-apiserver.yaml
+------------------------------------------------------
+spec:
+  containers:
+  - command:
+    - kube-apiserver
+    - --authorization-mode=Node,RBAC
+    - --advertise-address=172.17.0.32
+    - --allow-privileged=true
+    - --client-ca-file=/etc/kubernetes/pki/ca.crt			# client CA sertificate
+    - --disable-admission-plugins=PersistentVolumeLabel
+    - --enable-admission-plugins=NodeRestriction
+    - --enable-bootstrap-token-auth=true
+    - --etcd-cafile=/etc/kubernetes/pki/etcd/ca.crt 			# etcd public key
+    - --etcd-certfile=/etc/kubernetes/pki/apiserver-etcd-client.crt	# etcd client certificate
+    - --etcd-keyfile=/etc/kubernetes/pki/apiserver-etcd-client.key	# etcd client private key
+    - --etcd-server=https://127.0.0.1:2379
+    - --insecure-port=0
+    - --kubelet-client-certificate=/etc/kubernetes/pki/apiserver-kubelet-client.crt	# kubelet client certificate
+    - --kubelet-client-key=/etc/kubernetes/pki/apiserver-kubelet-client.key		# kubelet client private key
+    - --kubelet-preferred-address-type=InternalIP,ExernalIP,Hostname
+    - --proxy-client-cert-file=/etc/kubernetes/pki/front-proxy-client.crt
+    - --proxy-client-key-file=/etc/kubernetes/pki/front-proxy-client.key
+    - --secure-port=6443
+    - --service-account-key-file=/etc/kubernetes/pki/sa.pub
+    - --service-cluster-ip-range=10.96.0.0/12
+    - --tls-cert-file=/etc/kubernetes/pki/apiserver.crt			# apiserver certificate
+    - --tls-private-key-file=/etc/kubernetes/pki/apiserver.key		# apiserver private key
+------------------------------------------------------
+
+
+
+Find details about specific certificate (--tls-cert-file=/etc/kubernetes/pki/apiserver.crt)
+---------------------------------------
+	terminal --> openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text -noout
+
+	# this command will print the certificate
+-----------------------------------------------------------------------
+Certificate:
+    Data:
+	Version: 3 (0x2)
+	Serial Number: 3147495682089747350 (0x2bae26a58f090396)
+    Signature Algorithm: sha256WithRSAEncryption
+	Issuer: CN=kubernetes							# issuer - CA name
+	Validity
+	    Not Before: Feb 11 05:39:19 2019 GMT
+	    Not After : Feb 11 05:39:20 2020 GMT				# expirate date
+	Subject: CN=kube-apiserver						# certificate name
+	Subject Public Key Info:
+	    Public Key Algorithm: rsaEncryption
+		Public-Key: (2048 bit)
+		    Modulus:
+			00:d9:69:38:80:68:3b:b7:2e:9e:25:00:e8:fd:01:
+
+		    Exponent: 65537 (0x10001)
+	X509v3 extensions:
+	    X509v3 Key Usage: critical
+		Digital Signature, Key Encipherment
+	    X509v3 Extended Key Usage:
+		TLS Web Server Authentication
+	    X509v3 Subject Alternative Name:					# alias names
+		DNS:master, DNS:kubernetes, DNS:kubernetes.default,
+DNS:kubernetes.default.svc, DNS:kubernetes.default.svc.cluster.local, IP
+Address:10.96.0.1, IP Address:172.17.0.27
+-----------------------------------------------------------------------
+
+We can do the same procedure to find details about all other certificates
+
+
+Troubleshooting
+---------------
+
+Inspect service logs in manually created cluste
+	terminal --> journalctl -u etcd.service -l
+
+Inspect service logs in cluster created with kubeadm tool
+	terminal --> kubectl logs etcd-master			# show logs for the specific pod
+
+If apiserver is down and we cannot use kubectl command, we need to go one level down to fetch the logs - in docker
+	List al containers
+		terminal --> docker ps -a
+
+	View logs for the specific container
+		terminal --> docker logs [container_number_or_name]
+
+There is a prepared excel sheet in the course resources for this table 'kubernetes-certs-checker.xlsx'
+
+
+
+=======================================================================
+Section 7 155. Download Kubernetes Certificate Health Check Spreadsheet
+=======================================================================
+
+I have uploaded the Kubernetes Certificate Health Check Spreadsheet here:
+	- https://github.com/mmumshad/kubernetes-the-hard-way/tree/master/tools
+
+
+
+================================================
+Section 7 156. Practice Test - View Certificates
+================================================
+
+
+1. Identify the certificate file used for the kube-api server.
+--------------------------------------------------------------
+
+List certificates files
+	terminal --> ls /etc/kubernetes/manifests
+
+Show details for kube-apiserver
+	terminal --> cat /etc/kubernetes/manifests/kube-apiserver.yaml
+
+In the result we see :     
+    - --tls-cert-file=/etc/kubernetes/pki/apiserver.crt
+
+- choose '/etc/kubernetes/pki/apiserver.crt' as answer
+
+
+
+2. Identify the Certificate file used to authenticate kube-apiserver as a client to ETCD Server.
+------------------------------------------------------------------------------------------------
+
+List certificates files
+	terminal --> ls /etc/kubernetes/manifests
+
+Show details for kube-apiserver
+	terminal --> cat /etc/kubernetes/manifests/kube-apiserver.yaml
+
+In the result we see :     
+    - --etcd-certfile=/etc/kubernetes/pki/apiserver-etcd-client.crt
+
+- choose '/etc/kubernetes/pki/apiserver-etcd-client.crt' as answer
+
+
+
+3. Identify the key used to authenticate kubeapi-server to the kubelet server.
+------------------------------------------------------------------------------
+
+List certificates files
+	terminal --> ls /etc/kubernetes/manifests
+
+Show details for kube-apiserver
+	terminal --> cat /etc/kubernetes/manifests/kube-apiserver.yaml
+
+In the result we see :     
+    - --kubelet-client-key=/etc/kubernetes/pki/apiserver-kubelet-client.key
+
+- choose '/etc/kubernetes/pki/apiserver-kubelet-client.key' as answer
+
+
+
+4. Identify the ETCD Server Certificate used to host ETCD server.
+-----------------------------------------------------------------
+
+List certificates files
+	terminal --> ls /etc/kubernetes/manifests
+
+Show details for kube-apiserver
+	terminal --> cat /etc/kubernetes/manifests/etcd.yaml
+
+In the result we see :     
+    - --cert-file=/etc/kubernetes/pki/etcd/server.crt
+
+- choose '/etc/kubernetes/pki/etcd/server.crt' as answer
+
+
+
+5. Identify the ETCD Server CA Root Certificate used to serve ETCD Server.
+--------------------------------------------------------------------------
+ETCD can have its own CA. So this may be a different CA certificate than the one used by kube-api server.
+
+List certificates files
+	terminal --> ls /etc/kubernetes/manifests
+
+Show details for kube-apiserver
+	terminal --> cat /etc/kubernetes/manifests/etcd.yaml
+
+In the result we see :     
+    - --trusted-ca-file=/etc/kubernetes/pki/etcd/ca.crt
+
+- choose '/etc/kubernetes/pki/etcd/ca.crt' as answer
+
+
+
+6. What is the Common Name (CN) configured on the Kube API Server Certificate?
+------------------------------------------------------------------------------
+OpenSSL Syntax: openssl x509 -in file-path.crt -text -noout
+
+List certificates files
+	terminal --> ls /etc/kubernetes/manifests
+
+Show details for kube-apiserver
+	terminal --> cat /etc/kubernetes/manifests/kube-apiserver.yaml
+
+In the result we see :     
+    - --tls-cert-file=/etc/kubernetes/pki/apiserver.crt
+
+Show certificate
+	terminal --> openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text -noout
+
+	# result: Subject: CN = kube-apiserver
+
+- choose 'kube-apiserver' as answer
+
+
+
+7. What is the name of the CA who issued the Kube API Server Certificate?
+-------------------------------------------------------------------------
+
+List certificates files
+	terminal --> ls /etc/kubernetes/manifests
+
+Show details for kube-apiserver
+	terminal --> cat /etc/kubernetes/manifests/kube-apiserver.yaml
+
+In the result we see :     
+    - --tls-cert-file=/etc/kubernetes/pki/apiserver.crt
+
+Show certificate
+	terminal --> openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text -noout
+
+	# result: Subject: Issuer: CN = kubernetes
+
+- choose 'kubernetes' as answer
+
+
+
+8. Which of the below alternate names is not configured on the Kube API Server Certificate?
+-------------------------------------------------------------------------------------------
+
+List certificates files
+	terminal --> ls /etc/kubernetes/manifests
+
+Show details for kube-apiserver
+	terminal --> cat /etc/kubernetes/manifests/kube-apiserver.yaml
+
+In the result we see :     
+            X509v3 Subject Alternative Name: 
+                DNS:controlplane, DNS:kubernetes, DNS:kubernetes.default, DNS:kubernetes.default.svc, DNS:kubernetes.default.svc.cluster.local,
+
+- choose 'kube-master' as answer
+
+
+
+9. What is the Common Name (CN) configured on the ETCD Server certificate?
+--------------------------------------------------------------------------
+
+List certificates files
+	terminal --> ls /etc/kubernetes/manifests
+
+Show details for kube-apiserver
+	terminal --> cat /etc/kubernetes/manifests/etcd.yaml
+
+In the result we see :     
+    - --cert-file=/etc/kubernetes/pki/etcd/server.crt
+
+Show certificate
+	terminal --> openssl x509 -in /etc/kubernetes/pki/etcd/server.crt -text -noout
+
+	# result: Subject: Issuer: Subject: CN = controlplane
+
+- choose 'controlplane' as answer
+
+
+
+
+10. How long, from the issued date, is the Kube-API Server Certificate valid for?
+---------------------------------------------------------------------------------
+File: /etc/kubernetes/pki/apiserver.crt
+
+Show certificate
+	terminal --> openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text -noout
+
+in the resut we can see:
+            Not Before: Jan 17 15:47:28 2025 GMT
+            Not After : Jan 17 15:52:28 2026 GMT
+
+- choose '1 Year' as answer
+
+
+
+
+11. How long, from the issued date, is the Root CA Certificate valid for?
+-------------------------------------------------------------------------
+File: /etc/kubernetes/pki/ca.crt
+
+Show certificate
+	terminal --> openssl x509 -in /etc/kubernetes/pki/ca.crt -text -noout
+
+In the result we can see:
+            Not Before: Jan 17 15:47:28 2025 GMT
+            Not After : Jan 15 15:52:28 2035 GMT
+
+- choose '10 Year' as answer
+
+
+
+12. Kubectl suddenly stops responding to your commands. Check it out! Someone recently modified the /etc/kubernetes/manifests/etcd.yaml file
+---------------------------------------------------------------------------------------------------
+
+You are asked to investigate and fix the issue. Once you fix the issue wait for sometime for kubectl to respond. Check the logs of the ETCD container.
+
+List pods
+	terminal --> k get pods
+
+	# result: The connection to the server controlplane:6443 was refused - did you specify the right host or port?
+	# this mean that the kube-apiserver is not working
+
+Show apiserver container with crictl
+	terminal --> crictl ps -a | grep kube-apiserver
+
+	# result: 1c3daf7f8d660       604f5db92eaa8       About a minute ago   Exited              kube-apiserver            6                   60fb132c72933       kube-apiserver-controlplane
+
+Show logs of the etcd
+	terminal --> crictl logs 1c3daf7f8d660 
+
+	# result: 1 logging.go:55] [core] [Channel #5 SubChannel #6]grpc: addrConn.createTransport failed to connect to {Addr: "127.0.0.1:2379", ServerName: "127.0.0.1:2379", }. Err: connection error: desc = "transport: Error while dialing: dial tcp 127.0.0.1:2379: connect: connection refused"
+W0117 16:27:13.307013
+
+We can see that the apiserver cannot connect to 'ServerName: "127.0.0.1:2379"'. This is ETCD server.
+
+Show etcd container with crictl
+	terminal --> crictl ps -a | grep etcd
+
+	# result: 936f37c637baf       2e96e5913fc06       5 seconds ago       Exited              etcd                      7                   16cacaaf8e7e2       etcd-controlplane
+
+Show logs of the ETCD container
+	terminal --> crictl logs 936f37c637baf
+
+	# result: {"level":"fatal","ts":"2025-01-17T16:33:03.144805Z","caller":"etcdmain/etcd.go:219","msg":"listener failed","error":"open /etc/kubernetes/pki/etcd/server-certificate.crt: no such file or directory","stacktrace":"go.etcd.io/etcd/server/v3/etcdmain.startEtcdOrProxyV2\n\tgo.etcd.io/etcd/server/v3/etcdmain/etcd.go:219\ngo.etcd.io/etcd/server/v3/etcdmain.Main\n\tgo.etcd.io/etcd/server/v3/etcdmain/main.go:40\nmain.main\n\tgo.etcd.io/etcd/server/v3/main.go:31\nruntime.main\n\truntime/proc.go:267"}
+
+We can see "error":"open /etc/kubernetes/pki/etcd/server-certificate.crt: no such file or directory"
+
+List files in the error directory
+	terminal --> ls /etc/kubernetes/pki/etcd/
+
+	# result: ca.crt  ca.key  healthcheck-client.crt  healthcheck-client.key  peer.crt  peer.key  server.crt  server.key
+	# we have to use certificate 'server.crt' instead of 'server-certificate.crt' shown in the error
+
+Show etcd definition file
+	terminal --> cat /etc/kubernetes/manifests/etcd.yaml
+
+	# we can see in the result:     - --cert-file=/etc/kubernetes/pki/etcd/server-certificate.crt
+	# this line should be modified to use the right certificate file
+
+Edit the etcd definition file
+	terminal --> vi /etc/kubernetes/manifests/etcd.yaml
+
+etcd.yaml
+-----------------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    kubeadm.kubernetes.io/etcd.advertise-client-urls: https://192.168.233.140:2379
+  creationTimestamp: null
+  labels:
+    component: etcd
+    tier: control-plane
+  name: etcd
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+    - etcd
+    - --advertise-client-urls=https://192.168.233.140:2379
+    - --cert-file=/etc/kubernetes/pki/etcd/server.crt		# fix this line
+    - --client-cert-auth=true
+    - --data-dir=/var/lib/etcd
+    - --experimental-initial-corrupt-check=true
+    - --experimental-watch-progress-notify-interval=5s
+    - --initial-advertise-peer-urls=https://192.168.233.140:2380
+    - --initial-cluster=controlplane=https://192.168.233.140:2380
+    - --key-file=/etc/kubernetes/pki/etcd/server.key
+    - --listen-client-urls=https://127.0.0.1:2379,https://192.168.233.140:2379
+    - --listen-metrics-urls=http://127.0.0.1:2381
+    - --listen-peer-urls=https://192.168.233.140:2380
+    - --name=controlplane
+    - --peer-cert-file=/etc/kubernetes/pki/etcd/peer.crt
+    - --peer-client-cert-auth=true
+    - --peer-key-file=/etc/kubernetes/pki/etcd/peer.key
+    - --peer-trusted-ca-file=/etc/kubernetes/pki/etcd/ca.crt
+    - --snapshot-count=10000
+    - --trusted-ca-file=/etc/kubernetes/pki/etcd/ca.crt
+    image: registry.k8s.io/etcd:3.5.15-0
+    imagePullPolicy: IfNotPresent
+    livenessProbe:
+      failureThreshold: 8
+      httpGet:
+        host: 127.0.0.1
+        path: /livez
+        port: 2381
+        scheme: HTTP
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 15
+-----------------------------------------------------------
+save changes - escape, :wq!. enter
+
+Wait a few minutes and show etcd container with crictl again
+	terminal --> crictl ps -a | grep etcd
+
+	# result: 2fa409bdb07d7       2e96e5913fc06       About a minute ago   Running             etcd                      0                   83a6673002782       etcd-controlplane
+
+Show logs of the container 
+	terminal --> crictl logs 2fa409bdb07d7
+
+	# we can see that the ETCD server is working properly
+
+Show apiserver container with crictl
+	terminal --> crictl ps -a | grep kube-apiserver
+
+	# we can see taht the api server have new running pod
+
+Wait few minutes.
+
+- click 'Check' button
+
+
+
+13. The kube-api server stopped again! Check it out. Inspect the kube-api server logs and identify the root cause and fix the issue.
+---------------------------------------------------------------------------------------------------------------------------
+Run crictl ps -a command to identify the kube-api server container. Run crictl logs container-id command to view the logs.
+
+
+Try to list pods with kubectl
+	terminal --> k get pods
+
+	# result: The connection to the server controlplane:6443 was refused - did you specify the right host or port?
+
+Find kube-apiserver container with crictl
+	terminal --> crictl ps -a | grep kube-apiserver
+
+# result: 
+6d2f4d6b1769f       604f5db92eaa8       6 seconds ago        Running             kube-apiserver            4                   98b60861cba7f       kube-apiserver-controlplane
+
+Show kube-apiserver container logs
+	terminal --> crictl logs 6d2f4d6b1769f
+
+# result: 
+W0117 17:05:16.973619       1 logging.go:55] [core] [Channel #2 SubChannel #3]grpc: addrConn.createTransport failed to connect to {Addr: "127.0.0.1:2379", ServerName: "127.0.0.1:2379", }. Err: connection error: desc = "transport: authentication handshake failed: tls: failed to verify certificate: x509: certificate signed by unknown authority"
+W0117 17:05:16.974132       
+
+We can see that kube-api server cannot connect to 'ServerName: "127.0.0.1:2379' - ETCD server. 
+We can see 'certificate signed by unknown authority'.
+
+Find etcd container with crictl
+	terminal --> crictl ps -a | grep etcd
+
+	# result: 454c4ebf6f3ac       2e96e5913fc06       9 minutes ago        Running             etcd                      0                   ba0eb7bea445c       etcd-controlplane
+
+Show logs of the etcd pod
+	terimnal --> crictl logs 454c4ebf6f3ac
+
+	# result:
+{"level":"warn","ts":"2025-01-17T17:10:25.206023Z","caller":"embed/config_logging.go:170","msg":"rejected connection on client endpoint","remote-addr":"127.0.0.1:34564","server-name":"","error":"remote error: tls: bad certificate"}
+
+
+Show kube-apiserver definition file and see what certificates is working with
+	terminal --> cat /etc/kubernetes/manifests/kube-apiserver.yaml
+
+	# result connected with etcd
+    		- --etcd-cafile=/etc/kubernetes/pki/ca.crt				# this file is not correct
+   		- --etcd-certfile=/etc/kubernetes/pki/apiserver-etcd-client.crt
+   		- --etcd-keyfile=/etc/kubernetes/pki/apiserver-etcd-client.key
+    		- --etcd-servers=https://127.0.0.1:2379
+
+As we kwno ETCD server has his own CA file.
+-------------------------------------------
+
+List ETCD server certificates
+	terminal --> ls /etc/kubernetes/pki/etcd
+
+	# result: ca.crt  ca.key  healthcheck-client.crt  healthcheck-client.key  peer.crt  peer.key  server.crt  server.key
+
+So we have to change used file for the ETCD server connection to '- --etcd-cafile=/etc/kubernetes/pki/etcd/ca.crt'
+
+Edit the kube-apiserver definition file
+	terminal --> vi /etc/kubernetes/manifests/kube-apiserver.yaml
+
+kube-apiserver.yaml
+---------------------------------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    kubeadm.kubernetes.io/kube-apiserver.advertise-address.endpoint: 192.168.28.39:6443
+  creationTimestamp: null
+  labels:
+    component: kube-apiserver
+    tier: control-plane
+  name: kube-apiserver
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+    - kube-apiserver
+    - --advertise-address=192.168.28.39
+    - --allow-privileged=true
+    - --authorization-mode=Node,RBAC
+    - --client-ca-file=/etc/kubernetes/pki/ca.crt
+    - --enable-admission-plugins=NodeRestriction
+    - --enable-bootstrap-token-auth=true
+    - --etcd-cafile=/etc/kubernetes/pki//etcd/ca.crt				# modify this line
+    - --etcd-certfile=/etc/kubernetes/pki/apiserver-etcd-client.crt
+    - --etcd-keyfile=/etc/kubernetes/pki/apiserver-etcd-client.key
+    - --etcd-servers=https://127.0.0.1:2379
+    - --kubelet-client-certificate=/etc/kubernetes/pki/apiserver-kubelet-client.crt
+...
+---------------------------------------------------------------------------
+save changes - escape, :wq!, enter
+
+
+Wait a few minutes and check if ETCD server is running	
+	terminal --> crictl ps -a | grep etcd
+
+	# result: 454c4ebf6f3ac       2e96e5913fc06       23 minutes ago      Running             etcd                      0                   ba0eb7bea445c       etcd-controlplane
+
+We can see that the ETCD server is running.
+
+Check if kube-apiserver is runnignproperly:
+	terminal --> crictl ps -a | grep kube-apiserver
+
+	# result: d2af4bbe4c59c       604f5db92eaa8       About a minute ago   Running             kube-apiserver            0                   d513a3a4a0378       kube-apiserver-controlplane
+
+We can see that the kube-apiserver is running.
+
+- click 'Chech' button
+
+
+
+===============================
+Section 7 158. Certificates API
+===============================
+
+How to create access to new user that have to access the cluster?
+
+The user generates a key
+	terminal --> openssl genrsa -out jabekey 2
+
+	# openssl				- common openssl command
+	# genrsa				- create a key
+	# -out jabekey				- name result key file
+	# 2 					- key length
+
+	# result: jane.key
+
+User send singing request
+	terminal --> openssl req -new -key jane.key -subj "/CN=jane" -out jane.csr
+
+	# openssl				- common openssl command
+	# req -new				- create singning request
+	# -key jane.key				- used key
+	# -subj "/CN=jane"			- name the user components (the user)
+	# -out jane.csr				- name the request
+	
+	# result: jane.csr
+
+The admin takes the key and encode it with base64
+	terminal --> cat jane.csr | base64
+
+	# result: dfalAASDApdfADfALDFDAP9ddfa76DDS)DSDSfDSAFSDfgHFSfFSfSFSFSFS&ffhSFHfS
+
+The admin creates a certificate signing request object with definition file
+
+jane-csr.yaml
+---------------------------------------------------------------
+apiVersion: certificates.k8s.io/v1
+kind: CertificateSigningRequest
+metadata:
+  name: jane
+spec:
+  ExpirationSeconds: 600 	# seconds
+  usages:
+  - digital signature
+  - key encipherment
+  - server auth
+  request:
+	dfalAASDApdfADfALDFDAP9ddfa76DDS)DSDSfDSAFSDfgHFSfFSfSFSFSFS&ffhSFHfS
+---------------------------------------------------------------
+
+When the definitio file jane-csr.yaml is saved, the object is created and can be seen by daministrators and reviewed.
+
+List all singning requests
+	terminal --> kubectl get csr
+
+Approve singning request
+	terminal --> kubectl certificate approve jane
+
+	# result: jane approved!
+
+After the approval, kubernetes signs the certificate using CA key pair and generate certificate for the user. This certificate can be extracted and shared with the user
+
+Show certificate singing request details in yaml format
+	terminal --> kubectl get csr jabe -o yaml
+
+----------------------------------------------------------------
+apiVersion: certificates.k8s.io/v1beta1
+kind: CertificateSigningRequest
+metadata:
+creationTimestamp: 2019-02-13T16:36:43Z
+name: new-user
+spec:
+groups:
+- system:masters
+- system:authenticated
+usages:
+- digital signature
+- key encipherment
+- server auth
+username: kubernetes-admin
+status:
+certificate:									
+dfalAASDApdfADfALDFDAP9ddfa76DDS)DSDSfDSAFSDfgHFSfFSfSFSFSFS&ffhSFHfS		# this is the certificate
+conditions:
+- lastUpdateTime: 2019-02-13T16:37:21Z
+message: This CSR was approved by kubectl certificate approve.
+reason: KubectlApprove
+type: Approved
+----------------------------------------------------------------
+
+We can decode the certificate and share it with the user
+	terminal --> echo "dfalAASDAp...ffhSFHfS" | base64 --decode
+
+
+Who take care of the certificate connected activities? - Controller Manager
+------------------------------------------------------
+
+Controller manager has CSR-APPROVING and CSR_SIGNING modules that carries out certificates specific tasks
+
+Show controller-manager pod-definition file
+	terminal --> cat /etc/kubernetes/manifests/kube-controller-manager.yaml
+
+kube-controller-manager.yaml
+----------------------------------------------------------------
+spec:
+  containers:
+  - command:
+    - kube-controller-manager
+    - --address=127.0.0.1
+    - --cluster-signing-cert-file=/etc/kubernetes/pki/ca.crt		# this is CA public key
+    - --cluster-signing-key-file=/etc/kubernetes/pki/ca.key		# this is CA private key
+    - --controllers=*,bootstrapsigner,tokencleaner
+....
+----------------------------------------------------------------
+
+
+
+
+===============================================
+Section 7 159. Practice Test - Certificates API
+===============================================
+
+
+1. A new member akshay joined our team. He requires access to our cluster. The Certificate Signing Request is at the /root location.
+------------------------------------------------------------------------------------------------
+Inspect it
+
+Show wcertificate
+	terminal --> ls /root
+
+	# result: akshay.csr  akshay.key
+
+Print the certificate singning request
+	terminal --> cat akshay.csr
+
+Print the key
+	terminal --> cat akshay.key
+
+- click 'Ok' button
+
+
+
+2. Create a CertificateSigningRequest object with the name akshay with the contents of the akshay.csr file
+----------------------------------------------------------------------------------------------------------
+As of kubernetes 1.19, the API to use for CSR is certificates.k8s.io/v1.
+
+Please note that an additional field called signerName should also be added when creating CSR. For client authentication to the API server we will use the built-in signer kubernetes.io/kube-apiserver-client.
+
+
+We can take the certficate singning request form from the kubernetes documentation
+	- https://kubernetes.io/docs/reference/access-authn-authz/certificate-signing-requests/#create-certificatessigningrequest
+
+-----------------------------------------------------------------------------
+apiVersion: certificates.k8s.io/v1
+kind: CertificateSigningRequest
+metadata:
+  name: myuser
+spec:
+  request: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURSBSRVFVRVNULS0tLS0KTUlJQ1ZqQ0NBVDRDQVFBd0VURVBNQTBHQTFVRUF3d0dZVzVuWld4aE1JSUJJakFOQmdrcWhraUc5dzBCQVFFRgpBQU9DQVE4QU1JSUJDZ0tDQVFFQTByczhJTHRHdTYxakx2dHhWTTJSVlRWMDNHWlJTWWw0dWluVWo4RElaWjBOCnR2MUZtRVFSd3VoaUZsOFEzcWl0Qm0wMUFSMkNJVXBGd2ZzSjZ4MXF3ckJzVkhZbGlBNVhwRVpZM3ExcGswSDQKM3Z3aGJlK1o2MVNrVHF5SVBYUUwrTWM5T1Nsbm0xb0R2N0NtSkZNMUlMRVI3QTVGZnZKOEdFRjJ6dHBoaUlFMwpub1dtdHNZb3JuT2wzc2lHQ2ZGZzR4Zmd4eW8ybmlneFNVekl1bXNnVm9PM2ttT0x1RVF6cXpkakJ3TFJXbWlECklmMXBMWnoyalVnald4UkhCM1gyWnVVV1d1T09PZnpXM01LaE8ybHEvZi9DdS8wYk83c0x0MCt3U2ZMSU91TFcKcW90blZtRmxMMytqTy82WDNDKzBERHk5aUtwbXJjVDBnWGZLemE1dHJRSURBUUFCb0FBd0RRWUpLb1pJaHZjTgpBUUVMQlFBRGdnRUJBR05WdmVIOGR4ZzNvK21VeVRkbmFjVmQ1N24zSkExdnZEU1JWREkyQTZ1eXN3ZFp1L1BVCkkwZXpZWFV0RVNnSk1IRmQycVVNMjNuNVJsSXJ3R0xuUXFISUh5VStWWHhsdnZsRnpNOVpEWllSTmU3QlJvYXgKQVlEdUI5STZXT3FYbkFvczFqRmxNUG5NbFpqdU5kSGxpT1BjTU1oNndLaTZzZFhpVStHYTJ2RUVLY01jSVUyRgpvU2djUWdMYTk0aEpacGk3ZnNMdm1OQUxoT045UHdNMGM1dVJVejV4T0dGMUtCbWRSeEgvbUNOS2JKYjFRQm1HCkkwYitEUEdaTktXTU0xMzhIQXdoV0tkNjVoVHdYOWl4V3ZHMkh4TG1WQzg0L1BHT0tWQW9FNkpsYWFHdTlQVmkKdjlOSjVaZlZrcXdCd0hKbzZXdk9xVlA3SVFjZmg3d0drWm89Ci0tLS0tRU5EIENFUlRJRklDQVRFIFJFUVVFU1QtLS0tLQo=
+  signerName: kubernetes.io/kube-apiserver-client
+  expirationSeconds: 86400  # one day
+  usages:
+  - client auth
+-----------------------------------------------------------------------------
+
+
+Create a file akshey.yaml
+	terminal --> cat > akshay.yaml
+	
+	- paste the form
+		terminal --> ctrl+shift+v
+	
+	- exit the file
+		terminal --> ctrl+c
+
+Verify the changes
+	terminal --> cat akshay.yaml
+
+Encode the certificate singning request
+	terminal --> cat akshay.csr | base64 -w 0
+	
+	# cat 				- print
+	# akshey.csr			- used file
+	# | base64			- encoded in base64 format
+	# -w 0				- print result on one line
+
+	# result: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURSBSRVFVRVNULS0tLS0KTUlJQ1ZqQ0NBVDRDQVFBd0VURVBNQTBHQTFVRUF3d0dZV3R6YUdGNU1JSUJJakFOQmdrcWhraUc5dzBCQVFFRgpBQU9DQVE4QU1JSUJDZ0tDQVFFQTRxSWwra2RJQXdRd003ZGNEa1d5MnBrQWRTNXVTa0E3bjl1ZDBKL0ZlRFVuCnBFbjVGUTdpNVhZVSt1N2xkZitzQi82eFRDSCsyWmlBcmVHME1MdnNLd09qdVhlQzJJSFZGSzFrc1BjRytLNlkKMWtlRG1OZ0o1WjhKMXRMUWJpOHFzSGIwdW1DVkJXbU5HNUpHa3lVY24xZTJlRkFtOHB4aC9jcys0UkVFV2FkQwo0NHpELyszWkRSSmRGNm1RYjhHUm01NlhTajNIcXlVdHE0RmI1aHBab0prTTl1VTc3TkRQYUVUaUNYNUFQQmZvCkt2VkROYlY4bzUzNjJLQWhnU2xZRWNOMSs4MnNXS2M0cHQyUnYyOHdMelNJbzBONzBINUx3MnYrT0dEOHR3QVkKRVhKMjh1bnMxSHBIZmtwVTNzbCtpTEJFeTNjemU1R2thYWpPbjUyamRRSURBUUFCb0FBd0RRWUpLb1pJaHZjTgpBUUVMQlFBRGdnRUJBSjByN2V5WkJOQ2ZkU2Z5a01wZFRtQ0tkN01SZFcwRG9tV3g1OFlDZXk2VEhaOE1KM1pWCjBZeENOMWdIanJSQmpReXRybEo3SDdIVnREV2hKTzhkNlpHelVjR000WjFNc0didlJTOUZWWjFneDhxV050cTUKTTNBdG5EZ3hNbFhXbUVoamI3a2R2ekhTUDhBN1Bob3dVTWxzTzQzUzAxbWFtNnB5UC9pdXZudTNCbzhHcW40WgpLVDVaT0wwakVUSG9NeUg5Wk1tSFExd0U4bFYwKzRKMnc4bFhZdHdCTXN0UklRY1hwZ2RacklxOEg1Z3c2UmtjCk1VaTNrRHpWb2c1RXdEUXB2TGFTR0YzMzRlSXJNREFoTHUxRVBXV2pPVUJoaFM4UWZVanZWcG5uRHpRaWYvb3EKK3ZPVngzRXZYVXQ5ZEpPekFWOHFUUjhmc1lucC82RE9ncjg9Ci0tLS0tRU5EIENFUlRJRklDQVRFIFJFUVVFU1QtLS0tLQo=
+
+Edit the alshay.yaml file and paste the encoded request in it
+	terminal --> vi akshay.yaml
+
+akshay.yaml
+-----------------------------------------------------------------------------
+apiVersion: certificates.k8s.io/v1
+kind: CertificateSigningRequest
+metadata:
+  name: akshay
+spec:
+  request: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURSBSRVFVRVNULS0tLS0KTUlJQ1ZqQ0NBVDRDQVFBd0VURVBNQTBHQTFVRUF3d0dZV3R6YUdGNU1JSUJJakFOQmdrcWhraUc5dzBCQVFFRgpBQU9DQVE4QU1JSUJDZ0tDQVFFQTRxSWwra2RJQXdRd003ZGNEa1d5MnBrQWRTNXVTa0E3bjl1ZDBKL0ZlRFVuCnBFbjVGUTdpNVhZVSt1N2xkZitzQi82eFRDSCsyWmlBcmVHME1MdnNLd09qdVhlQzJJSFZGSzFrc1BjRytLNlkKMWtlRG1OZ0o1WjhKMXRMUWJpOHFzSGIwdW1DVkJXbU5HNUpHa3lVY24xZTJlRkFtOHB4aC9jcys0UkVFV2FkQwo0NHpELyszWkRSSmRGNm1RYjhHUm01NlhTajNIcXlVdHE0RmI1aHBab0prTTl1VTc3TkRQYUVUaUNYNUFQQmZvCkt2VkROYlY4bzUzNjJLQWhnU2xZRWNOMSs4MnNXS2M0cHQyUnYyOHdMelNJbzBONzBINUx3MnYrT0dEOHR3QVkKRVhKMjh1bnMxSHBIZmtwVTNzbCtpTEJFeTNjemU1R2thYWpPbjUyamRRSURBUUFCb0FBd0RRWUpLb1pJaHZjTgpBUUVMQlFBRGdnRUJBSjByN2V5WkJOQ2ZkU2Z5a01wZFRtQ0tkN01SZFcwRG9tV3g1OFlDZXk2VEhaOE1KM1pWCjBZeENOMWdIanJSQmpReXRybEo3SDdIVnREV2hKTzhkNlpHelVjR000WjFNc0didlJTOUZWWjFneDhxV050cTUKTTNBdG5EZ3hNbFhXbUVoamI3a2R2ekhTUDhBN1Bob3dVTWxzTzQzUzAxbWFtNnB5UC9pdXZudTNCbzhHcW40WgpLVDVaT0wwakVUSG9NeUg5Wk1tSFExd0U4bFYwKzRKMnc4bFhZdHdCTXN0UklRY1hwZ2RacklxOEg1Z3c2UmtjCk1VaTNrRHpWb2c1RXdEUXB2TGFTR0YzMzRlSXJNREFoTHUxRVBXV2pPVUJoaFM4UWZVanZWcG5uRHpRaWYvb3EKK3ZPVngzRXZYVXQ5ZEpPekFWOHFUUjhmc1lucC82RE9ncjg9Ci0tLS0tRU5EIENFUlRJRklDQVRFIFJFUVVFU1QtLS0tLQo=
+  signerName: kubernetes.io/kube-apiserver-client
+  usages:
+    - client auth
+-----------------------------------------------------------------------------
+save changes - escape, :wq!, enter
+
+Create singing requests object
+	terminal --> kubectl create -f akshay.yaml
+
+	# result: certificatesigningrequest.certificates.k8s.io/akshay created
+
+List certificate singing requests
+	terminal --> kubectl get csr
+
+	# result:
+NAME     AGE   SIGNERNAME                            REQUESTOR          REQUESTEDDURATION   CONDITION
+akshay   72s   kubernetes.io/kube-apiserver-client   kubernetes-admin   <none>              Pending
+
+- click 'Çheck' button
+
+
+3. What is the Condition of the newly created Certificate Signing Request object?
+---------------------------------------------------------------------------------
+
+List certificate singing requests
+	terminal --> kubectl get csr
+
+	# result:
+NAME     AGE   SIGNERNAME                            REQUESTOR          REQUESTEDDURATION   CONDITION
+akshay   72s   kubernetes.io/kube-apiserver-client   kubernetes-admin   <none>              Pending
+
+- choose 'Pending' as answer
+
+
+
+4. Approve the CSR Request
+--------------------------
+
+List certificate singing requests
+	terminal --> kubectl get csr
+
+Approve the certificate singing request (csr)
+	terminal --> kubectl certificate approve akshay
+	
+	# result: certificatesigningrequest.certificates.k8s.io/akshay approved
+
+- click 'Çheck' button
+
+
+
+5. How many CSR requests are available on the cluster?
+------------------------------------------------------
+Including approved and pending
+
+List certificate singing requests csr
+	terminal --> kubectl get csr
+
+	# result: 
+NAME     AGE     SIGNERNAME                            REQUESTOR          REQUESTEDDURATION   CONDITION
+akshay   4m27s   kubernetes.io/kube-apiserver-client   kubernetes-admin   <none>              Approved,Issued
+
+- choose '1' as answer
+
+
+
+6. During a routine check you realized that there is a new CSR request in place. What is the name of this request?
+------------------------------------------------------------------------------------------------------------------
+
+List certificate singing requests csr
+	terminal --> kubectl get csr
+
+	# result: 
+NAME          AGE     SIGNERNAME                            REQUESTOR          REQUESTEDDURATION   CONDITION
+agent-smith   56s     kubernetes.io/kube-apiserver-client   agent-x            <none>              Pending
+akshay        5m53s   kubernetes.io/kube-apiserver-client   kubernetes-admin   <none>              Approved,Issued
+
+
+- choose 'agent-smith' as answer 
+
+
+
+7. Hmmm.. You are not aware of a request coming in. What groups is this CSR requesting access to?
+-------------------------------------------------------------------------------------------------
+Check the details about the request. Preferably in YAML.
+
+
+Show certificate signing request details
+	terminal --> kubectl get csr agent-smith -o yaml
+
+	# result:
+spec:
+  groups:
+  - system:masters
+  - system:authenticated
+
+- choose 'system:masters' as answer
+
+
+8. That doesn't look very right. Reject that request.
+-----------------------------------------------------
+
+Reject the request
+	termianl --> kubectl certificate deny agent-smith
+
+	# result: certificatesigningrequest.certificates.k8s.io/agent-smith denied
+
+
+9. Let's get rid of it. Delete the new CSR object
+-------------------------------------------------
+
+List csrs and see the status of agent-smith csr
+	terminal --> kubectl get csr
+	
+	# result:
+NAME          AGE     SIGNERNAME                            REQUESTOR          REQUESTEDDURATION   CONDITION
+agent-smith   6m21s   kubernetes.io/kube-apiserver-client   agent-x            <none>              Denied
+akshay        11m     kubernetes.io/kube-apiserver-client   kubernetes-admin   <none>              Approved,Issued
+
+We can see that the agent-smith csr is 'Denied'
+
+Delete certificate signing request agent-smith
+	terminal --> kubectl delete csr agent-smith
+
+	# result: certificatesigningrequest.certificates.k8s.io "agent-smith" deleted
+
+Verify deletion of csr agent-smith
+	terminal --> kubectl get csr
+
+	# result:
+NAME          AGE     SIGNERNAME                            REQUESTOR          REQUESTEDDURATION   CONDITION
+akshay        11m     kubernetes.io/kube-apiserver-client   kubernetes-admin   <none>              Approved,Issued
+
+- click 'Check' button
+
+
+
+=========================
+Section 7 161. KubeConfig
+=========================
+
+We can call the api server for a list of pods manually (with curl command)
+	termimnal --> curl https://my-kubeplayground:6443/api/v1/pods --key admin.key --cert admin.crt --cacert ca.crt
+
+	# curl 						- request command
+	# https://my-kubeplayground:6443/api/v1/pods	- pis sever address
+	# --key admin.key				- user key
+	# --cert admin.crt				- suer certificate
+	# --cacert ca.crt				- Certificates Authority (CA) certificate
+
+
+We can call the api server for a list of pods with kubectl command 
+	terminal --> kubectl get pods --server my-kubeplayground:6443 --client-key admin.key --client-certificate admin.crt --certificate-authority ca.crt
+
+	# kubectl				- common kubernetes command
+	# get pods				- ask for pods
+	# --server my-kubeplayground:6443	- specify server 
+	# --client-key admin.key		- user key
+	# --client-certificate admin.crt	- user certificate
+	# --certificate-authority ca.crt	- Certificates Authority (CA) certificate
+
+We can set all options from the kubectl command in config file and the jsut pass the file in the command.
+	terminal -->kubectl get pods --kubeconfig config
+
+If we set the config file in '$HOME/.kube/' directory, kubectl will load it for us so we don't have to specify it at all
+	terminal --> kubectl get pods
+
+$HOME/.kube/config
+-------------------------------------------
+--server my-kubeplayground:6443
+--client-key admin.key
+--client-certificate admin.crt
+--certificate-authority ca.crt
+-------------------------------------------
+
+
+
+KubeConfig File
+---------------
+
+KubeConfig file have 3 sections
+	- Clusters 
+		- different environaments - Development, Production
+		- different organizations - Mycompany1, Mycompany2
+
+	- Users
+		- user accounts that have access to clusters
+			- Admin, Dev User, Prod User
+		- user accounts have different previleges on different clusters
+
+	- Contexts
+		- With context we don't have to specify certificates and clusters in each command.
+			- Admin@Production - This context can access Production with Admin rights.
+			- Dev@Mycompany1   - This user can access Myconpany1 with developer rights
+		
+
+How this fit in the previous example?
+
+In Cluster we have
+	--server my-kubeplayground:6443
+	--certificate-authority ca.crt
+
+In Users we have
+	--client-key admin.key
+	--client-certificate admin.crt
+
+In Contexts we have
+	MyKubeAdmin@MyKubePlayground
+
+
+KubeConfig
+------------------------------------------------------
+apiVersion: v1
+kind: Config
+
+clusters:
+- name: my-kube-playground
+  cluster:
+    certificate-authority: ca.crt
+    server: httos://my-kube-playground:6443
+
+contexts:
+- name my-kube-admin@my-kube-playground
+  context:
+    cluster: my-kube-playground
+    user: my-kube-admin
+
+users:
+- name:
+  user:
+    client-certificate: admin.crt
+    client-key: admin.key
+------------------------------------------------------
+
+
+We can specify all clusters and user we can use
+
+KubeConfig
+------------------------------------------------------
+apiVersion: v1
+kind: Config
+current-context: admin@production			# this is the default user kubectl use from this Config
+
+clusters:
+- name: my-kube-playground
+	...
+- name: development
+	...
+- name: production
+	...
+- name: mycompany1
+	...
+
+contexts:
+- name my-kube-admin@my-kube-playground
+	...
+- name dev-user@company1
+	...
+- name admin@production
+	...
+
+users:
+- name: my-kube-admin
+- name: admin
+- name: dev-user
+- nameL prod-user
+------------------------------------------------------
+
+How kubectl command know what context to use very time?
+	- filed 'current-context:' in the file is the default context used by kubectl
+
+We can specify different config file for kubectl to use by passing it in the command
+	terminal --> terminal --> config view --kubeconfig=my-custom-config
+
+Print Config file
+	terminal --> kubectl config view 
+
+	# we can see default context and all clusters and users used
+
+How to change used context
+	terminal --> kubectl config use-context dev-user@company1
+	
+	# kubectl				- common kubernetes command
+	# config				- target object
+	# use-context dev-user@company1		- use context
+
+	# this coomand will change the 'current-context:' field in the config file
+
+List used command used in kubectl config file
+	terminal --> kubectl config -h
+
+Available Commands:
+	current-context 		- Displays the current-context
+	delete-cluster 			- Delete the specified cluster from the kubeconfig
+	delete-context			- Delete the specified context from the kubeconfig
+	get-clusters 			- Display clusters defined in the kubeconfig
+	get-contexts 			- Describe one or many contexts
+	rename-context 			- Renames a context from the kubeconfig file.
+	set 				- Sets an individual value in a kubeconfig file
+	set-cluster 			- Sets a cluster entry in kubeconfig
+	set-context 			- Sets a context entry in kubeconfig
+	set-credentials 		- Sets a user entry in kubeconfig
+	unset 				- Unsets an individual value in a kubeconfig file
+	use-context 			- Sets the current context in a kubeconfig file
+	view 				- Display merged kubeconfig settings or a specified kubeconfig file
+
+
+
+We can specify Namespaces in specific context in the context section.
+
+Also we can specify certificates with full file path like shown below.
+
+KubeConfig
+------------------------------------------------------
+apiVersion: v1
+kind: Config
+
+clusters:
+- name: my-kube-playground
+  cluster:
+    certificate-authority: /etc/kubernetes/pki/ca.crt		# full file path
+    server: httos://my-kube-playground:6443
+
+contexts:
+- name my-kube-admin@my-kube-playground
+  context:
+    cluster: my-kube-playground
+    user: my-kube-admin
+    namespace: finance						# added namespace
+
+users:
+- name:
+  user:
+    client-certificate: /etc/kubernetes/pki/users/admin.crt	# full file path
+    client-key: /etc/kubernetes/pki/users/admin.key		# full file path
+------------------------------------------------------
+
+
+There is another way to specify certificate credentials. We can use filed 'certificate-authority-data' and pass encoded certificatein it.
+
+First we encode the certificate
+	terminal --> cat ca.crt | base64
+
+	# result: AASiasiFDADAKAFKSA8safoads7SAsadlfALSK0dsaf76jfa0FLO...sadkDAKAd8a75asjs6
+
+Then we pass the result in the 'certificate-authority-data' field.
+
+KubeConfig
+------------------------------------------------------
+apiVersion: v1
+kind: Config
+
+clusters:
+- name: my-kube-playground
+  cluster:
+    # certificate-authority: /etc/kubernetes/pki/ca.crt		
+    certificate-authority-data: AASiasiFDADAKAFKSA8sa
+				foads7SAsadlfALSK0dsa
+				f76jfa0FLO...sadkDAKA
+				d8a75asjs6
+...
+------------------------------------------------------
+
+We can decode the certificate with the decode option
+	terminal --> echo "ASi...sjs6" | base64 --decode
+
+
+
+=========================================
+Section 7 162. Practice Test - KubeConfig
+=========================================
+
+
+1. Where is the default kubeconfig file located in the current environment?
+---------------------------------------------------------------------------
+Find the current home directory by looking at the HOME environment variable.
+
+Print config file
+	terminal --> cat /root/.kube/config
+
+- choose '/root/.kube/config' as answer
+
+
+
+2. How many clusters are defined in the default kubeconfig file?
+----------------------------------------------------------------
+
+Print config file
+	terminal --> cat /root/.kube/config
+
+	# in the result:     cluster: kubernetes
+
+- choose '1' as answer
+
+
+
+3. How many Users are defined in the default kubeconfig file?
+-------------------------------------------------------------
+
+Print config file
+	terminal --> cat /root/.kube/config
+
+#result:
+----------------------------
+...
+users:
+- name: kubernetes-admin
+  user:
+    client-certificate-data:
+...
+----------------------------
+
+- choose '1' as answer
+
+
+
+4. How many contexts are defined in the default kubeconfig file?
+----------------------------------------------------------------
+
+Print config file
+	terminal --> cat /root/.kube/config
+
+#result:
+----------------------------
+...
+contexts:
+- context:
+    cluster: kubernetes
+...
+----------------------------
+
+- choose '1' as answer
+
+
+
+
+5. What is the user configured in the current context?
+------------------------------------------------------
+
+Print config file
+	terminal --> cat /root/.kube/config
+
+#result:
+----------------------------
+...
+current-context: kubernetes-admin@kubernetes
+...
+----------------------------
+
+- choose 'kubernetes-admin' as answer
+
+
+
+6. What is the name of the cluster configured in the default kubeconfig file?
+-----------------------------------------------------------------------------
+
+Print config file
+	terminal --> cat /root/.kube/config
+
+#result:
+----------------------------
+...
+current-context: kubernetes-admin@kubernetes
+...
+----------------------------
+
+- choose 'kubernetes' as answer
+
+
+
+7. A new kubeconfig file named my-kube-config is created. It is placed in the /root directory. How many clusters are defined in that kubeconfig file?
+------------------------------------------------------------------------------------------------
+
+Print my-kube-config file
+	terminal --> cat /root/my-kube-config
+
+#result:
+----------------------------
+...
+clusters:
+- name: production
+  cluster:
+    certificate-authority: /etc/kubernetes/pki/ca.crt
+    server: https://controlplane:6443
+
+- name: development
+  cluster:
+    certificate-authority: /etc/kubernetes/pki/ca.crt
+    server: https://controlplane:6443
+
+- name: kubernetes-on-aws
+  cluster:
+    certificate-authority: /etc/kubernetes/pki/ca.crt
+    server: https://controlplane:6443
+
+- name: test-cluster-1
+  cluster:
+    certificate-authority: /etc/kubernetes/pki/ca.crt
+    server: https://controlplane:6443
+...
+----------------------------
+
+- choose '4' as answer
+
+
+
+
+8. How many contexts are configured in the my-kube-config file?
+---------------------------------------------------------------
+
+Print my-kube-config file
+	terminal --> cat /root/my-kube-config
+
+#result:
+----------------------------
+...
+contexts:
+- name: test-user@development
+  context:
+    cluster: development
+    user: test-user
+
+- name: aws-user@kubernetes-on-aws
+  context:
+    cluster: kubernetes-on-aws
+    user: aws-user
+
+- name: test-user@production
+  context:
+    cluster: production
+    user: test-user
+
+- name: research
+  context:
+    cluster: test-cluster-1
+    user: dev-user
+...
+----------------------------
+
+- choose '4' as answer
+
+
+
+9. What user is configured in the research context?
+---------------------------------------------------
+
+Print my-kube-config file
+	terminal --> cat /root/my-kube-config
+
+#result:
+----------------------------
+...
+- name: research
+  context:
+    cluster: test-cluster-1
+    user: dev-user
+...
+----------------------------
+
+- choose 'dev-user' as answer
+
+
+
+
+10. What is the name of the client-certificate file configured for the aws-user?
+--------------------------------------------------------------------------------
+
+Print my-kube-config file
+	terminal --> cat /root/my-kube-config
+
+#result:
+----------------------------
+...
+- name: aws-user
+  user:
+    client-certificate: /etc/kubernetes/pki/users/aws-user/aws-user.crt
+    client-key: /etc/kubernetes/pki/users/aws-user/aws-user.key
+...
+----------------------------
+
+- choose 'aws-user.crt' as answer
+
+
+
+11. What is the current context set to in the my-kube-config file?
+------------------------------------------------------------------
+
+Print my-kube-config file
+	terminal --> cat /root/my-kube-config
+
+#result:
+----------------------------
+...
+current-context: test-user@development
+...
+----------------------------
+
+- choose 'test-user@development' as answer
+
+
+
+
+12. I would like to use the dev-user to access test-cluster-1. Set the current context to the right one so I can do that.
+------------------------------------------------------------------------------------------------------------------------
+Once the right context is identified, use the kubectl config use-context command.
+
+Print my-kube-config file
+	terminal --> cat /root/my-kube-config
+
+#result:
+----------------------------
+...
+- name: research
+  context:
+    cluster: test-cluster-1
+    user: dev-user
+...
+----------------------------
+
+Set context research
+	terminal --> kubectl config use-context research --kubeconfig /root/my-kube-config
+
+	# kubectl 				- common kubernetes command
+	# config				- config settings
+	# use-context research			- use context
+	# --kubeconfig /root/my-kube-config	- use config file
+
+	# result: Switched to context "research".
+
+Verify the change
+	terminal --> cat /root/my-kube-config
+
+#result:
+----------------------------
+...
+current-context: research
+...
+----------------------------
+
+- click 'Check' button
+
+
+
+
+13. We don't want to specify the kubeconfig file option on each kubectl command.
+--------------------------------------------------------------------------------
+Set the my-kube-config file as the default kubeconfig file and make it persistent across all sessions without overwriting the existing ~/.kube/config. Ensure any configuration changes persist across reboots and new shell sessions.
+
+Note: Don't forget to source the configuration file to take effect in the existing session. Example: source ~/.bashrc
+
+Overwrite config file with my-kube-config to /root/.kube/ directory
+	terminal --> mv /root/my-kube-config /root/.kube/config
+
+Verify file movement
+	terminal --> ls /root/.kube/
+
+	# result: config  my-kube-config
+
+Reload kubectl service
+	terminal --> source ~/.bashrc
+
+Verify default config used
+	terminal --> kubectl config view
+
+- click 'Check' button
+
+
+14. With the current-context set to research, we are trying to access the cluster. However something seems to be wrong. Identify and fix the issue.
+----------------------------------------------------------------------------------------------------
+Try running the kubectl get pods command and look for the error. All users certificates are stored at /etc/kubernetes/pki/users.
+
+Try to list nodes
+	terminal --> k get nodes
+
+# result:
+error: unable to read client-cert /etc/kubernetes/pki/users/dev-user/developer-user.crt for dev-user due to open /etc/kubernetes/pki/users/dev-user/developer-user.crt: no such file or directory
+
+List dev certificates
+	terminal --> ls /etc/kubernetes/pki/users/dev-user/
+
+	# result: dev-user.crt  dev-user.csr  dev-user.key
+
+Print config file
+	terminal --> cat /root/.kube/config
+
+# result:
+-------------------------------------------------------------------------
+...
+users:
+...
+- name: dev-user
+  user:
+    client-certificate: /etc/kubernetes/pki/users/dev-user/developer-user.crt	# this certificate is wrong
+    client-key: /etc/kubernetes/pki/users/dev-user/dev-user.key
+...
+-------------------------------------------------------------------------
+
+
+Edit the config file and set the correct certificate
+	terminal --> vi /root/.kube/config
+
+# result:
+-------------------------------------------------------------------------
+...
+users:
+...
+- name: dev-user
+  user:
+    client-certificate: /etc/kubernetes/pki/users/dev-user/dev-user.crt		# correct certificate is set
+    client-key: /etc/kubernetes/pki/users/dev-user/dev-user.key
+...
+-------------------------------------------------------------------------
+save changes - escape, :wq!, enter
+
+Verify changes
+	terminal --> cat /root/.kube/config
+
+- click 'Check' button
+
+
+
+=========================================
+Section 7 164. Persistent Key/Value Store
+=========================================
+
+We have already seen how to secure the ETCD key/value store using TLS certificates in the previous videos. Towards the end of this course, when we setup an actual cluster from scratch we will see this in action.
+
+
+
+=========================
+Section 7 165. API Groups
+=========================
+
+We can check api version with crul command
+	terminal --> curl https://kube-master:6443/version
+
+We can list pods with curl command
+	terminal --> curl https://kube-master:6443/api/v1/pods
+
+Kubernetes APIs are 
+	- /metrics
+	- /healthz		- monitor the health of the cluster
+	- /version		- view the version on the cluster
+	- /api
+	- /apis
+	- /logs			- integrating with third party logging applications
+
+
+We will focus on APIs responsible for the cluster functionality
+---------------------------------------------------------------
+
+Responsible for cluster functionality are 2 groups - core - /api and named - /apis
+
+core - /api - manage all core functionalities
+----
+
+/api
+  - /v1
+    - namespaces
+	- events
+	- bindings
+	- configmaps
+    - pods
+	- endpoints
+	- PV		- persistent volumes
+	- secrets
+    - rc		- replication controllers
+	- nodes
+	- PVC		- persistent volumes claims
+	- services
+
+
+named - /apis - manage all newer features of Kubernetes
+-----
+
+/apis
+- /apps				# API Group
+  - /v1
+	- /deployments			# Group Resource
+	  - list				# Resource Verb
+	  - get					# Resource Verb
+	  - create				# Resource Verb
+	  - delete				# Resource Verb
+	  - update				# Resource Verb
+	  - watch				# Resource Verb
+	- /replicasets			# Group Resource
+	- /statefulsets			# Group Resource
+- /extensions			# API Group
+- /networking.k8s.io		# API Group
+  - /v1
+	- /networkpolicies 		# Group Resource
+- /storage/k8s.io		# API Group
+- /authentication.k8s.io	# API Group
+- /certificates.k8s.io		# API Group
+  - /v1
+	- /certifiatesigningrequests	# Group Resource
+
+List available APIs
+	terminal --> curl httos://localhost:6443 -k
+
+List all supported resource groups
+	terminal --> curl httos://localhost:6443 -k | grep "name"
+
+If we want to make requests to the api server we need to authenticate
+	terminal --> curl httos://localhost:6443 -k --key admin.key --cert admin.crt --cacert ca.crt
+
+We can also open kubectl proxy and use some of the contexts in the kubectl config file. The proxy will the creadentials from current context to send requests to the api server
+
+List proxyes
+	terminal --> kubectl proxy
+
+	# result: Starting to serv on 127.0.0.1:8001
+
+List apis with the proxy
+	terminal --> curl http://localhost:8001 -k
+
+# result - list all available APIs on root:
+{
+"paths": [
+"/api",
+"/api/v1",
+"/apis",
+"/apis/",
+"/healthz",
+"/logs",
+"/metrics",
+"/openapi/v2",
+"/swagger-2.0.0.json",
+...
+
+
+Kube proxy is NOT the same as Kubectl proxy !
+
+Kube proxy - enable connectivity between pods and services across different nodes in the cluster.
+
+Kubectl proxy - http proxy service created by kubectl utility to access the kube-apiserver
+
+
+
+============================
+Section 7 166. Authorization
+============================
+
+How many Authorization we have in Kubernetes
+	- Node
+	- ABAC				- attribute based access controls
+	- RBAC				- role based access controls
+	- Webhook
+	- AlwaysAllow			- allows all requests
+	- AlwaysDeny			- deny all requests
+
+
+Node (access in the cluster)
+----
+Uses Node Authorizer to manage the requests. We know that kubelet are part of the system 'nodes' group and certificate must be named with prefix 'system:node'. So any request comming from user named 'system:node' and part of the system 'nodes' group is authorized by Node Authorizer and granted this previleges. Previleges required for a kubelet.
+
+User 		<-------->    		Kube API		<-------->		kubelet
+
+											  - Read
+												- services
+												- Endpoints
+												- Nodes
+												- Pods
+											  - Write
+												- Node statis
+												- Pod status
+												- events
+
+
+ABAC - attribute based authrization (external access to the API)
+----
+Asociate user or group of user with set of permissions.
+
+Example: 
+Dev-User --> View, Create, Delete PODs
+security-1 --> Can View CSR, Can Approve CSR
+
+We create policy definition file with set of policies in JSON format and pass it to the api-server.
+We create policy definition file for each user or group in this file
+
+dev-user
+dev-user-2
+dev-users (group)
+security-1
+
+Example policy file:
+-------------------------------------------------------------------------
+{"kind": "Policy", "spec": {"user": “dev-user", "namespace": "*", "resource": “pods", "apiGroup": "*"}}
+{"kind": "Policy", "spec": {"user": “dev-user-2", "namespace": "*", "resource": “pods", "apiGroup": "*"}}
+{"kind": "Policy", "spec": {“group": “dev-users", "namespace": "*", "resource": “pods", "apiGroup": "*"}}
+{"kind": "Policy", "spec": {"user": “security-1", "namespace": "*", "resource": “csr", "apiGroup": "*"}}
+-------------------------------------------------------------------------
+
+Every time we need to change someting in the security, we need to edit teh file manually and restart the api-server. ABAC methodology is difficult to manage. Not recommended.
+
+
+RBAC - role based access controls
+----
+We create a role group with set of permissions. Every user added to specific role group will have group's permissions. This way we can edit the role group permissions and the changes apply to all users immediately.This is the default access control in Kubernetes.
+
+We will focus this methodology more in the next lectures.
+
+
+Webhook
+-------
+Kubernetes can use external tools for external access authorization like 'Open Policy Agent'
+
+
+Authorization modes are passed in the api-server option set. If not specified is set 'AlwaysAllow' as default. Not recommended
+
+kube-apiserver.yaml
+--------------------------------------------------------------------
+ExecStart=/usr/local/ kube apiserver \\
+--advertise address=${INTERNAL_IP} \\
+--allow-privileged=true \\
+--apiserver-count=3 \\
+--authorization-mode=Node,RBAC,Webhook \\				# this is the authorization mode option
+--bind-address=0.0.0.0 \\
+--enable swagger ui =true \\
+--etcd-cafile =/var/lib/ ca.pem \\
+--etcd-certfile =/var/ kubernetes /apiserver etcd client.crt \\
+--etcd-keyfile =/var/ kubernetes apiserver etcd client.key \\
+--etcd-servers=https://127.0.0.1:2379 \\
+--event-ttl=1h \\
+--kubelet-certificate-authority=/var/lib/kubernetes/ca.pem \\
+--kubelet-client-certificate=/var/lib/kubernetes/apiserver-etcd-client.crt \\
+--kubelet-client-key=/var/lib/kubernetes/apiserver-etcd-client.key \\
+--service-node-port-range=30000-32767 \\
+--client-ca-file=/var/lib/kubernetes/ca.pem \\
+--tls-cert-file=/var/lib/kubernetes/apiserver.crt \\
+--tls-private-key-file=/var/lib/kubernetes/apiserver.key \\
+--v=2
+--------------------------------------------------------------------
+
+If we have multiple authorization method configured, the requests are authorized by each one by the oreder they are set in the api-server option. If one authorization module deny the request, then forewards the request to the next module in the chain.
+
+--authorization-mode=Node,RBAC,Webhook	
+Node module first. Node Authorizer handle only Node requests, so the request it denied and forewarded to the next one in the chain.
+RBAC module second. Checks are performed and access is given to the user for the requested object.
+
+
+===============================================
+Section 7 167. Role Based Access Control (RBAC)
+===============================================
+
+How we define a role?
+
+Create a role object with role-definition file.
+
+developer-role.yaml
+--------------------------------------------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: developer
+rules:
+- apiGroups: [""]
+  resources: ["pods"]						# allow to manage objects
+  verbs: ["list", "get", "create", "update", "delete"]		# allowed actions
+- apiGroups: [""]
+  resources: ["ConfigMap"]					# allow to manage objects
+  verbs: ["create"]						# allowed actions
+--------------------------------------------------------------------
+
+Create the role
+	terminal --> kubectl create -f developer-role.yaml
+
+
+How to link user to the role?
+
+Create an object called role binding.
+
+
+devuser-developer-binding.yaml
+--------------------------------------------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: devuser-developer-binding
+subjects:
+- kind: User
+  name: dev-user
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: developer
+  apiGroup: rbac.authorization.k8s.io/v1
+--------------------------------------------------------------------
+
+Create the role-binding with kubectl
+	terminal --> kubectl create -f devuser-developer-binding.yaml
+
+This role is defind and bind to the user in the default namespace. If we want to limit the user into specific namespace, we need to specify the namespace in the role definition file under 'metadata' section.
+
+
+List roles
+	terminal --> kubectl get roles
+
+	# result: developer
+
+List role bindings
+	terminal --> kubectl get rolebindings
+
+	# result: devuser-developer-binding
+
+Show details about the role
+	terminal --> kubectl describe role developer
+
+	# the result show us object thet the role can work with and what actions the role can perform
+
+Show details about rolebindings
+	terminal --> kubectl describe rolebinding devuser-developer-binding
+
+	# the result will show us info about the role and used namespace
+
+
+How to check if I the user I am working with have specific rights?
+
+Check access to create deployments
+	terminal --> kubectl auth can-i create deployments
+	
+	# result: yes
+
+Check access to delete nodes
+	terminal --> kubectl auth can-i delete nodes
+
+	# result: no
+
+
+When we are an admin and we set permissions to a user, we can test the given rigths without login as the user.
+
+Check access to create deployments for specific user
+	terminal --> kubectl auth can-i create deployments --as dev-user 		# result: no
+
+Check access to delete nodes for specific user
+	terminal --> kubectl auth can-i delete nodes --as dev-user			# result: yes
+
+Check rights of the user for specific namespace
+	terminal --> kubectl auth can-i create pods --as dev-user --namespace test	# result: no
+
+
+We can set rights to users and specify the exact resurces we need them to be able to work with
+
+developer-role.yaml
+--------------------------------------------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: developer
+rules:
+- apiGroups: [""]
+  resources: ["pods"]						# allow to manage objects
+  verbs: ["list", "get", "create", "update", "delete"]		# allowed actions
+  resourceNames: ["frontend", "backend"]			# specify pods
+- apiGroups: [""]
+  resources: ["ConfigMap"]					# allow to manage objects
+  verbs: ["create"]						# allowed actions
+--------------------------------------------------------------------
+
+
+
+=============================================================
+Section 7 168. Practice Test Role Based Access Control (RBAC)
+=============================================================
+
+
+1. Inspect the environment and identify the authorization modes configured on the cluster.
+------------------------------------------------------------------------------------------
+Check the kube-apiserver settings.
+
+Option 1:
+Show kube-apiserver details and find authorization mode
+	terminal --> cat /etc/kubernetes/manifests/kube-apiserver.yaml
+
+	# result:     - --authorization-mode=Node,RBAC
+
+Option 2:
+Check authorization mode
+	terminal --> ps -aux | grep authorization
+
+	# result: --authorization-mode=Node,RBAC
+
+
+- choose 'Node,ARBAC' as answer
+
+
+2. How many roles exist in the default namespace?
+-------------------------------------------------
+
+Check roles in the default namespace
+	terminal --> k get roles
+	
+	# result: No resources found in default namespace.
+
+- choose '0' as answer
+
+
+3. How many roles exist in all namespaces together?
+---------------------------------------------------
+
+List all roles in all namespaces
+	terminal --> k get roles -A
+
+Counts all roles in all namespacec
+	terminal --> k get roles -A --no-headers | wc -l
+
+- choose '12' as asnwer
+
+
+
+4. What are the resources the kube-proxy role in the kube-system namespace is given access to?
+----------------------------------------------------------------------------------------------
+
+List all roles in all namespaces
+	terminal --> k get roles -A
+
+Show the details about 'kube-proxy' role
+	terminal --> k describe role kube-proxy -n kube-system
+
+# result:
+----------------------------------------------------------
+Name:         kube-proxy
+Labels:       <none>
+Annotations:  <none>
+PolicyRule:
+  Resources   Non-Resource URLs  Resource Names  Verbs
+  ---------   -----------------  --------------  -----
+  configmaps  []                 [kube-proxy]    [get]
+----------------------------------------------------------
+
+- choose 'configmaps' as answer
+
+
+
+5. What actions can the kube-proxy role perform on configmaps?
+--------------------------------------------------------------
+
+List all roles in all namespaces
+	terminal --> k get roles -A
+
+Show the details about 'kube-proxy' role
+	terminal --> k describe role kube-proxy -n kube-system
+
+# result:
+----------------------------------------------------------
+Name:         kube-proxy
+Labels:       <none>
+Annotations:  <none>
+PolicyRule:
+  Resources   Non-Resource URLs  Resource Names  Verbs
+  ---------   -----------------  --------------  -----
+  configmaps  []                 [kube-proxy]    [get]
+----------------------------------------------------------
+
+- choose 'Get' as answer
+
+
+
+6. Which of the following statements are true?
+----------------------------------------------
+
+List all roles in all namespaces
+	terminal --> k get roles -A
+
+Show the details about 'kube-proxy' role
+	terminal --> k describe role kube-proxy -n kube-system
+
+# result:
+----------------------------------------------------------
+Name:         kube-proxy
+Labels:       <none>
+Annotations:  <none>
+PolicyRule:
+  Resources   Non-Resource URLs  Resource Names  Verbs
+  ---------   -----------------  --------------  -----
+  configmaps  []                 [kube-proxy]    [get]		# allowed only kube-proxy resource
+----------------------------------------------------------
+
+
+- choose 'kube-proxy role can get details of a objects by the name kube-proxy only' as answer
+
+
+
+7. Which account is the kube-proxy role assigned to?
+----------------------------------------------------
+
+List all roles in all namespaces
+	terminal --> k get rolebindings -A
+
+Show the details about 'kube-proxy' role
+	terminal --> k describe rolebinding kube-proxy -n kube-system
+
+# result:
+----------------------------------------------------------
+Name:         kube-proxy
+Labels:       <none>
+Annotations:  <none>
+Role:
+  Kind:  Role
+  Name:  kube-proxy
+Subjects:
+  Kind   Name                                             Namespace
+  ----   ----                                             ---------
+  Group  system:bootstrappers:kubeadm:default-node-token  		# this is the answer
+----------------------------------------------------------
+
+- choose 'Group:system:bootstrappers:kubeadm:default-node-token'
+
+
+
+
+8. A user dev-user is created. User's details have been added to the kubeconfig file. Inspect the permissions granted to the user. Check if the user can list pods in the default namespace.
+-----------------------------------------------------------------------------------------------------
+Use the --as dev-user option with kubectl to run commands as the dev-user.
+
+Show config file
+	terminal --> kubectl config view
+
+# result:
+----------------------------------------------------------
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: DATA+OMITTED
+    server: https://controlplane:6443
+  name: kubernetes
+contexts:
+- context:
+    cluster: kubernetes
+    user: kubernetes-admin
+  name: kubernetes-admin@kubernetes
+current-context: kubernetes-admin@kubernetes
+kind: Config
+preferences: {}
+users:
+- name: dev-user				# this is the user
+  user:
+    client-certificate-data: DATA+OMITTED
+    client-key-data: DATA+OMITTED
+- name: kubernetes-admin
+  user:
+    client-certificate-data: DATA+OMITTED
+    client-key-data: DATA+OMITTED
+----------------------------------------------------------
+
+
+Show permissions granted to the user
+	terminall --> k get pods --as dev-user
+
+# result: Error from server (Forbidden): pods is forbidden: User "dev-user" cannot list resource "pods" in API group "" in the namespace "default"
+
+- choose 'dev-ser does not have permissions to list pods'
+
+
+
+
+9. Create the necessary roles and role bindings required for the dev-user to create, list and delete pods in the default namespace.
+-------------------------------------------------------------------------------------------------------------
+Use the given spec:
+
+Role: developer
+Role Resources: pods
+Role Actions: list
+Role Actions: create
+Role Actions: delete
+RoleBinding: dev-user-binding
+RoleBinding: Bound to dev-user
+
+
+Show create role help commmands
+	terminal --> kubectl create role -h
+
+We will use the third example in the result:
+  # Create a role named "foo" with SubResource specified
+  kubectl create role foo --verb=get,list,watch --resource=pods,pods/status
+
+Create role
+	terminal --> k create role developer --verb=list,create,delete --resource=pods
+
+	# k					- common kubectl command
+	# create				- used action
+	# role					- object
+	# developer				- name of the object
+	# --verb=list,create,delete		- specified actions that the role can do
+	# --resource=pods			- specified resources the the rolecan operate on
+
+	# result: role.rbac.authorization.k8s.io/developer created
+	
+
+Verify the role creation	
+	terminal --> k describe role developer
+
+# result:
+----------------------------------------------------------
+Name:         developer
+Labels:       <none>
+Annotations:  <none>
+PolicyRule:
+  Resources  Non-Resource URLs  Resource Names  Verbs
+  ---------  -----------------  --------------  -----
+  pods       []                 []              [list create delete]
+----------------------------------------------------------
+
+Show rolebinding create help commands
+	terminal --> k create rolebinding -h
+
+We will use second example
+  # Create a role binding for service account monitoring:sa-dev using the admin role
+  kubectl create rolebinding admin-binding --role=admin --serviceaccount=monitoring:sa-dev
+
+
+Create the rolebinding
+	terminal --> k create rolebinding dev-user-binding --role=developer --user=dev-user
+
+	# k					- common kubectl command
+	# create				- used action
+	# rolebinding				- object
+	# dev-user-binding			- name of the object
+	# --role=developer			- specified the role for the binding
+	# --user=dev-user			- specified user for the binding
+
+	# result: rolebinding.rbac.authorization.k8s.io/dev-user-binding created
+
+Verify the rolebinding creation
+	terminal --> k describe rolebinding dev-user-binding
+
+# result:
+----------------------------------------------------------
+Name:         dev-user-binding
+Labels:       <none>
+Annotations:  <none>
+Role:
+  Kind:  Role
+  Name:  developer
+Subjects:
+  Kind  Name      Namespace
+  ----  ----      ---------
+  User  dev-user  
+----------------------------------------------------------
+
+- click 'Çheck' button
+
+
+
+10. A set of new roles and role-bindings are created in the blue namespace for the dev-user. However, the dev-user is unable to get details of the dark-blue-app pod in the blue namespace. Investigate and fix the issue.
+--------------------------------------------------------------------------------------------------
+We have created the required roles and rolebindings, but something seems to be wrong.
+
+Try the action that is the issue on
+	terminal --> k get pod dark-blue-app -n blue --as dev-user
+
+	# result: Error from server (Forbidden): pods "dark-blue-app" is forbidden: User "dev-user" cannot get resource "pods" in API group "" in the namespace "blue"
+
+List role in the 'blue' namespace
+	terminal --> k get role -n blue
+
+# result:
+NAME        CREATED AT
+developer   2025-01-19T09:49:44Z
+
+
+List rolebinding is hte 'blue' namespace
+	terminal --> k get rolebindings -n blue
+	
+# result
+NAME               ROLE             AGE
+dev-user-binding   Role/developer   42m
+
+
+Show details for the role 'developer'
+	terminal --> k describe role developer -n blue
+
+# result:
+----------------------------------------------------------
+Name:         developer
+Labels:       <none>
+Annotations:  <none>
+PolicyRule:
+  Resources  Non-Resource URLs  Resource Names  Verbs
+  ---------  -----------------  --------------  -----
+  pods       []                 [blue-app]      [get watch create delete]  
+----------------------------------------------------------
+
+# we can see user is asigned not to 'dark-blue-app' but to 'blue-app'
+
+Modify the role developer in the 'blue' namespace and change the asigned resource
+	terminal --> k edit role developer -n blue
+
+
+----------------------------------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  creationTimestamp: "2025-01-19T09:49:44Z"
+  name: developer
+  namespace: blue
+  resourceVersion: "612"
+  uid: f42a78c0-b236-465a-8c7e-9a934b0148e6
+rules:
+- apiGroups:
+  - ""
+  resourceNames:
+  - dark-blue-app				# set to dark-blue-app
+  resources:
+  - pods
+  verbs:
+  - get
+  - watch
+  - create
+  - delete
+----------------------------------------------------------
+save changes - escape, :wq!, enter
+# result: role.rbac.authorization.k8s.io/developer edited
+
+Verify changes made
+	terminal --> k describe role developer -n blue
+
+- click 'Check' button
+
+
+
+1. Add a new rule in the existing role developer to grant the dev-user permissions to create deployments in the blue namespace.
+-------------------------------------------------------------------------------------------------------------------------------
+Remember to add api group "apps".
+
+Check the action 
+	termial --> k create deployment nginx --image=nginx -n blue --as dev-user
+
+	# result: error: failed to create deployment: deployments.apps is forbidden: User "dev-user" cannot create resource "deployments" in API group "apps" in the namespace "blue"
+
+
+Edit the developer role in the blue namespace
+	terminal --> k edit role developer -n blue
+
+----------------------------------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  creationTimestamp: "2025-01-19T09:49:44Z"
+  name: developer
+  namespace: blue
+  resourceVersion: "4296"
+  uid: f42a78c0-b236-465a-8c7e-9a934b0148e6
+rules:
+- apiGroups:
+  - ""
+  resourceNames:
+  - dark-blue-app
+  resources:
+  - pods
+  verbs:
+  - get
+  - watch
+  - create
+  - delete
+- apiGroups:		# added new rule from this line
+  - "apps"
+  resources:
+  - deployments
+  verbs:
+  - get
+  - watch
+  - create
+  - delete		# to this line
+----------------------------------------------------------
+save changes - escape, :wq!, enter
+# result: role.rbac.authorization.k8s.io/developer edited
+
+
+Verify changes made
+	terminal --> k describe role developer -n blue
+
+# result:
+----------------------------------------------------------
+Name:         developer
+Labels:       <none>
+Annotations:  <none>
+PolicyRule:
+  Resources        Non-Resource URLs  Resource Names   Verbs
+  ---------        -----------------  --------------   -----
+  pods             []                 [dark-blue-app]  [get watch create delete]
+  deployments.apps []                 []               [get watch create delete]	# this is added 
+----------------------------------------------------------
+
+Check the action again
+	termial --> k create deployment nginx --image=nginx -n blue --as dev-user
+
+	# result: deployment.apps/nginx created
+
+- click 'Check' button
+
+
+
+==============================================
+Section 7 170. Cluster Roles and Role Bindings
+==============================================
+
+We know that the role and rolebinding are craeted in the default namespqce if the namespace is not defined and access into this namespace. If we want to view, create or edit role or rolebinding we need to specify the namespace they are in.
+
+Resources are categorized either as namespaced or cluster scoped. Can't be 
+
+To view namespaced resources try
+	terminal --> kubectl api-resources --namespaced=true
+
+To view cluster scoped resourced try
+	terminal --> kubectl api-resources --namespaced=false
+
+To assign rights to users to cluster scoped resources we use clusterroles and clusterrolebindings
+
+To create a cluster role we have to create cluster role definition file.
+
+cluster-admin-role.yaml
+----------------------------------------------------------------
+apiVersionL rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cluster-administrator
+rule:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["list", "get", "create", "delete"]
+----------------------------------------------------------------
+
+Create the role
+	terminal --> kubectl create -f cluster-admin-role.yaml
+
+
+We need to link the user to the cluster role.
+
+To link the user to this role we have to create role-binding object and link it to the user
+
+Create role-bindinf definition file
+
+cluster-admin-role-binding.yaml
+----------------------------------------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cluster-admin-role-binding
+subjects:
+- kind: User
+  name: cluster-admin
+  apiGroups: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: cluster-administrator
+  apiGroupd: rbac.authorization.k8s.io
+----------------------------------------------------------------
+
+Create the rolebinding
+	terminal --> kubectl create -f cluster-admin-role-binding.yaml
+
+INFO: 
+User granted with access to resources by cluster role, can manage resources with specified names in all namespaces.
+When the cluster is created, Kubernetes creates a set of cluster roles that we will go over in the practice test next.
+
+
+
+
+
+==============================================================
+Section 7 171. Practice Test - Cluster Roles and Role Bindings
+==============================================================
+
+1. For the first few questions of this lab, you would have to inspect the existing ClusterRoles and ClusterRoleBindings that have been created in this cluster.
+--------------------------------------------------------------------------------------------------
+
+- click 'Ok' button
+
+
+
+2. How many ClusterRoles do you see defined in the cluster?
+-----------------------------------------------------------
+
+Show cluster roles
+	terminal --> k get clusterroles
+
+Count cluster roles
+	terminal --> k get clusterroles --no-headers | wc -l
+
+	# result: 72
+
+- choose '72' as answer
+
+
+
+3. How many ClusterRoleBindings exist on the cluster?
+-----------------------------------------------------
+
+Show cluster bindings
+	terminal --> k get clusterrolebindings
+
+
+Count cluster role-bindings
+	terminal --> k get clusterrolebindings --no-headers | wc -l
+
+	# result: 57
+
+- choose '57' as answer
+
+
+
+4. What namespace is the cluster-admin clusterrole part of?
+-----------------------------------------------------------
+
+We know that cluster roles are not part of a specific namespace.
+
+- choose 'Cluster Roles are cluster wide and not part of any namespace' as answer
+
+
+
+5. What user/groups are the cluster-admin role bound to?
+--------------------------------------------------------
+The ClusterRoleBinding for the role is with the same name.
+
+Find cluterrolebinding for the cluster-admin user
+	terminal --> k get clusterrolebindings | grep cluster-admin
+
+# result:
+cluster-admin                                                   ClusterRole/cluster-admin                                            
+helm-kube-system-traefik                                        ClusterRole/cluster-admin                                                   
+helm-kube-system-traefik-crd                                    ClusterRole/cluster-admin                                                   
+
+Show details for this clusterrolebinding
+	terminal --> k describe clusterrolebinding cluster-admin
+
+# result:
+-----------------------------------------------------------
+Name:         cluster-admin
+Labels:       kubernetes.io/bootstrapping=rbac-defaults
+Annotations:  rbac.authorization.kubernetes.io/autoupdate: true
+Role:
+  Kind:  ClusterRole
+  Name:  cluster-admin
+Subjects:
+  Kind   Name            Namespace
+  ----   ----            ---------
+  Group  system:masters  					# this is the group
+-----------------------------------------------------------
+
+- choose 'system:masters' as answer
+
+
+6. What level of permission does the cluster-admin role grant?
+--------------------------------------------------------------
+Inspect the cluster-admin role's privileges.
+
+Show details about the role cluster-admin
+	terminal --> k describe clusterrole cluster-admin
+
+# result:
+-----------------------------------------
+Name:         cluster-admin
+Labels:       kubernetes.io/bootstrapping=rbac-defaults
+Annotations:  rbac.authorization.kubernetes.io/autoupdate: true
+PolicyRule:
+  Resources  Non-Resource URLs  Resource Names  Verbs
+  ---------  -----------------  --------------  -----
+  *.*        []                 []              [*]		# '*' - any
+             [*]                []              [*]		# '*' - any
+-----------------------------------------
+
+- choose 'Perform any action on any resource in the cluster' as answer
+
+
+
+
+7. A new user michelle joined the team. She will be focusing on the nodes in the cluster. Create the required ClusterRoles and ClusterRoleBindings so she gets access to the nodes.
+------------------------------------------------------------------------------------------------------------------
+
+Check if the new user 'michelle' can perform any action with nodes
+	terminal --> k get nodes --as michelle
+
+	# result: Error from server (Forbidden): nodes is forbidden: User "michelle" cannot list resource "nodes" in API group "" at the cluster scope
+
+Create role
+-----------
+
+Show help commands for cluster role creation
+	terminal --> k create clusterrole -h
+
+We will use first example
+  # Create a cluster role named "pod-reader" that allows user to perform "get", "watch" and "list" on pods
+  kubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods
+
+Create cluster role for michelle
+	terminal --> kubectl create clusterrole michelle-role --verb=get,list,watch,delete --resource=nodes
+
+	# result: clusterrole.rbac.authorization.k8s.io/michelle-role created
+
+VErify the role creation
+	terminal --> k describe clusterroles michelle-role
+
+# result:
+------------------------------------------
+Name:         michelle-role
+Labels:       <none>
+Annotations:  <none>
+PolicyRule:
+  Resources  Non-Resource URLs  Resource Names  Verbs
+  ---------  -----------------  --------------  -----
+  nodes      []                 []              [get list watch delete]
+------------------------------------------
+
+
+
+Create rolebinding
+------------------
+
+Show help commands for creating clusterrolebinding
+	terminal --> k create clusterrolebinding -h
+
+We will use first example
+  # Create a cluster role binding for user1, user2, and group1 using the cluster-admin cluster role
+  kubectl create clusterrolebinding cluster-admin --clusterrole=cluster-admin --user=user1 --user=user2 --group=group1
+
+
+Create the clusterrolebinding for michelle
+	terminal --> kubectl create clusterrolebinding michelle-clusterrole-binding --clusterrole=michelle-role --user=michelle
+
+	# result: clusterrolebinding.rbac.authorization.k8s.io/michelle-clusterrole-binding created
+
+Verify creation of the clusterrolebinding
+	terminal --> k describe clusterrolebinding michelle-clusterrole-binding
+
+	# reult:
+------------------------------------------
+Name:         michelle-clusterrole-binding
+Labels:       <none>
+Annotations:  <none>
+Role:
+  Kind:  ClusterRole
+  Name:  michelle-role
+Subjects:
+  Kind  Name      Namespace
+  ----  ----      ---------
+  User  michelle  
+------------------------------------------
+
+- click 'Check' button
+
+
+
+8. michelle's responsibilities are growing and now she will be responsible for storage as well. Create the required ClusterRoles and ClusterRoleBindings to allow her access to Storage.
+---------------------------------------------------------------------------------------
+Get the API groups and resource names from command kubectl api-resources. Use the given spec:
+
+ClusterRole: storage-admin
+Resource: persistentvolumes
+Resource: storageclasses
+ClusterRoleBinding: michelle-storage-admin
+ClusterRoleBinding Subject: michelle
+ClusterRoleBinding Role: storage-admin
+
+
+Create clusterrole
+------------------
+
+Show api resources
+	terminal --> kubectl api-resources | grep storage 
+
+# result:
+csidrivers                                       storage.k8s.io/v1                 false        CSIDriver
+csinodes                                         storage.k8s.io/v1                 false        CSINode
+csistoragecapacities                             storage.k8s.io/v1                 true         CSIStorageCapacity
+storageclasses                      sc           storage.k8s.io/v1                 false        StorageClass
+volumeattachments                                storage.k8s.io/v1                 false        VolumeAttachment
+
+
+Show help commands for cluster role creation
+	terminal --> k create clusterrole -h
+
+We will use first example
+  # Create a cluster role named "pod-reader" that allows user to perform "get", "watch" and "list" on pods
+  kubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods
+
+Create the cluster role
+	terminal --> k create clusterrole storage-admin --resource=persistentvolumes,storageclasses --verb=list,create,get,watch
+
+	# result: clusterrole.rbac.authorization.k8s.io/storage-admin created
+
+Verify the clusterole creation printed in yaml fomrat
+	terminal --> k get clusterrole storage-admin -o yaml
+
+# result:
+-------------------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: "2025-01-19T11:43:29Z"
+  name: storage-admin
+  resourceVersion: "1390"
+  uid: 1507b87e-62ec-4b55-a7ab-6c9843a421de
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumes
+  verbs:
+  - list
+  - create
+  - get
+  - watch
+- apiGroups:		
+  - storage.k8s.io	# group 1
+  resources:
+  - storageclasses	# group 2
+  verbs:
+  - list
+  - create
+  - get
+  - watch
+-------------------------------------------
+
+
+Create clusterrolebinding
+-------------------------
+
+Show help commands for creating clusterrolebinding
+	terminal --> k create clusterrolebinding -h
+
+We will use first example
+  # Create a cluster role binding for user1, user2, and group1 using the cluster-admin cluster role
+  kubectl create clusterrolebinding cluster-admin --clusterrole=cluster-admin --user=user1 --user=user2 --group=group1
+
+
+Create the clusterrolebinding for michelle
+	terminal --> kubectl create clusterrolebinding michelle-storage-admin --clusterrole=storage-admin --user=michelle
+
+	# result: clusterrolebinding.rbac.authorization.k8s.io/michelle-storage-admin created
+
+Verify creation of the clusterrolebinding
+	terminal --> k describe clusterrolebinding michelle-storage-admin
+
+	# reult:
+------------------------------------------
+Name:         michelle-storage-admin
+Labels:       <none>
+Annotations:  <none>
+Role:
+  Kind:  ClusterRole
+  Name:  storage-admin
+Subjects:
+  Kind  Name      Namespace
+  ----  ----      ---------
+  User  michelle  
+------------------------------------------
+
+Check action as micelle user
+	terminal --> k get storageclass --as michelle
+
+# result:
+NAME                   PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+local-path (default)   rancher.io/local-path   Delete          WaitForFirstConsumer   false                  47m
+
+- click 'Check' burron
+
+
+
+
+===============================
+Section 7 173. Service Accounts
+===============================
+
+HOW IT WORK
+-----------
+
+Two type of accounts in Kubernetes
+	- User Account
+		- used by humans (admin, developer, etc)
+	- Service Accounts
+		- used by bots (Prometheus, Jenkins)
+
+
+We have simple web app (dashboard) that make a GET request to the api-servers and present data on the screen. For this purpos the web app must authenticate with service account to the api-servers.
+
+Create a service account
+	terminal --> kubectl create seviceaccount dashboard-sa
+
+	# kubectl				- common kubernetes command
+	# create				- used action
+	# seviceaccount				- type object
+	# dashboard-sa				- name of the object
+
+Process of creation of a service account:
+- creates the account
+- creates an account token (for authentication)
+- creates a secret and save the token in the secret
+- the secret is linked to the service account
+
+
+List all service accounts
+	terminal --> kubectl get serviceaccount
+
+
+Shod details about service account
+	terminal --> kubectl describe serviceaccout dashboard-sa
+
+When service account is created, a token for the account is created automatically. The token is presented as a asecret with name "Tokens: dahsboard-sa-token-kbbdm" in the description.
+
+View the secret for the token
+	terminal --> kubectl describe secret dashboard-sa-token-kbbdm
+
+	# the token can be used as "Bearer" authentication token when request is made to the api server
+
+Example with curl
+	terminal --> curl https://192.168.56.70:6443/api -insecure --header "Autherization: Bearer daASd5rSA...ASdasd4dS"
+
+If third party application is used, paste the token in the authentication field
+
+Case:
+If the third party application is hosted on the kubernetes cluster itself, the process for authentication is simplified as the secret token is automatically mounted as volume inside the pod hosting third party application.
+
+For every namespace we have created default service account already.
+
+List sevice accounts
+	terminal --> kubectl get serviceaccount
+
+Whenever a pod is created, the deafult service account and its token are automatically mounted in that pod as a volume mount.
+
+Example: Pod is created with pod-definition file as follow:
+
+pod-definition.yaml
+------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-kubernetes-dashboard
+
+spec:
+  containers:
+    - nameL my-kubernetes-dashboard
+      image: my-kubernetes-dashboard
+------------------------------------------
+
+When we show info about the pod
+	terminal --> kubectl describe pod my-kubernetes-dashboard
+
+We can see 
+------------------------------------------
+...
+Mounts:
+       /var/run/secrets/kubernetes.io/serviceaccount from default-token-j4hkv (ro)
+...
+------------------------------------------
+
+List the files in the '/var/run/secrets/kubernetes.io/serviceaccount' dir from iside the pod
+	terminal --> k exec -it my-kubernetes-dashboard -- ls /var/run/secrets/kubernetes.io/serviceaccount
+
+	# result: ca.crt namespace token
+
+If we print the 'token' file we will see the token used for authenticate to the kubenetes api
+	terminal --> kubectl exec -it my-kubernetes-dashboard cat /var/run/secrets/kubernetes.io/serviceaccount/token
+
+The default service account is permitted to run basic api queries.
+
+If we want to use another service account we need to modify the pod-definition file and add 'SeviceAccountName:' field.
+
+pod-definition.yaml
+------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-kubernetes-dashboard
+
+spec:
+  containers:
+    - nameL my-kubernetes-dashboard
+      image: my-kubernetes-dashboard
+  serviceAccountName: dashboard-sa			# added
+------------------------------------------
+
+Reminder: 
+We CAN NOT edit the definition file of a existing pod. We have to edlete and recreate the pod.
+In case of a deployment, we CAN edit the service account as any changes to the pod definition file will automatically trigger new rollout for the deployment. So the deployment will take care of the deleting and recraetion of new pods with right service account.
+Kubernetes automatically mount the default service account if not specified any in the definition file. We can choose not to mount any service account as adding "automauntServiceAccontToken: false" in the spec section
+
+pod-definition.yaml
+------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-kubernetes-dashboard
+
+spec:
+  containers:
+    - nameL my-kubernetes-dashboard
+      image: my-kubernetes-dashboard
+  automauntServiceAccontToken: false		# dont link default service account
+------------------------------------------
+
+
+THE PROCESS ABOVE IS NO LONGER USED - because the token has no expiration date
+-----------------------------------
+
+
+
+THIS IS THE USED PROCESS AFTER v1.24
+-------------------------------------
+
+With v1.24 when we create service account and theb create a token for authentication that have expiration date
+
+Create a service accoutn
+	terminal --> kubectl create serviceaccount dashboard-sa
+
+Create a token for the service account
+	terminal --> kubectl create token dashboard-sa
+
+Print the token
+	terminal --> jq -R 'split(".") | select(length > 0) | .[0],.[1] | @base64d | fromjson' <<< saSasdasa34sA..sadAdd3WSsa4
+
+We can see in the result that the token have expiration value. (one hour from the creat command by default)
+
+
+
+How to create a token with no expiration in newr version > v1.24
+----------------------------------------------------------------
+
+We should only create a service account token Secret object if we can't use the TokenRequest API to obtain a token, and the security exposure of persisting a non-expiring token creadential in a readable API object is acceptable for us.
+
+More info - https://kubernetes.io/docs/concepts/security/service-accounts/#use-cases
+
+1. Create the service account first
+	terminal --> kubectl create serviceaccount dashboard-sa
+
+2. Create a secret with the specified service account
+
+secret-definition.yaml
+---------------------------------------------
+apiVersion: v1
+kind: Secret
+type: kubernetes.io/service-account-token
+metadata:
+  mysecretname
+
+  annotations:
+    kubernetes.io/service-account.name: dashboard-sa
+---------------------------------------------
+
+
+
+
+===============================================
+Section 7 174. Practice Test - Service Accounts
+===============================================
+
+
+1. How many Service Accounts exist in the default namespace?
+------------------------------------------------------------
+
+List service accounts in the default namespace
+	terminal --> k get sa
+
+# result:
+NAME      SECRETS   AGE
+default   0         5m36s
+dev       0         46s
+
+
+Count service accounts in the default namespace
+	terminal --> k get sa --no-headers | wc -l
+
+	# result: 2
+
+- choose '2' as answer
+
+
+
+2. What is the secret token used by the default service account?
+----------------------------------------------------------------
+
+Show details of the default service account
+	terminal --> k describe sa default
+
+	# result: Tokens:              <none>
+
+- choose 'none' as answer
+
+
+
+3. We just deployed the Dashboard application. Inspect the deployment. What is the image used by the deployment?
+----------------------------------------------------------------------------------------------------------------
+
+List deployments
+	terminal --> k get deploy
+
+# result:
+NAME            READY   UP-TO-DATE   AVAILABLE   AGE
+web-dashboard   1/1     1            1           31s
+
+Show 'web-dashboard' deployment details
+	terminal --> k describe deploy web-dashboard
+
+# in teh result we can see 
+---------------------------------------------------------
+...
+Pod Template:
+  Labels:  name=web-dashboard
+  Containers:
+   web-dashboard:
+    Image:      gcr.io/kodekloud/customimage/my-kubernetes-dashboard
+...
+---------------------------------------------------------
+
+- choose 'gcr.io/kodekloud/customimage/my-kubernetes-dashboard' as answer
+
+
+
+4. Wait for the deployment to be ready. Access the custom-dashboard by clicking on the link to dashboard portal.
+----------------------------------------------------------------------------------------------------------------
+
+Click on the 'wep-dashboard' tab on the top right side of the console
+
+We should see
+
+"pods is forbidden: User "system:serviceaccount:default:default" cannot list resource "pods" in API group "" in the namespace "default""
+
+- click 'Ok' button
+
+
+5. What is the state of the dashboard? Have the pod details loaded successfully?
+-------------------------------------------------------------------------------
+
+- click 'Failed' as answer
+
+
+6. What type of account does the Dashboard application use to query the Kubernetes API?
+---------------------------------------------------------------------------------------
+
+Click on the 'wep-dashboard' tab on the top right side of the console
+
+We should see
+
+"pods is forbidden: User "system:serviceaccount:default:default" cannot list resource "pods" in API group "" in the namespace "default""
+
+- choose 'Service Account' as answer
+
+
+
+7. Which account does the Dashboard application use to query the Kubernetes API?
+--------------------------------------------------------------------------------
+
+Click on the 'wep-dashboard' tab on the top right side of the console
+
+We should see
+
+"pods is forbidden: User "system:serviceaccount:default:default" cannot list resource "pods" in API group "" in the namespace "default""
+
+- choose 'Default' as answer
+
+
+
+8. Inspect the Dashboard Application POD and identify the Service Account mounted on it.
+----------------------------------------------------------------------------------------
+
+Show web-dashboard pod details
+	terminal --> k describe pod web-dashboard
+
+# result: Service Account:  default
+
+- choose 'default' as answer
+
+
+
+9. At what location is the ServiceAccount credentials available within the pod?
+-------------------------------------------------------------------------------
+
+Show web-dashboard pod details
+	terminal --> k describe pod web-dashboard
+
+# result:
+------------------------------------------
+...
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-8m7f7 (ro)
+...
+------------------------------------------
+
+
+- choose '/var/run/secrets' as answer
+
+
+
+
+10 .The application needs a ServiceAccount with the Right permissions to be created to authenticate to Kubernetes. The default ServiceAccount has limited access. Create a new ServiceAccount named dashboard-sa.
+------------------------------------------------------------------------------------------------
+
+Create service account dashboard-sa
+	terminal --> k create sa dashboard-sa
+
+	# result: serviceaccount/dashboard-sa created
+
+Verify service account creation
+	terminal --> k describe sa dashboard-sa
+
+- click 'Check' button
+
+
+
+
+11. We just added additional permissions for the newly created dashboard-sa account using RBAC.
+-----------------------------------------------------------------------------------------------
+If you are interested checkout the files used to configure RBAC at /var/rbac. We will discuss RBAC in a separate section.
+
+List service account dir files
+	terminal --> ls /var/rbac
+
+	# result: dashboard-sa-role-binding.yaml  pod-reader-role.yaml
+
+
+
+
+12. Enter the access token in the UI of the dashboard application. Click Load Dashboard button to load Dashboard
+----------------------------------------------------------------------------------------------------------------
+Create an authorization token for the newly created service account, copy the generated token and paste it into the token field of the UI.
+
+To do this, run kubectl create token dashboard-sa for the dashboard-sa service account, copy the token and paste it in the UI.
+
+
+Create a token for service account dashboard-sa
+	terminal --> kubectl create token dashboard-sa
+
+	# result: eyJhbGciOiJSUzI1NiIsImtpZCI6ImJiRVV1eUZJT1g2Z3JqV0RPWTMwU1lMNG1fSUFING5nQ3Awa29lSWh3eGMifQ.eyJhdWQiOlsiaHR0cHM6Ly9rdWJlcm5ldGVzLmRlZmF1bHQuc3ZjLmNsdXN0ZXIubG9jYWwiLCJrM3MiXSwiZXhwIjoxNzM3Mjk4OTg2LCJpYXQiOjE3MzcyOTUzODYsImlzcyI6Imh0dHBzOi8va3ViZXJuZXRlcy5kZWZhdWx0LnN2Yy5jbHVzdGVyLmxvY2FsIiwianRpIjoiMDdkZDkxN2ItNzM4NC00ODg2LTkzNzItMjAzZWI2ZTk5YzFlIiwia3ViZXJuZXRlcy5pbyI6eyJuYW1lc3BhY2UiOiJkZWZhdWx0Iiwic2VydmljZWFjY291bnQiOnsibmFtZSI6ImRhc2hib2FyZC1zYSIsInVpZCI6ImExM2UyMDI0LWE2NjQtNDUyNi1hNmExLTA4OTMzMWI1YTBiMCJ9fSwibmJmIjoxNzM3Mjk1Mzg2LCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6ZGVmYXVsdDpkYXNoYm9hcmQtc2EifQ.r7Pb0S1E2HFKgU2v6bzOXwV1lHYOOMNFkHHdwW2ucLl5cYMc5VtzvYeTZYBXcBp9Y2zUFaW_Aws8Fah-0rr3SWfQ4OCE3Q2OkbAU7h8CpS4jbEQH6CJ_bSCLz_udltzHV9lvnt_xM-YGzVL7FTzzf4MxZTOc_OMUhGYnF7xFJpB7NpvPwYEnswDCpCli1aswi6VjONpiyDaRrkEFW4DANa4l6B1HDwGmoLA0Ow59tRHThcac8IgR2ze9EiOSn1Hnbyofb1EV51JtW6zMxBfCXBbuWHd1KtuM8nhncSC0qjUNLarwjLDVcup8XxqgWIzRFwjd9Wdo8QwaoN1YjUx_Uw
+
+Paste the result in the 'web-dashboard' tab in the 'Token' field and click 'LOAD DASHBOARD' button
+
+- click 'Ok' button
+
+
+
+13. You shouldn't have to copy and paste the token each time. The Dashboard application is programmed to read token from the secret mount location. However currently, the default service account is mounted. Update the deployment to use the newly created ServiceAccount
+-----------------------------------------------------------------------------------------------------
+Edit the deployment to change ServiceAccount from default to dashboard-sa.
+
+List deployments
+	terminal --> k get deploy
+
+# result
+NAME            READY   UP-TO-DATE   AVAILABLE   AGE
+web-dashboard   1/1     1            1           21m
+
+Save the web-dashboard deployment configuration file in new file named dashboard.yaml
+	terminal --> k get deploy web-dashboard -o yaml > dashboard.yaml
+
+Edit the created dashboard.yaml file
+	terminal --> vi dashboard.yaml
+
+-----------------------------------------------------------
+...
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        name: web-dashboard
+    spec:
+      serviceAccountName: dashboard-sa		# added field
+      containers:
+      - env:
+        - name: PYTHONUNBUFFERED
+...
+-----------------------------------------------------------
+save changes - escape, :wq!, enter
+
+Apply the changes to the deployment
+	terminal --> kubectl apply -f dashboard.yaml
+
+# result:
+Warning: resource deployments/web-dashboard is missing the kubectl.kubernetes.io/last-applied-configuration annotation which is required by kubectl apply. kubectl apply should only be used on resources created declaratively by either kubectl create --save-config or kubectl apply. The missing annotation will be patched automatically.
+deployment.apps/web-dashboard configured
+
+
+Verify changes made
+	terminal --> k get deploy
+
+# result:
+NAME            READY   UP-TO-DATE   AVAILABLE   AGE
+web-dashboard   1/1     1            1           27m
+
+- click 'Check' button
+
+
+
+14. Refresh the Dashboard application UI and you should now see the PODs listed automatically.
+----------------------------------------------------------------------------------------------
+This time you shouldn't have to put in the token manually.
+
+Open the 'wep-dashboard' tab on the top right side of the console
+
+We should see working application
+
+- click 'Ok' button
+
+
+
+
+=============================
+Section 7 176. Image Security
+=============================
+
+We have simple pod definition file:
+
+nginx-pod.yaml
+------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-pod
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+------------------------------------
+
+
+'image' field is taken from default docker registry (docker.io/library/nginx) if not other registry is specified.
+
+Other registry the Kubernetes uses in Google's. For examole the image that is used for end-to-end kubernetes testing is in Google Contianer Registry (gcr) - gcr.io/kubernetes-e2e-test-images/dnsutils
+
+We can use a private registry. (Recommended)
+
+To run a docker image using private repository we need to:
+
+1. Login to our private repository
+	terminal --> docker login private-repository.io
+
+	- enter creadentials
+
+2. Run the image from the private registry
+	terminal --> docker run private-registry.io/apps/internal-app
+
+
+To use the container we need to set the 'image' field with full image path. Alos we need to pass the private repository credential to allow Kubernetes to pull the image.
+
+To pass the creadential we create a secret with them.
+	terminal --> kubectl create secret docker-registry regcred --docker-server=private-registry.io --docker-username=registry-username --docker-password=registry-password --docker-email=registry-email@org.com			
+
+		# kubectl						- common kubernetes command
+		# create						- used action
+		# secret						- object
+		# docker-registry					- kubernetes docker registry object
+		# regcred						- name the object
+		# --docker-server=private-registry.io			- pass docker server address
+		# --docker-username=registry-username			- pass docker registry username
+		# --docker-password=registry-password			- pass docker registry password
+		# --docker-email=registry-email@org.com			- pass docker registry email
+
+
+
+nginx-pod.yaml
+------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-pod
+spec:
+  containers:
+  - name: nginx
+    image: private-registry.io/apps/internal-app
+  imagePullSecrets:
+  - name: regcred
+------------------------------------
+
+This allows the kubelet to use the secret and pull the private image and create pods with it.
+
+
+
+
+=============================================
+Section 7 177. Practice Test - Image Security
+=============================================
+
+
+1. What secret type must we choose for docker registry?
+-------------------------------------------------------
+
+Show types of secrets that can be created
+	terminal --> kubectl create secret
+
+# result:
+Available Commands:
+  docker-registry   Create a secret for use with a Docker registry
+  generic           Create a secret from a local file, directory, or literal value
+  tls               Create a TLS secret
+
+- choose 'docker-registry' as answer
+
+
+
+2. We have an application running on our cluster. Let us explore it first. What image is the application using?
+---------------------------------------------------------------------------------------------------------------
+
+Show deploymentss
+	terminal --> k get deploy
+
+# result: 
+NAME   READY   UP-TO-DATE   AVAILABLE   AGE
+web    2/2     2            2           2m14s
+
+
+Show details about the deploy
+	terminal --> k describe deploy web
+
+# result:     Image:         nginx:alpine
+
+- choose 'nginx:alpine' as answer
+
+
+
+3. We decided to use a modified version of the application from an internal private registry. Update the image of the deployment to use a new image from myprivateregistry.com:5000
+------------------------------------------------------------------------------------------------------
+The registry is located at myprivateregistry.com:5000. Don't worry about the credentials for now. We will configure them in the upcoming steps.
+
+
+Show deploymentss
+	terminal --> k get deploy
+
+# result: 
+NAME   READY   UP-TO-DATE   AVAILABLE   AGE
+web    2/2     2            2           2m14s
+
+
+Edit the deploy to change the used image
+	terminal --> k edit deploy web
+
+
+-----------------------------------------------------------
+...
+    spec:
+      containers:
+      - image: myprivateregistry.com:5000/nginx:alpine		# added private registry address
+        imagePullPolicy: IfNotPresent
+        name: nginx
+...
+-----------------------------------------------------------
+save changes - escape, :wq!, enter
+
+
+Verify changes
+	terminal --> k describe deploy web
+
+
+- click 'Check' button
+
+
+
+
+4. Are the new PODs created with the new images successfully running?
+---------------------------------------------------------------------
+
+List pods
+	terminal --> k get pods
+	
+# result: 
+NAME                  READY   STATUS             RESTARTS   AGE
+web-749fcb599-h697d   0/1     ImagePullBackOff   0          2m16s		# we can see that new pod is created
+web-cbfbbd684-26bf9   1/1     Running            0          12m
+web-cbfbbd684-rtv8k   1/1     Running            0          12m
+
+
+Show details about the newly created pod
+	terminal --> k describe pod web-749fcb599-h697d
+
+# result:
+ Failed to pull image "myprivateregistry.com:5000/nginx:alpine": failed to pull and unpack image "myprivateregistry.com:5000/nginx:alpine": failed to resolve reference "myprivateregistry.com:5000/nginx:alpine": pull access denied, repository does not exist or may require authorization: authorization failed: no basic auth credentials
+  Warning  Failed     115s (x4 over 3m25s)  kubelet            Error: ErrImagePull
+  Warning  Failed     102s (x6 over 3m25s)  kubelet            Error: ImagePullBackOff
+  Normal   BackOff    87s (x7 over 3m25s)   kubelet            Back-off pulling image "myprivateregistry.com:5000/nginx:alpine"
+
+The erros mean that we do not have permissions to pull the image.
+
+- choose 'No' as answer
+
+
+
+
+
+5. Create a secret object with the credentials required to access the registry.
+-------------------------------------------------------------------------------
+
+Name: private-reg-cred
+Username: dock_user
+Password: dock_password
+Server: myprivateregistry.com:5000
+Email: dock_user@myprivateregistry.com
+
+Show create registry help commands
+	terminal --> k create secret docker-registry -h
+
+We will use the first example
+  # If you do not already have a .dockercfg file, create a dockercfg secret directly
+  kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER
+--docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL
+
+
+Create the secret for registry credentials
+	terminal --> k create secret docker-registry private-reg-cred --docker-server=myprivateregistry.com:5000 --docker-username=dock_user --docker-password=dock_password --docker-email=dock_user@myprivateregistry.com
+
+		# k							- common kubernetes command
+		# create						- used action
+		# secret						- object
+		# docker-registry					- kubernetes docker registry object
+		# private-reg-cred					- name the object
+		# --docker-server=myprivateregistry.com:5000		- pass docker server address
+		# --docker-username=dock_user				- pass docker registry username
+		# --docker-password=dock_password			- pass docker registry password
+		# --docker-email=dock_user@myprivateregistry.com	- pass docker registry email
+
+
+		# result: secret/private-reg-cred created
+
+
+- click 'Check' button
+
+
+
+
+6. Configure the deployment to use credentials from the new secret to pull images from the private registry
+-----------------------------------------------------------------------------------------------------------
+
+We can see the synatx in kubernetes documentation
+	- https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#create-a-pod-that-uses-your-secret
+
+Edit the deployment configuration
+	terminal --> k edit deploy web	
+
+-----------------------------------------------------------
+...
+    spec:
+      imagePullSecrets:				# added
+      - name: private-reg-cred			# added
+      containers:
+      - image: myprivateregistry.com:5000/nginx:alpine
+        imagePullPolicy: IfNotPresent
+...
+-----------------------------------------------------------
+save changes - escape, :wq!, enter
+# result: deployment.apps/web edited
+
+Verify changes
+	terminal --> k describe deploy web
+
+	# result: no errors should accor 
+
+- click 'Çheck' button
+
+
+
+7. Check the status of PODs. Wait for them to be running. You have now successfully configured a Deployment to pull images from the private registry.
+--------------------------------------------------------------------------------------------------------------
+
+Check status of the pods
+	terminal --> k get pods
+
+# result: all pods are recreated with new image
+NAME                   READY   STATUS    RESTARTS   AGE
+web-8569544bdb-9l6jv   1/1     Running   0          2m18s
+web-8569544bdb-t9ddk   1/1     Running   0          2m2s
+
+- click 'Ok' button
+
+
+
+
+=================================================
+Section 7 179. Pre-requisite - Security in Docker
+=================================================
+
+We have a host with installed Docker on it.
+
+We start ubuntu that sleeps for 1 hour
+	terminal --> docker run ubuntu sleep 3600
+
+We know that the host have its own namespace and the container (ubuntu) have its own namespace. The container can see only his own namespace. 
+
+We can list the processes in the container and we will see only one prcess
+	terminal --> ps aux
+
+If we list the processes on the host, we will see that the same sleep process exists but with different ID
+	host terinal -->  ps aux
+
+Different process IDs in different namespaces is how docker isolates containers in a system.
+
+
+User security
+-------------
+
+The host have a set of users and in the container have only root user. Host runs containers with the root user.
+
+We can run container with specific user speified in the start container command.
+
+Start container with specific user (not root)
+	terminal --> docker run --user=1000 ubuntu sleep 3600
+
+Show running processes on the host
+	terminal --> ps aux
+
+# we can see that the user of the sleep command is 1000
+
+Another way to secure that a specific user runs a specific container is to include this option in the container configurations (Dockerfile).
+
+
+Dockerfile
+-----------------------
+FROM ubuntu
+
+USER 1000			# User is specified
+-----------------------
+
+Build the image
+	terminal --> docker build -t my-ubuntu-image .
+
+Run the image without specifing the user ID
+	terminal --> docker run my-ubuntu-image sleep 3600
+
+Check the user 
+	terminal --> ps aux
+
+
+When root user is used (by default) to start containers, docker uses Linux Capabilities to restrict the root user in the container to have permissions fo all actions. 
+
+All capabilities we can see on linux system on address /usr/include/linux/capability.h
+
+If we want to add permission to the user that run the container we need to do it manually
+	terminal --> docker run --cap-add MAC_ADMIN ubuntu
+
+We can remove privilegesof the user as
+	terminal --> docker run --cap-drop Kill ubuntu
+
+If we want to set all privileges to user
+	terminal --> docker run --privileged ubuntu
+
+
+
+
+===============================
+Section 7 180. Security Context
+===============================
+
+Recap from Docker
+-----------------
+
+Set specific user to the container
+	terminal --> docker run --user=1000 ubuntu sleep 3600
+
+Add privileges to the user
+	terminal --> docker run --cap-add MAC_ADMIN ubuntu
+
+
+We can use this options in Kubernetes as well.
+We can configure user security on a container level or on a POD level. If configured on a POD level, the configurations will apply to all containers with in the POD. If we configure on hte container and the POD, the container configs will overwrite the configurations on the POD.
+
+
+pod-definition.yaml
+---------------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web-pod
+spec:
+  securityContext:			# set user filed on Pod level
+    runAsUser: 1000			# set user name on Pod level
+
+  containers:
+	- name: ubuntu
+	  image: ubuntu
+	  command: ["sleep", "3600"]
+  	  securityContext:			# set user filed on container level
+    	    runAsUser: 1000			# set user name on container level
+	    capabilities:
+		add: ["MAC_ADMIN"]  # add capabilities for the user on container level. Capabilities are not allowed on POD level
+---------------------------------------------------------
+
+
+
+
+===============================================
+Section 7 181. Practice Test - Security Context
+===============================================
+
+
+1. What is the user used to execute the sleep process within the ubuntu-sleeper pod?
+------------------------------------------------------------------------------------
+In the current(default) namespace.
+
+
+List pods
+	terminal --> k get pods
+
+# result:
+NAME             READY   STATUS    RESTARTS   AGE
+ubuntu-sleeper   1/1     Running   0          32s
+
+
+Show pod 'ubuntu-sleeper' configuration
+	terminal --> ps aux
+
+# result:  5854 root      0:00 sleep 4800
+
+OR
+
+Run the command
+	terminal --> whoami
+
+We can access the pod and see the user in it
+	terminal --> kubectl exec ubuntu-sleeper -- whoami
+
+
+- choose 'root' as answer
+
+
+
+
+2. Edit the pod ubuntu-sleeper to run the sleep process with user ID 1010.
+--------------------------------------------------------------------------
+Note: Only make the necessary changes. Do not modify the name or image of the pod.
+
+List pods
+	terminal --> k get pods
+
+# result:
+NAME             READY   STATUS    RESTARTS   AGE
+ubuntu-sleeper   1/1     Running   0          5m43s
+
+
+Take the container configurations and save them as a separate pod-definition file (ubuntu-sleeper.yaml)
+	terminal --> kubectl get pod ubuntu-sleeper -o yaml > ubuntu-sleeper.yaml
+
+Edit the configuration file ubuntu-sleeper.yaml
+	terminal --> vi ubuntu-sleeper.yaml
+
+------------------------------------------------
+...
+  schedulerName: default-scheduler
+  securityContext: 			# edited
+    runAsUser: 1010			# added
+  serviceAccount: default
+...
+------------------------------------------------
+save changes - escape, :wq!, enter
+
+
+Delete the current pod
+	terminal --> kubectl delete pod ubuntu-sleeper --force
+
+Apply the changes and create the new POD
+	terminal --> kubectl apply -f ubuntu-sleeper.yaml
+
+List pods
+	terminal --> k get pods
+
+- click 'Check' button
+
+
+
+3. A Pod definition file named multi-pod.yaml is given. With what user are the processes in the web container started?
+----------------------------------------------------------------------------------------------------------------------
+The pod is created with multiple containers and security contexts defined at the Pod and Container level.
+
+Print the file multi-pod.yaml
+	terminal --> cat multi-pod.yaml
+
+
+------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: multi-pod
+spec:
+  securityContext:
+    runAsUser: 1001
+  containers:
+  -  image: ubuntu
+     name: web				# web container
+     command: ["sleep", "5000"]		
+     securityContext:
+      runAsUser: 1002			# user set 
+
+  -  image: ubuntu
+     name: sidecar
+     command: ["sleep", "5000"]
+------------------------------------------------
+
+- choose '1002' as answer
+
+
+
+
+4. With what user are the processes in the sidecar container started?
+---------------------------------------------------------------------
+The pod is created with multiple containers and security contexts defined at the Pod and Container level.
+
+
+Print the file multi-pod.yaml
+	terminal --> cat multi-pod.yaml
+
+
+------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: multi-pod
+spec:
+  securityContext:
+    runAsUser: 1001			# sidecar user
+  containers:
+  -  image: ubuntu
+     name: web				
+     command: ["sleep", "5000"]		
+     securityContext:
+      runAsUser: 1002			 
+
+  -  image: ubuntu			# sidecar container
+     name: sidecar
+     command: ["sleep", "5000"]
+------------------------------------------------
+
+- choose '1001' as answer
+
+
+
+
+5. Update pod ubuntu-sleeper to run as Root user and with the SYS_TIME capability.
+----------------------------------------------------------------------------------
+Note: Only make the necessary changes. Do not modify the name of the pod.
+
+Copy the pod configuration file in a new file
+	terminal --> k get pod ubuntu-sleeper -o yaml > ubuntu-sleeper.yaml
+
+Edit the pod cnfiguration
+	terminal --> vi ubuntu-sleeper.yaml
+
+ubuntu-sleeper.yaml
+----------------------------------------------------
+...
+spec:
+  containers:
+  - command:
+    - sleep
+    - "4800"
+    image: ubuntu
+    imagePullPolicy: Always
+    name: ubuntu
+    securityContext:
+     capabilities:
+      add: ["SYS_TIME"]
+    resources: {}
+...
+
+# remove the added user in the container
+...
+  securityContext: 			# delete
+    runAsUser: 1010			# delete
+...
+----------------------------------------------------
+save changes - escape, :wq!, enter
+
+
+Verify changes
+	terminal --> cat ubuntu-sleeper.yaml
+	
+Delete the current pod
+	terminal --> kubectl delete pod ubuntu-sleeper --force
+
+Apply the changes and create the new POD
+	terminal --> kubectl apply -f ubuntu-sleeper.yaml
+
+List pods
+	terminal --> k get pods
+
+- click 'Check' button
+
+
+
+
+6. Now update the pod to also make use of the NET_ADMIN capability.
+-------------------------------------------------------------------
+Note: Only make the necessary changes. Do not modify the name of the pod.
+
+
+Edit the pod cnfiguration
+	terminal --> vi ubuntu-sleeper.yaml
+
+ubuntu-sleeper.yaml
+----------------------------------------------------
+...
+spec:
+  containers:
+  - command:
+    - sleep
+    - "4800"
+    image: ubuntu
+    imagePullPolicy: Always
+    name: ubuntu
+    securityContext:
+     capabilities:
+      add: ["SYS_TIME", "NET_ADMIN"]		# modify the line
+    resources: {}
+...
+----------------------------------------------------
+save changes - escape, :wq!, enter
+
+Verify changes
+	terminal --> cat ubuntu-sleeper.yaml
+	
+Delete the current pod
+	terminal --> kubectl delete pod ubuntu-sleeper --force
+
+Apply the changes and create the new POD
+	terminal --> kubectl apply -f ubuntu-sleeper.yaml
+
+List pods
+	terminal --> k get pods
+
+- click 'Check' button
+
+
+
+
+
+=============================
+Section 7 183. Network Policy
+=============================
+
+We have 3 component architecture
+	- Web server (front-end - FE) 	- port 80
+	- API server (back-end - BE)	- port 5000
+	- DB 				- port 3306
+
+
+2 Types of traffic
+	- Ingress			- incoming traffic from the client
+	- Egress			- outgoing traffic from the component
+
+
+	- Ingress			
+		- from users to FE (FE view)		port 80
+		- from FE to BE (BE view)		port 5000
+		- from BE to BE (DB view)		port 3306	
+
+	- Egress
+		- from FE to BE (FE view)		port 5000
+		- from BE to DB (BE view)		port 4406
+		- from DB to BE (DB view)		port 3306
+
+
+All nodes in a cluster are in one virutal network that is in "All Allow" mode to secure communication between all pods in all nodes.
+
+So we want to prevent FE to communicate with the DB. We can set network policy to allow communication with DB only to BE. Network policy is another object in the Kubernetes namespace (like pods, replicasets or services). We link network policy to one or more pods. We define rules in the network policy - in this case we will set "Allow Ingress Traffic From BE Pod on Port 3306". Ones set, the policy block all other traffic except that from the BE Pod.
+
+We link network policy to a pod with labels and selectors.
+
+Example for network policy definition file
+
+policy-definition.yaml
+----------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-policy
+spec:
+  podSelector:
+    matchLabels:
+      role: db
+  policyTypes:		# only ingress traffic is isolated (affected), all egress traffic is unaffected
+  - Ingrees		# if we want to modify egress traffic we need to add it in 'policyTypes' list and set rules
+  ingrees:
+  - from:
+    - podSelector:
+        matchLabels:
+	  name: api-pod  
+    ports:
+    - protocol: TCP
+      port: 3306  
+----------------------------------------------
+
+Create a network policy
+	terminal --> k create -f policy-definition.yaml
+
+
+Note :
+------
+- Solutions that Support Network Policies
+	- Kube-router
+	- Calico
+	- Romana
+	- Weave-net
+
+- Solutions that DO NOT Support Network Policies
+	- Flannel
+	# we can still create network policies, but they wil not take effect
+
+
+
+
+
+==========================================
+Section 7 184. Developing Network Policies
+==========================================
+
+We have 3 pod architecture in production (prod) environment
+	- Web server (front-end - FE) 	- port 80
+	- API server (back-end - BE)	- port 5000
+	- DB 				- port 3306
+
+We need to set incoming traffic to DB pod to be modified. Only calls from API Server Pod (BE) should be allowed.
+
+Create a network policy with definition file with Ingress (incoming traffic rules)
+----------------------------------------------------------------------------------
+
+db-network-policy.yaml
+----------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-policy
+spec:
+  podSelector:
+    matchLabels:
+      role: db		# select the pods witth this label
+
+  policyTypes:		# only ingress traffic is isolated (affected)
+  - Ingrees		# if we want to modify egress traffic we need to add it in 'policyTypes' list and set rules
+  ingrees:
+  - from:
+    - podSelector:		# select other pod 
+        matchLabels:
+	  name: api-pod 	# API server (BE)
+    ports:
+    - protocol: TCP
+      port: 3306  		
+----------------------------------------------
+
+- We plan the rules from the receiving pod's prospective (from DB View)
+- When we allow Ingrees traffic from other pod, the response traffic is allowed by default.
+- The Egress traffic from DB to BE (API) is restricted (not available).
+
+
+How to manage pod with the same name in different namespaces? We have few more pods.
+	- API pod for Dev environment
+	- API pod for test environment
+
+
+db-network-policy.yaml
+----------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-policy
+spec:
+  podSelector:
+    matchLabels:
+      role: db		# select the pods witth this label
+
+  policyTypes:		# only ingress traffic is isolated (affected)
+  - Ingrees		# if we want to modify egress traffic we need to add it in 'policyTypes' list and set rules
+  ingrees:
+  - from:
+    - podSelector:		# select other pod 
+        matchLabels:
+	  name: api-pod 	# API server (BE)
+      namespaceSelector:
+	matchLabel:
+	  name: prod
+    ports:
+    - protocol: TCP
+      port: 3306  		
+----------------------------------------------
+
+
+- If 'podSelector' section is not defined and only namespace section is defind, then all pods in the specified namespace will use this network policy. Pods outside spcified (prod) namespace will not be able to communicate with the DB pod.
+
+
+We have Backup Server (with IP 192.168.5.10) that we want to allow to connect with the DB pod in production namepsace. We can set 'ipBlock' configuration section in the network policy.
+
+
+db-network-policy.yaml Ingrees
+----------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-policy
+spec:
+  podSelector:
+    matchLabels:
+      role: db		# select the pods witth this label
+
+  policyTypes:		# only ingress traffic is isolated (affected)
+  - Ingrees		# if we want to modify egress traffic we need to add it in 'policyTypes' list and set rules
+  ingrees:
+  - from:
+    - podSelector:		# select pods
+        matchLabels:
+	  name: api-pod 	# API server (BE)
+
+      namespaceSelector:	# select namespace
+	matchLabel:
+	  name: prod
+
+    - ipBlock:			# allow IPs to communicate
+	cidr: 192.168.5.10/32		# allow traffic from this IP
+	
+    ports:
+    - protocol: TCP
+      port: 3306  		
+----------------------------------------------
+
+- Every item in the '-from' section is separated rule. They are executed with AND OR logic. 
+- Rule selector are executed with AND logic. That means that all criteria must be met - name of the pod must be 'api-pod' and the namespace must match.
+----------------------------------------
+  - from:
+    - podSelector:				- Rule 1 - selector for pods label, including namespace
+        matchLabels:
+	  name: api-pod
+      namespaceSelector:			- additional criteria for rule 1 
+	matchLabel:
+	  name: prod
+    - ipBlock:		  			- Rule 2 - allow traffic from specific IP address (rule 2)
+----------------------------------------
+
+We can specify all configurations under one rule (like in the example above) or separate them each in different rule.
+
+if '-' is added infront 'namespaceSelector', this criteria is become different rule. Small changes like this can have big impact. Below example is set all prods with name 'api-pod' can requests, all pods from namespace 'prod' can traffic.
+----------------------------------------
+  - from:
+    - podSelector:				- Rule 1 - selector for pods label, including namespace
+        matchLabels:
+	  name: api-pod
+    - namespaceSelector:			- Rule 2 - selector for namespace
+	matchLabel:
+	  name: prod
+    - ipBlock:		  			- Rule 3 - allow traffic from specific IP address
+	cidr: 192.168.5.10/32
+----------------------------------------
+
+
+
+Create a network policy with definition file with Egress (outgoing traffic rules)
+---------------------------------------------------------------------------------
+
+We have data pushing to the Backup Server (with IP 192.168.5.10, port 80). We have to se egress traffic.
+
+db-network-policy.yaml egress
+----------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-policy
+spec:
+  podSelector:
+    matchLabels:
+      role: db		# select the pods witth this label
+
+  policyTypes:		# both ingress and egress traffic are affected
+  - Ingrees		
+  - Egress
+  ingrees:			# incoming traffic
+  - from:
+    - podSelector:		# select pods
+        matchLabels:
+	  name: api-pod 	# API server (BE)
+
+    ports:
+    - protocol: TCP
+      port: 3306  
+
+  egress:					# outgoing traffic
+  - to:
+    - ipBlock:
+	  cidr: 192.168.5.10/32			# IP of the target - backup server
+	
+    ports:
+    - protocol: TCP				
+      port: 80  				# what port data will be sent to
+----------------------------------------------
+
+
+
+
+
+==========================================================
+Section 7 186. Kubectx and Kubens – Command line Utilities
+==========================================================
+
+Through out the course, you have had to work on several different namespaces in the practice lab environments. In some labs, you also had to switch between several contexts.
+
+While this is excellent for hands-on practice, in a real “live” kubernetes cluster implemented for production, there could be a possibility of often switching between a large number of namespaces and clusters.
+
+This can quickly become and confusing and overwhelming task if you had to rely on kubectl alone.
+
+This is where command line tools such as kubectx and kubens come in to picture.
+
+Reference: https://github.com/ahmetb/kubectx
+
+
+Kubectx:
+========
+With this tool, you don't have to make use of lengthy “kubectl config” commands to switch between contexts. This tool is particularly useful to switch context between clusters in a multi-cluster environment.
+
+
+Installation:
+	terminal --> sudo git clone https://github.com/ahmetb/kubectx /opt/kubectx
+	terminal --> sudo ln -s /opt/kubectx/kubectx /usr/local/bin/kubectx
+
+Syntax:
+-------
+To list all contexts:
+	terminal --> kubectx
+
+To switch to a new context:
+	terminal --> kubectx <context_name>
+
+To switch back to previous context:
+	terminal --> kubectx -
+
+To see current context:
+	terminal --> kubectx -c
+
+Kubens:
+=======
+This tool allows users to switch between namespaces quickly with a simple command.
+
+Installation:
+	terminal --> sudo git clone https://github.com/ahmetb/kubectx /opt/kubectx
+	terminal --> sudo ln -s /opt/kubectx/kubens /usr/local/bin/kubens
+
+Syntax:
+-------
+To switch to a new namespace:
+	terminal --> kubens <new_namespace>
+
+To switch back to previous namespace:
+	terminal --> kubens -
+
+
+
+
+
+===============================================
+Section 7 187. Practice Test - Network Policies
+===============================================
+
+
+1. How many network policies do you see in the environment?
+-----------------------------------------------------------
+We have deployed few web applications, services and network policies. Inspect the environment.
+
+List pods
+	terminal --> k get pods
+# result:
+NAME       READY   STATUS    RESTARTS   AGE
+external   1/1     Running   0          80s
+internal   1/1     Running   0          80s
+mysql      1/1     Running   0          80s
+payroll    1/1     Running   0          80s
+
+
+List services
+	terminal --> k get svc
+# result:
+NAME               TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
+db-service         ClusterIP   10.100.30.69    <none>        3306/TCP         2m2s
+external-service   NodePort    10.104.66.126   <none>        8080:30080/TCP   2m3s
+internal-service   NodePort    10.99.127.155   <none>        8080:30082/TCP   2m3s
+kubernetes         ClusterIP   10.96.0.1       <none>        443/TCP          44m
+payroll-service    NodePort    10.110.45.31    <none>        8080:30083/TCP   2m2s
+
+Look over the ports that services are set on.
+
+
+List network policies
+	terminal --> k get networkpolicies		# netpol - short syntax
+
+# result:
+NAME             POD-SELECTOR   AGE
+payroll-policy   name=payroll   3m35s
+
+- choose '1' as answer
+
+
+
+2. What is the name of the Network Policy?
+------------------------------------------
+
+List network policies
+	terminal --> k get networkpolicies		# netpol - short syntax
+
+# result:
+NAME             POD-SELECTOR   AGE
+payroll-policy   name=payroll   3m35s
+
+- choose 'payroll-policy' as answer
+
+
+
+3. Which pod is the Network Policy applied on?
+----------------------------------------------
+
+List network policies
+	terminal --> k get networkpolicies		# netpol - short syntax
+
+# result:
+NAME             POD-SELECTOR   AGE
+payroll-policy   name=payroll   3m35s
+
+Show details about the network policy
+	terminal --> k describe netpol payroll-policy
+
+payroll-policy
+----------------------------------------------
+Name:         payroll-policy
+Namespace:    default
+Created on:   2025-01-22 19:33:21 +0000 UTC
+Labels:       <none>
+Annotations:  <none>
+Spec:
+  PodSelector:     name=payroll			# this is the pod of the applied policy
+  Allowing ingress traffic:
+    To Port: 8080/TCP
+    From:
+      PodSelector: name=internal
+  Not affecting egress traffic
+  Policy Types: Ingress
+----------------------------------------------
+
+- choose 'payroll' as answer
+
+
+
+4. What type of traffic is this Network Policy configured to handle?
+--------------------------------------------------------------------
+
+List network policies
+	terminal --> k get networkpolicies		# netpol - short syntax
+
+# result:
+NAME             POD-SELECTOR   AGE
+payroll-policy   name=payroll   3m35s
+
+
+Show details about the network policy
+	terminal --> k describe netpol payroll-policy
+
+payroll-policy
+----------------------------------------------
+Name:         payroll-policy
+Namespace:    default
+Created on:   2025-01-22 19:33:21 +0000 UTC
+Labels:       <none>
+Annotations:  <none>
+Spec:
+  PodSelector:     name=payroll	
+  Allowing ingress traffic:			# ingress is specified
+    To Port: 8080/TCP
+    From:
+      PodSelector: name=internal
+  Not affecting egress traffic
+  Policy Types: Ingress
+----------------------------------------------
+
+- choose 'ingress' as answer
+
+
+
+5. What is the impact of the rule configured on this Network Policy?
+--------------------------------------------------------------------
+
+List network policies
+	terminal --> k get networkpolicies		# netpol - short syntax
+
+# result:
+NAME             POD-SELECTOR   AGE
+payroll-policy   name=payroll   3m35s
+
+
+Show details about the network policy
+	terminal --> k describe netpol payroll-policy
+
+payroll-policy
+----------------------------------------------
+Name:         payroll-policy
+Namespace:    default
+Created on:   2025-01-22 19:33:21 +0000 UTC
+Labels:       <none>
+Annotations:  <none>
+Spec:
+  PodSelector:     name=payroll	
+  Allowing ingress traffic:
+    To Port: 8080/TCP
+    From:
+      PodSelector: name=internal		# from selector name
+  Not affecting egress traffic
+  Policy Types: Ingress
+----------------------------------------------
+
+- choose 'Traffic from Internal to Payroll is allowed' as answer
+
+
+
+
+6. What is the impact of the rule configured on this Network Policy?
+--------------------------------------------------------------------
+
+List network policies
+	terminal --> k get networkpolicies		# netpol - short syntax
+
+# result:
+NAME             POD-SELECTOR   AGE
+payroll-policy   name=payroll   3m35s
+
+
+Show details about the network policy
+	terminal --> k describe netpol payroll-policy
+
+payroll-policy
+----------------------------------------------
+Name:         payroll-policy
+Namespace:    default
+Created on:   2025-01-22 19:33:21 +0000 UTC
+Labels:       <none>
+Annotations:  <none>
+Spec:
+  PodSelector:     name=payroll	
+  Allowing ingress traffic:
+    To Port: 8080/TCP
+    From:
+      PodSelector: name=internal
+  Not affecting egress traffic
+  Policy Types: Ingress
+----------------------------------------------
+
+- choose 'Internal POD can access port 8080 on Payroll POD' as answer
+
+
+
+
+7. Access the UI of these applications using the link given above the terminal.
+-------------------------------------------------------------------------------
+
+Open 'External Portal' and 'Internal Portal' tabs on top right side of the console.
+
+On 'External Portal' we have red background
+On 'Internal Portal' we have green background 
+
+
+- click 'Ok' button
+
+
+
+8. Perform a connectivity test using the User Interface in these Applications to access the payroll-service at port 8080.
+-------------------------------------------------------------------------------------------------------------------------
+
+On 'External Portal' and 'Internal Portal' tabs set HOST as 'payroll-service' and PORT as '8080'
+ - click 'TEST' button
+
+On 'External Portal' tab should receive 'timed out'
+On 'Internal Portal' tab should receive 'Success!'
+
+- choose 'Only Internal application can access payroll service' as answer
+
+
+
+9. Perform a connectivity test using the User Interface of the Internal Application to access the external-service at port 8080.
+--------------------------------------------------------------------------------------------------------------------------------
+
+On 'Internal Portal' tabs set HOST as 'external-service' and PORT as '8080'
+ - click 'TEST' button
+
+We should receive 'Success!'
+
+- choose 'Successful' as answer
+
+
+
+
+10. Create a network policy to allow traffic from the Internal application only to the payroll-service and db-service.
+----------------------------------------------------------------------------------------------------------------------
+Use the spec given below. You might want to enable ingress traffic to the pod to test your rules in the UI.
+Also, ensure that you allow egress traffic to DNS ports TCP and UDP (port 53) to enable DNS resolution from the internal pod.
+
+Policy Name: internal-policy
+Policy Type: Egress
+Egress Allow: payroll
+Payroll Port: 8080
+Egress Allow: mysql
+MySQL Port: 3306
+
+We can find syntax on Kubernetes Documentation
+	- https://kubernetes.io/docs/concepts/services-networking/network-policies/#networkpolicy-resource
+
+
+Create the network policy file
+	terminal --> vi internal-policy.yaml
+
+internal-policy.yaml
+--------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: internal-policy
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      name: internal
+  policyTypes:
+  - Egress			# allow traffic from this pod out
+  egress:
+  - to:
+    - podSelector:		# Rule 1
+        matchLabels:	
+          name: payroll		# to pods with name
+    ports:
+    - protocol: TCP
+      port: 8080
+  - to:				# Rule 2
+    - podSelector:
+        matchLabels:
+          name: mysql		# to pods with name
+    ports:
+    - protocol: TCP
+      port: 3306
+--------------------------------------------------------
+save changes - escape, :wq!, enter
+
+Verify creation of the policy
+	terminal --> cat internal-policy.yaml
+
+Create the network policy
+	terminal --> k create -f internal-policy.yaml
+
+	# result: networkpolicy.networking.k8s.io/internal-policy created
+
+Verify network policy creation
+	terminal --> k describe netpol internal-policy
+
+internal-policy
+--------------------------------------------------------
+Name:         internal-policy
+Namespace:    default
+Created on:   2025-01-22 20:11:12 +0000 UTC
+Labels:       <none>
+Annotations:  <none>
+Spec:
+  PodSelector:     name=internal
+  Not affecting ingress traffic
+  Allowing egress traffic:
+    To Port: 8080/TCP
+    To:
+      PodSelector: name=payroll
+    ----------
+    To Port: 3306/TCP
+    To:
+      PodSelector: name=mysql
+  Policy Types: Egress
+--------------------------------------------------------
+
+- click 'Check' button
+
+
+
+
+
+
+
+=====================================================
+Section 7 188. 2025 Custom Resource Definitions (CRD)
+=====================================================
+
+example deployment of a application
+-----------------------------------
+
+deployment.yaml
+--------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp-deployment
+spec:
+  template:
+    metadata:
+      name: myapp-pod
+      labels:
+      type: front-end
+    spec:
+      containers:
+      - image: nginx
+replicas: 3
+selector:
+  matchLabels:
+    type: front-end
+--------------------------------------------------------
+
+
+Apply deploy
+	terminal --> kubectl create -f deployment.yaml
+
+List deployment
+	terminal --> kubectl get deployments
+
+Delete deployment
+	terminal --> kubectl delete -f deployment.yaml
+
+
+All command create, modify or delete entities in the ETCD server. The Controllers are monitoring ETCD Server and maintain the required status of the system (create, modify, delete, redeploy etc.).
+
+
+
+example controoler configuration
+--------------------------------
+
+deployment_controller.go
+--------------------------------------------------------
+package deployment
+
+var controllerKind = apps.ScheeGroupVersion.WithKind("Deplyment")
+
+// < Code hidden >
+
+// Run brgins whatching and syncing
+func (dc "DeploymentController) addReplicaSet (obj interface{})
+
+//< A lot of code hidden >
+--------------------------------------------------------
+
+
+
+For different resources on the cluster there is a specific controller that watching the status and make necessary changes on the cluster to maintain the state as expected.
+
+
+Resource							Controller
+-----------------------------------------------------------------------------
+ReplicaSet							ReplicaSet		
+Deployment							Deployment
+Job								Job
+Cronjob				ETCD				Cronjob		
+Statefulset							Statefulset
+Namespace							Namespace
+				
+
+
+
+For us to create a custom resource and expect this kind resources to be managed by controllers, we need to create resourcename-custom-definition.yaml
+
+This is the resource we want to use:
+
+flightticket.yaml
+-------------------------------------------------
+apiVersion: flights.com/v1
+kind: FlightTicket
+metadata:
+  name: my-flight-ticket
+spec:
+  from: Mumbai
+  to: London
+  number: 2
+-------------------------------------------------
+
+
+flightticket-custom-definition.yaml
+-------------------------------------------------
+apiVersion: apiextensions.k8s/io/v1
+kind: CustomResourceDefintion
+metadata:
+  name: flighttickets.flights.com
+spec:
+  scope: Namespaced				# defines if the object is namespaced or not
+  groups: flights.com				# apiVersion of the flightticket custom resource
+  names:
+    kind: FlightTicket				# kind of the flightticket.yaml file
+    singular: flightticket			# how we call the singular resource of this kind
+    plural: flighttickets			# how we call multiple resources of this kind
+    shortnames:
+      - ft					# set short synatx for this resource
+  versions:
+    - name: v1					# set name for the resource lifecycle stage (beta, alpha, v2, etc.)
+      served: true
+      storage: true
+  schema:					# all the parameters specified under 'spec:' section when creating an object
+    openAPIV3Schema:				# fields and kind of data that that fields require
+        type: object
+	properties:
+	  spec:
+	    type: object
+	    properties:
+	      from:
+		type: string
+	      to:
+		type: string
+	      number:
+		type: integer
+		minimum: 1
+		maximum: 10
+-------------------------------------------------
+
+Namespaced objects:
+	- pods
+	- replicasets
+	- deployments
+
+No namepsaced object:
+	- Persistent Volumes (PVs)
+	- Nodes
+	- Namespaces
+
+List api resources
+	terminal --> kubectl api-resources
+
+	# the result will be the plural name of the resource
+
+List api resources with short name
+	terminal --> kubectl get ft
+
+Create the custom resource
+--------------------------
+	terminal --> kubectl create -f flightticket-custom-definition.yaml
+
+	# result: customresourcedefinition "FlightTicket" created
+
+
+Now we can create, list or delete an entity of this type of resource
+	terminal --> kubectl create -f flightticket.yaml		# result: flightticket "my-flight-ticket" created
+
+	terminal --> kubectl get flightticket				# result: my-flight-ticket  pending
+
+	terminal --> kubectl delete -f flightticket.yaml		# result: flightticket "my-flight-ticket" deleted	
+
+	
+To make additional actions with these custom resources we need a controller. This controllers watch when this resources are created, and perform actions based on resource specifications.
+
+
+
+
+
+
+======================================
+Section 7 189. 2025 Custom Controllers
+======================================
+
+From last lection we created a Custom Resource Definition (CRD) and we now can create a entity flightticket.yaml and the data is stored in ETCD.
+
+flightticket.yaml
+-------------------------------------------------
+apiVersion: flights.com/v1
+kind: FlightTicket
+metadata:
+  name: my-flight-ticket
+spec:
+  from: Mumbai
+  to: London
+  number: 2
+-------------------------------------------------
+
+Craete flightticket
+	termina; --> kubectl create -f flightticket.yaml
+
+	# result: flightticket "my-flight-ticket" created
+
+List flighttickets
+	terminal --> kubectl get flighttickets
+
+	# result: 
+	NAME		  	STATUS
+	my-flight-ticket 	pending
+
+
+Now we need to monitor the status of the objects in ETCD and perform actions like make a call to the booking.api.com server to book, edit or cancel flighttickets. That why we need a custom controller.
+
+A controller is process running in loop who watches the state of the objects in the ETCD server.
+
+How we build a controller?
+	- install 'go' language
+	- clone the repo for sample controller - https://github.com/kubernetes/sample-controller
+		terminal --> git clone https://github.com/kubernetes/sample-controller.git
+	- edit ith our cutom code, build and run it
+		terminal --> cd sample-controller
+	- build the code
+		terminal --> go build -o simple-controller .
+	- run the code
+		terminal --> ./simple-controller -kubeconfig=$HOME/.kube/config
+
+We can package the controller in a Docker image and choose to run it inside a cluster as a pod or a deployment.
+
+
+
+
+
+======================================
+Section 7 190. 2025 Operator Framework
+======================================
+
+flightticket-custom-definition.yaml	# Custom Resource Definition (CRD) - craete modify and delete resources of this kind
+-------------------------------------------------
+apiVersion: apiextensions.k8s/io/v1
+kind: CustomResourceDefintion
+metadata:
+  name: flighttickets.flights.com
+spec:
+  scope: Namespaced				# defines if the object is namespaced or not
+  groups: flights.com				# apiVersion of the flightticket custom resource
+  names:
+    kind: FlightTicket				# kind of the flightticket.yaml file
+    singular: flightticket			# how we call the singular resource of this kind
+    plural: flighttickets			# how we call multiple resources of this kind
+    shortnames:
+      - ft					# set short synatx for this resource
+  versions:
+    - name: v1					# set name for the resource lifecycle stage (beta, alpha, v2, etc.)
+      served: true
+      storage: true
+-------------------------------------------------
+
+
+flightticket_controller.go				# controller that works with CRD entities
+--------------------------------------------------------
+package deployment
+
+var controllerKind = apps.ScheeGroupVersion.WithKind("Deplyment")
+
+// < Code hidden >
+
+// Run brgins whatching and syncing
+func (dc "DeploymentController) addReplicaSet (obj interface{})
+
+//< A lot of code hidden >
+--------------------------------------------------------
+
+
+These two objects can be packaged together as a single entity using the Operator Framework.
+
+Create a operator framework
+	terminal --> kubectl craete -f flight-operator.yaml
+	
+	# creates the custom resource definition and the resources
+	# deploys the custom controller as a deployment
+
+
+One of the most popular operators is ETCD operator. Used to deploy and manage an ETCD Cluster with in Kubernetes.
+
+Custom Resource Definition (CRD)				Custom COntroller
+---------------------------------------------------------------------------------
+EtcdCluster							ETCD Controller
+EtcdBackup							Backup Operator
+EtcdRestore							Restore Operator
+				Operator Framework
+
+Popular operators can be found on operatorhub.io
+	- install operator lifecycle manager
+	- install the operator itself
+
+
+
+
+
+
+
+
+
+
+
