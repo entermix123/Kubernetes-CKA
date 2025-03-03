@@ -1,0 +1,5702 @@
+CONTENT
+
+Section 9 210. Prerequisite - Switching Routing
+Section 9 211. Prerequisite - DNS on Linux
+Section 9 212. Prerequisite - CoreDNS
+Section 9 213. Prerequisite - Network Namespaces
+Section 9 214. FAQ
+Section 9 215. Prerequisite - Docker Networking
+Section 9 216. Prerequisite - Container Network Interface (CNI)
+Section 9 217. Cluster Networking
+Section 9 218. Important Node about CNI and CKA Exam
+Section 9 220. Practice Test - Explore Kubernetes Environment
+Section 9 221. POD Networking
+Section 9 222. CNI in Kubernetes
+Section 9 223. Note CNI in Weave
+Section 9 224. CNI Weave
+Section 9 226. Practice Test - CNI Weave
+Section 9 228. Practice Test - Deploy Network Solution
+Section 9 229. IP Address Management - Weave
+Section 9 231. Practice Test - Networking Weave
+Section 9 232. Service Networking
+Section 9 234. Pracice Test - Service Networking
+Section 9 235. DNS in Kubernetes
+Section 9 236. CoreDNS in Kubernetes
+Section 9 238. Practice Test - Explore DNS
+Section 9 239. Ingress
+Section 9 240. Article: Ingress
+Section 9 241. Ingress - Annotations and rewrite-target
+Section 9 243. Ingress - Practice Test - Ingrees-1
+Section 9 245. Ingress - Practice Test - Ingrees-2
+
+
+
+
+Networking Pre-Requisites
+-------------------------
+* Switching and Routing
+	* Switching
+	* Routing
+	* Default Gateway
+
+* DNS
+	* DNS Configuration on Linux
+	* CoreDNS Introduction
+
+* Network Namespaces
+* Docker Networking
+
+
+===============================================
+Section 9 210. Prerequisite - Switching Routing
+===============================================
+* Switching and Routing
+	* Switching
+	* Routing
+	* Default Gateway
+
+
+We are looking from Admin and Developer prospective.
+
+How networking works?
+
+We have two objects (PCs - A and B) with network interfaces eth0 (on both PCs the network interface name is the same).
+We have switch with IP 192.168.1.0. We will connect both PCs with the switch.
+
+How to find network interfaces on Linux?
+	terminal --> ip link
+
+	# result:
+	eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc
+	fq_codel state UP mode DEFAULT group default qlen 1000
+
+
+Assign the system (PCs - A and B) with their IP addresses
+	terminal --> ip addr add 192.168.1.10/24 dev eth0			# for PC A
+	terminal --> ip addr add 192.168.1.11/24 dev eth0			# for PC B
+
+
+Verify connection establishment
+	terminal --> ping 192.168.1.11
+
+	# OK result:
+	Reply from 192.168.1.11: bytes=32 time=4ms TTL=117
+	Reply from 192.168.1.11: bytes=32 time=4ms TTL=117
+	...
+
+
+We have another network configuration as the described one above:
+We have two objects (PCs - C and D) with network interfaces eth0 (on both PCs the network interface name is the same).
+We have switch with IP 192.168.2.0. PC C have IP address 192.168.2.10 and PC D have IP address 192.168.2.11
+
+We have a Router connect connected to the two switches with IPs 192.168.1.1 for the first setup and 192.168.2.1 for the second setup. Router IPs are gateways between the two networks AB and CD
+
+We configure Gateway (rout). If the network is a room then the Gateway is a door to the room to the rest of the space.
+How to list Gateways on a linux system
+	terminal --> route
+
+	# result: no gateways are configured
+	Kernel IP routing table
+	Destination Gateway Genmask Flags Metric Ref Use Iface
+
+Configure Gateway as allow access from PC B to PC C true router IP address
+	terminal --> ip doute add 192.168.2.0/24 via 192.168.1.1
+
+List gateways again
+	terminal --> route
+
+	# result:  
+	Kernel IP routing table
+	Destination Gateway Genmask Flags Metric Ref Use Iface
+	192.168.2.0 192.168.1.1 255.255.255.0 UG 0 0 0 eth0
+
+We need to configure gateway on the other network to access first network - C to B
+	terminal --> ip doute add 192.168.1.0/24 via 192.168.2.1
+
+	# result:
+	Kernel IP routing table
+	Destination Gateway Genmask Flags Metric Ref Use Iface
+	192.168.1.0 192.168.2.1 255.255.255.0 UG 0 0 0 eth0
+
+
+We connect the router to the internet with default IP address
+	terminal --> ip route default via 192.168.2.1
+	or
+	terminal --> ip route 0.0.0.0 via 192.168.2.1	
+
+We add second router for internet connection and first will stay for internal network.
+	- The first router si with IPs 192.168.1.1 and 192.168.2.2
+	- The second router for internet only with IP 192.168.2.1
+
+Configure fisrt router with updated IP for the second network 
+	terminal --> ip route add 192.168.1.0/24 via 192.168.2.2
+
+List gateways on the system
+	terminal --> route
+
+
+How to set Linux host as a router?
+----------------------------------
+
+We have 3 systems:
+	- A with network interface ath0 and IP 192.168.1.5
+		- A nad B are connected in network 192.168.1.0
+	- B with 2 network interfaces eth0 IP 192.168.1.6 and eth1 IP 192.168.2.6
+		- B and C are connected to network 192.168.2.0
+	- C with network interface eth1 and IP 192.168.2.5
+
+How to set connection between A and C system? We configure access for requests and responses.
+
+We configure gateway for A to access C for requests
+	terminal --> ip route add 192.168.2.0/24 via 192.168.1.6
+
+	# network 192.168.2.0 can be reached true eth0 192.168.1.6 on system B
+
+We configure gateway for response from C to A for responses
+	terminal --> ip route add 192.168.1.0/24 via 192.168.2.6
+
+	# network 192.168.1.0 can be reached true eth1 192.168.2.6 on system B
+
+We need to set internal communication (forewarding traffic) between network interfaces eth0 and eth1 in system B. This is forewarding is disabled by defaul for security reasons. We can see how the setting is set 
+	terminal --> cat /proc/sys/net/ipv4/ip_foreward
+
+	# result: 0			# disabled
+
+Enable forewarding option
+	terminal --> echo > 1 /proc/sys/net/ipv4/ip_foreward
+
+	# result: 1			# enabled
+
+Modify system configuration
+	terminal --> vi /etc/sysctl.conf
+	
+	# set 'net.ipv4.ip_foreward = 1'
+
+
+Used commands
+=============
+
+List and modify interfaces on the host
+	terminal --> ip link
+
+List IP addresses assignet to these interfaces
+	terminal --> ip link
+
+Set IP address on interface
+	terminal --> ip addr add 192.168.1.10/24 dev eth0
+
+To persist this configuration we need to set them in the /etc/net/interfaces file. If not they will be lost after restart.
+
+Show routing table
+	terminal --> route
+	or
+	terminal --> ip route
+
+Add entries into the routing table
+	terminal --> ip route add 192.168.1.0/24 via 192.168.2.1
+
+Check if ip forewarding is enabled on a host
+	terminal --> cat /proc/sys/net/ipv4/ip_foreward
+
+
+
+
+
+
+==========================================
+Section 9 211. Prerequisite - DNS on Linux
+==========================================
+
+* DNS
+	* DNS Configuration on Linux
+	* CoreDNS Introduction
+
+
+We have 2 systems 
+	- A with network interface eth0 IP 192.168.1.10 
+	- B with network interface eth0 IP 192.168.1.11 named 'db'
+
+They are connected to network 192.168.1.0 
+
+We must configure name in the host /etc/hosts file
+	terminal --> vi /etc/hosts
+	
+	# set '192.168.1.11	db'
+	# set '192.168.1.11	www.google.com'
+
+List host configurations
+	terminal --> cat >> /etc/hosts
+
+We can now test communication with system B (db)
+	terminal --> ping db
+
+If we check the name of the system B
+	terminal --> hostname 		# result: host-2
+
+However system A take all data in the /etc/hosts as single source of truth and works with it. It means that system A can reach system B by name 'db' or name 'www.google.com'. This translation of IP to name is called Name Resolution. This method is used in the past.
+
+Current Name Resolutions are handled by DNS server with IP 192.168.1.100
+
+We can add configuration for DNS server in file /etc/resolv.conf on every system. This way any connections are made by the Name Resolutions configured on the DNS server.
+
+List DNS configuration file
+	terminal --> cat /etc/resolv.conf
+
+	# result: 'nameserver	192.168.1.100'	
+	# DNS server is configured on this system
+
+If any changes on IP addresses must be made just change the configuration on the DNS server.
+
+If we want to set test server (IP 192.168.1.115) that only we can use, we still can configure connection form /etc/hosts file.
+	terminal --> cat >> /etc/hosts
+
+	# set '192.168.1.115 	test'
+
+If we have entry in both /etc/hosts file and DNS server, the system first looks in the /etc/hosts file and then on the DNS server.
+This order can be changed in /etc/nsswitch.conf. List this .conf file
+	terminal --> cat /etc/nsswitch.conf
+	
+	# result:
+	...
+	hosts: 	files dns		# first files (/etc/hosts) then DNS server
+	...
+
+If we wqant to access external adresses (like www.facebook.com) we need to configure public server that have access to most used internet sites on our DNS server. We have to add on our DNS server 'Forward All to 8.8.8.8'. 8.8.8.8 is well known google public server.
+
+Domain Names 
+------------
+	- .com		# commercial or general purpose domain
+	- .net		# network
+	- .edu		# education
+	- .org		# non profit organizations
+	- .io		# 
+
+Lets look over www.google.com
+	- '.' is root
+	- 'www' is subdomain. We can have different subdomains for different services like maps (maps.google.com), mail 			(mail.google.com), apps (apps.google.com) etc.
+	- 'google' is domain name assignet to google
+	- '.com' is Top Level Domain Name
+
+Lets say we want to connect to 'apps.google.com'
+	- root DNS looking at our request and foreward us to DNS serving .com
+	- .com DNS looking at our request and foreward us to google DNS
+	- google DNS looking at our request and foreward us to server with apps applications
+
+	# This process is optimized with cached resut from few seconds to few minutes.
+
+Lets see example structure of our company DNS structure - mycompany.com. We have multiple subdomains for each purpose.
+	- www		- for external facing website
+	- mail		- company oraginzation mail system
+	- drive		- accessing storage
+	- pay 		- payroll application
+	- hr 		- for accessing HR application etc.
+
+All of these subdomain names are configured in our organizations internal DNS server
+
+We have DNS server with these entries
+-----------------------------------------
+192.168.1.10 web.mycompany.com
+192.168.1.11 db.mycompany.com
+192.168.1.12 nfs.mycompany.com
+192.168.1.13 web-1.mycompany.com
+192.168.1.14 sql.mycompany.com
+-----------------------------------------
+
+If we want to access web.mycompany.com from outside our network we use web.mycompany.com
+
+If we want to use short name - 'web' instead of web.mycompany.com, we need to configure it in /etc/resolv.conf
+	terminal --> cat >> /etc/resolv.conf
+
+	# result:
+	nameserver	192.168.1.100			# this is our DNS server
+	search		mycompany.com prod.mycompany	# names included in the internal network search
+
+	# by searching 'web' we will receive results of web.mycompany.com and web.prod.mycompany.com
+
+ Now we can use web to access web.mycompany.com
+	terminal --> ping web
+
+Record Types
+------------
+How records are stored on our DNS server
+------------------------------------------------------------------------
+A	web-server 	192.168.1.1
+AAAA	web		server 2001:0db8:85a3:0000:0000:8a2e:0370:7334
+CNAME	food.web	server eat.web-server, hungry.web-server
+------------------------------------------------------------------------
+A record 		- stores IPs to hostname
+AAAA record		- stores IPv6 to hostname
+CNAME			- mapping one name to another name. In case we have multiple aliases for the same application
+
+
+nslookup tool
+-------------
+We can use nslookup to query a hostname from a DNS server. nslookup DO NOT consider etries in the local /etc/hosts file! nslookup tool looks only in the DNS server entries.
+	terminal --> nslookup www.google.com
+
+dig tool
+--------
+We can use dig tool to test DNS name resolution. We receive more details for the target
+	terminal --> dig www.google.com
+
+
+
+
+
+=====================================
+Section 9 212. Prerequisite - CoreDNS
+=====================================
+
+In the previous lecture we saw why you need a DNS server and how it can help manage name resolution in large environments with many hostnames and Ips and how you can configure your hosts to point to a DNS server. In this article we will see how to configure a host as a DNS server.
+
+We are given a server dedicated as the DNS server, and a set of Ips to configure as entries in the server. There are many DNS server solutions out there, in this lecture we will focus on a particular one – CoreDNS.
+
+So how do you get core dns? CoreDNS binaries can be downloaded from their Github releases page or as a docker image. Let’s go the traditional route. Download the binary using curl or wget. And extract it. You get the coredns executable.
+
+Download CoreDNS executable
+	terminal --> wget https://github.com/coredns/coredns/releases/download/v1.4.0/coredns_1.4.0_linux_amd64.tgz
+
+Extract .exe file
+	terminal --> tar –xzvf coredns_1.4.0_linux_amd64.tgz
+
+Install CoreDNS (run executable)
+	terminal --> ./coredns
+
+Run the executable to start a DNS server. It by default listens on port 53, which is the default port for a DNS server.
+
+Now we haven’t specified the IP to hostname mappings. For that you need to provide some configurations. There are multiple ways to do that. We will look at one. First we put all of the entries into the DNS servers /etc/hosts file.
+
+And then we configure CoreDNS to use that file. CoreDNS loads it’s configuration from a file named Corefile. Here is a simple configuration that instructs CoreDNS to fetch the IP to hostname mappings from the file /etc/hosts. When the DNS server is run, it now picks the Ips and names from the /etc/hosts file on the server.
+
+Save entries in the /etc/hosts file
+-----------------------------------
+	terminal --> cat > /etc/hosts
+192.168.1.10 web
+192.168.1.11 db
+192.168.1.12 nfs
+192.168.1.20 web
+192.168.1.21 db-1
+192.168.1.22 nfs-1
+192.168.1.30 web-1
+192.168.1.31 db-2
+192.168.1.32 nfs-2
+192.168.1.40 web-2
+192.168.1.41 sql
+192.168.1.42 web-5
+192.168.1.50 web-test
+192.168.1.61 db-prod
+192.168.1.52 nfs-4
+192.168.1.60 web-3
+192.168.1.61 db-test
+192.168.1.62 nfs-prod
+
+
+Save settings on Corefile
+-------------------------
+	terminal --> cat > Corefile
+. {
+hosts /etc/hosts
+}
+
+Start CoreDNS service
+---------------------
+	terminal --> ./coredns
+
+
+CoreDNS also supports other ways of configuring DNS entries through plugins. We will look at the plugin that it uses for Kubernetes in a later section.
+
+Read more about CoreDNS here:
+	- https://github.com/kubernetes/dns/blob/master/docs/specification.md	
+	- https://coredns.io/plugins/kubernetes/
+
+
+
+================================================
+Section 9 213. Prerequisite - Network Namespaces
+================================================
+
+Lets say that our host is our house, hte namespaces are the rooms in the house.
+
+When we create a container, he is isolated from all other processes and interfaces outside the container namespace.
+
+How to list processes in the container
+	terminal --> ps aux
+
+	# the processes in the container are listed only
+
+If we list processes as a Root User on the host, we will see many more processes including the processes in the container but with different ID.
+
+
+When the container is created, his virtual network interface (veth0), Routing Table and ARP table (Address Resolution Protocol table) are also created. The container cannot see any other network infrastructure on the host except his own or other specially configured.
+
+
+How to create namespace on a Linux host? We create 2 namespaces:
+	terminal --> ip netns add red
+	terminal --> ip netns add blue
+
+	# ip			- common network command
+	# netns			- namespace object
+	# add			- action used
+	# red, blue		- name of the object
+
+List namespaces on Linux host
+	terminal --> ip netns
+
+List network interfaces on our host
+	terminal --> ip link
+
+List network interfaces on one of the created namespaces
+	terminal --> ip netns exec red ip link
+
+	# ip			- common network command
+	# netns			- namespace object
+	# exec			- execute command
+	# red			- target namespace
+	# ip link		- executed command
+
+	OR
+
+	terminal --> ip -n red link
+
+	# ip			- common network command
+	# -n red		- namespace target
+	# link			- executed command
+
+
+ARP Tables
+----------
+How to print ARP table on the host
+	terminal --> arp
+
+How to print ARP table in one of the namespaces - This will list only eddresses in the namespace 'red' and not on the host.
+	terminal --> ip netns exec red arp
+
+
+Routing Tables
+--------------
+How to print Routing table on the host - this will print all routes on the host includeing all namespaces
+	terminal --> route
+
+How to print Routing table on one of the created namespaces - this will print only routs only on the 'red' namespace
+	terminal --> ip netns exec red rooute
+
+
+How to connect red and blue namespaces on our host?
+We need to configure the virtual netwrok interfaces of the two namespaces (red and blue). 
+	terminal --> ip link add veth-red type veth peer name veth-blue
+
+	# ip link				- network config command
+	# add					- used action
+	# veth-red				- first namespace
+	# type veth				- type net interface
+	# peer					- connect to
+	# name veth-blue			- second namespace
+
+We need to connect the attach the network interfaces to each namespace
+	terminal --> ip link set veth-red netns red
+	terminal --> ip link set veth-blue netns blue
+
+	# ip link			- network config command
+	# set				- used action
+	# veth-red netns red		- attach veth-red to red namespace
+	# veth-blue netns blue		- attach veth-blue to blue namespace
+
+We need to assign IP addresses to each namespace
+	terminal --> ip -n red addr add 192.168.15.1 dev veth-red
+	terminal --> ip -n blue addr add 192.168.15.2 dev veth-blue
+
+	# ip link			- network config command
+	# -n red			- red namespace
+	# addr add 192.168.15.1 dev	- set red namespace IP address
+	# veth-red			- red namespace virtual network interface
+
+
+Enable virtual network interfaces on each namespace
+	terminal --> ip -n red link set veth-red up
+	terminal --> ip -n blue link set veth-blue up
+
+	# ip 				- network config command
+	# -n red			- red namespace
+	# link set			- modify virtual network interface
+	# veth-blue 			- name of the virtual interface
+	# up				- enable command
+
+Verify the connection from red namespace to blue
+	terminal --> ip netns exec red ping 192.168.15.2
+
+	# ip netns			- network execution command
+	# exec red			- execute command from red namespace
+	# ping 192.168.15.2		- ping IP address of the blue namespace
+
+
+We can print ARP tables on each namespace and they will show information about the connection we created
+	terminal --> ip netns exec red arp
+	terminal --> ip netns exec blue arp
+
+If we print the ARP table on the host, it will NOT show the craeted connection between the two namespaces.
+	terminal --> arp
+
+If we have more namespaces and wee need to connect them, we need to configure virtual witch on the host. This is possible wth external tools like 'LINUX BRIDGE', 'Open vSwitch' and more. We will use 'LINUX BRIDGE' for this example.
+
+
+Create a virtual switch
+-----------------------
+
+Create a virtual network interface for the switch on the host named v-net-0
+	terminal --> ip link add v-net-0 type bridge
+
+Enable the created virtual network interface of the switch
+	terminal --> ip link set dev v-net-0 up
+
+
+
+Configure network between namespaces and virtual switch
+-------------------------------------------------------
+
+Now we need to connect the virtual network interfaces of the red and blue namespaces to this newly created v-net-0 interface. For this purpos we will delete the connection between veth-red and veth-blue interfaces and create new connections from each to the v-net-0 interface.
+
+Delete the connection between veth-red and veth-blue. 
+	terminal --> ip -n red veth-red
+
+	# When we delete one end of the connection, the second end is deleted automatically.
+
+
+Create a connection between red namespace and the interface of the switch network interface v-net-0
+	terminal --> ip link add veth-red type veth peer name veth-red-br
+
+	# ip link				- common network configuration command
+	# add					- action
+	# veth-red				- specify first interface
+	# type veth				- specify type of the interface
+	# peer 					- specify connection
+	# name veth-red-br			- name the target interface. br - bridge
+
+
+Create a connection between blue namespace and the interface of the switch network interface v-net-0
+	terminal --> ip link add veth-blue type veth peer name veth-blue-br
+
+	# ip link				- common network configuration command
+	# add					- action
+	# veth-blue				- specify first interface
+	# type veth				- specify type of the interface
+	# peer 					- specify connection
+	# name veth-blue-br			- name the target interface. br - bridge
+
+
+Configure connection between red namespace nad the switch
+---------------------------------------------------------
+Attach veth-red to red namespace
+	terminal --> ip link set veth-red netns red
+
+Attach veth-red-br interface to the switch
+	terminal --> ip link set veth-red-br master v-net-0
+
+
+Configure connection between blue namespace nad the switch
+---------------------------------------------------------
+Attach veth-blue to blue namespace
+	terminal --> ip link set veth-blue netns blue
+
+Attach veth-blue-br interface to the switch
+	terminal --> ip link set veth-blue-br master v-net-0
+
+
+Set IP addresses for this links and enable them
+------------------------------------------------
+Set IP address for red namespace
+	terminal --> ip -n red addr add 192.168.15.1 dev veth-red
+
+Set IP address for blue namespace
+	terminal --> ip -n blue addr add 192.168.15.2 dev veth-blue
+
+Enable virtual network interface of the red namespace
+	terminal --> ip -n red link set veth-red up
+
+Enable virtual network interface of the blue namespace
+	terminal --> ip -n red link set veth-blue up
+
+
+
+Configure connection between host nad namespace network
+-------------------------------------------------------
+Lets say we created and connected two more namespaces to this virtual swith. Four in total:
+	- red namespace with IP 192.168.15.1
+	- blue namespace with IP 192.168.15.2
+	- orange namespace with IP 192.168.15.3
+	- purple namespace with IP 192.168.15.4
+
+
+We need to configure connection between our namespace network 192.168.15.0 with the host. For this we need to assing PI address to the switch.
+
+Assign IP address to the switch.
+	terminal --> ip addr add 192.168.15.5/24 dev v-net-0
+
+Now we can test the connection between red namespace and our host
+	host terminal --> ping 192.168.15.1
+
+This network 192.168.15.0 is still private. No one from outside can access it ot anyone from inside cannot connect to external netwrok. The only port to the outside world is ethernet network interface on the host (eth0 with IP 192.168.1.2).
+
+We have another network host with IP 192.168.1.3.
+
+We can test communication with external netwrok from our blue namespace
+	terminal --> ip netns exec blue ping 192.168.1.3
+
+	# Connect: Network is unreachable
+
+We can print the routing table on the blue namespace. We can see that there is no information about outside network
+	terminal --> ip netns exec blue route
+
+	# result:
+	Destination Gateway Genmask Flags Metric Ref Use Iface
+	192.168.15.0 0.0.0.0 255.255.255.0 U 0 0 0 veth-blue
+
+
+We need to configure gateway to establish connection between namespace and external networks. This gateway is our first host with IP 192.168.1.2. We need to configure connection between one namespace (blue for the example) and the external network. We need to configure our switch IP to access the external network outside our host.
+
+Set gateway from blue namespace to outside network
+	terminal --> ip netns exec blue ip route add 192.168.1.0/24 via 192.168.15.5
+
+Configure our host with 'nat' functionality enabled to act like a gateway so the namespaces can receive response from the external network
+	terminal --> iptables -t nat -A POSTROUTING -s 192.168.15.0/24 -j MASQUERADE
+
+	# this functionality masquerade all packages from our private netwrk 192.168.15.0 with the headers of our host.
+
+Now we can test the communication between our blue namespace and outside network 192.168.1.3 (the second host)
+	terminal --> ip netns exec blue ping 192.168.1.3
+
+
+Configure connection between our namespaces to internet
+-------------------------------------------------------
+We want to establish connection with internet, but we are not able. We can print the routing table of the blue namespace and llok over the etries
+	terminal --> pi netns exec blue route
+
+	# result - we can see that there is no configuration for external servers (like 8.8.8.8)
+	Destination Gateway Genmask Flags Metric Ref Use Iface
+	192.168.15.0 0.0.0.0 255.255.255.0 U 0 0 0 veth-blue
+	192.168.1.0 192.168.15.5 255.255.255.0 UG 0 0 0 veth-blue
+
+We need to set our host as a default gateway to connect with internet
+	terminal --> ip netns exec blue ip route add default via 192.168.15.5
+
+	# result:
+	Destination Gateway Genmask Flags Metric Ref Use Iface
+	192.168.15.0 0.0.0.0 255.255.255.0 U 0 0 0 veth-blue
+	192.168.1.0 192.168.15.5 255.255.255.0 UG 0 0 0 veth-blue
+	Default 192.168.15.5 255.255.255.0 UG 0 0 0 veth-blue		# this is the default gateway role of our host
+
+We can now ping internet server from our blue namespace
+	terminal --> ipv-nneett-n0s exec blue ping 8.8.8.8
+
+	# result - the connection is established
+	64 bytes from 8.8.8.8: icmp_seq=1 ttl=63 time=0.587 ms
+	64 bytes from 8.8.8.8: icmp_seq=2 ttl=63 time=0.466 ms
+
+
+Set access from outside networks to our namespaces
+--------------------------------------------------
+
+We can set foreward option in our host to allow traffic to our blue namespace
+	terminal --> iptables -t nat -A PREROUTING --dport 80 --to-destination 192.168.15.2:80 -j DNAT
+
+
+
+
+==================
+Section 9 214. FAQ
+==================
+
+Troubleshooting for namespaces connuctivity
+
+While testing the Network Namespaces, if you come across issues where you can't ping one namespace from the other, make sure you set the NETMASK while setting IP Address. ie: 192.168.1.10/24
+
+terminal --> ip -n red addr add 192.168.1.10/24 dev veth-red
+
+Another thing to check is FirewallD/IP Table rules. Either add rules to IP Tables to allow traffic from one namespace to another. Or disable IP Tables all together (Only in a learning environment).
+
+
+
+
+
+===============================================
+Section 9 215. Prerequisite - Docker Networking
+===============================================
+
+We have simple Docker host - PC with Docker installed. The network interface of the host is eth0 with IP 192.168.1.10
+
+'none' docker network
+---------------------
+We start a container with nginx image in the 'none' network
+	terminal --> docker run --network none nginx
+
+	# docker				- common docker command
+	# run 					- start container
+	# --network non				- set the container in 'none' network
+	# nginx					- used image
+
+The container is not connected to any network. The 'none' network is the default network configuration when a contaner is started without pecified network.
+
+
+'host' docker network
+---------------------
+When we start container on the host network, the container is aotomatically configured to comunicate with other aoutside networks.
+
+Start container connected to host network
+	terminal --> docker run --network host nginx
+
+	# docker			- common docker command	
+	# run				- start container
+	# --network host		- connect to network 'host'
+	# nginx				- image used
+	
+	# the default port of the nginx is por 80
+	# This container have address htt:/102.168.1.10:80
+
+If we try to start the same container with the same external port, the container will not start.
+
+
+'bridge' docker network
+-----------------------
+This is the default Docker internal network with IP 172.17.0.0
+
+We start more than one container with nginx image in the 'bridge' network
+	terminal --> docker run nginx		# IP 172.17.0.2
+	terminal --> docker run nginx		# IP 172.17.0.3
+	
+
+How Docker creates and use the 'bridge' network?
+------------------------------------------------
+
+List docker networks
+	terminal --> docker netwrok ls
+
+	# result:
+	NETWORK ID   NAME   DRIVER SCOPE
+	2b60087261b2 bridge bridge local		# this is the bridge network
+	0beb4870b093 host   host   local
+	99035e02694f none   null   local
+
+Show docker network interface - docker0
+	terminal --> ip link
+
+	# result:
+	3: docker0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc
+	noqueue state DOWN mode DEFAULT group default
+	link/ether 02:42:88:56:50:83 brd ff:ff:ff:ff:ff:ff
+
+	# when container is created this command is executed:
+	# terminal --> ip link add docker0 type bridge
+
+Show bridge network interface IP address: 172.17.0.1/24
+	terminal --> ip addr
+
+	# result:
+	3: docker0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc
+	noqueue state DOWN group default
+	link/ether 02:42:88:56:50:83 brd ff:ff:ff:ff:ff:ff
+	inet 172.17.0.1/24 brd 172.17.0.255 scope global docker0
+	valid_lft forever preferred_lft forever
+
+	# docker0 interface is automatically set as a switch
+
+When a container is created namespace also is created by Docker.
+
+List namespaces in Docker (requires minor additional step)
+	terminal --> ip netns
+
+	# result: b3165c10a92b
+
+
+We can see bot network interfaces:
+
+List host interfaces
+	terminal --> ip link
+
+	# result:
+	...
+	4: docker0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP mode DEFAULT
+	group default
+	link/ether 02:42:9b:5f:d6:21 brd ff:ff:ff:ff:ff:ff
+	8: vethbb1c343@if7: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master docker0 	# contaniner interface
+	state UP mode DEFAULT group default
+	link/ether 9e:71:37:83:9f:50 brd ff:ff:ff:ff:ff:ff link-netnsid 1
+
+List container interfaces
+	terminal --> ip -n <contanier_namespace> link
+
+	# result:
+	7: eth0@if8: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP mode DEFAULT	# container interface
+	group default
+	link/ether 02:42:ac:11:00:03 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+
+Show container interface IP
+	terminal --> ip -n <contanier_namespace> addr
+
+	# result:
+	7: eth0@if8: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue
+	state UP group default
+	link/ether 02:42:ac:11:00:03 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+	inet 172.17.0.3/16 brd 172.17.255.255 scope global eth0			# this is the IP 172.17.0.3/16 
+	valid_lft forever preferred_lft forever
+
+
+The process is repeated every time container is created:
+	1. Craete namespace
+	2. Create pair of interfaces
+	3. attach one and to the container and the other end to the bridge network
+
+Interfaces can be connected true end of their numbers. The numbers are one after another for example - bridge network interface eth0@if11 and container interface eth0@if12.
+
+
+How to check mappings of the network components?
+------------------------------------------------
+
+The container we stated is nginx. Nginx is web server with default port 80. 
+We can access nginx from the host:
+	terminal --> curl http://172/17/0/3:80
+
+If we try to access the nginx container outside the host, we won't be able to do so.
+
+Fo rexternal access to container in private network, Docker provide port publishing (port mapping) option.
+Start container with specified ports
+	terminal --> docker run -p 8080:80 nginx
+
+	# docker			- common docker command	
+	# run				- start container
+	# -p 8080:80			- internal container port (8080) to external container port (80)
+	# nginx				- image used
+
+
+Now we can access the container from outside the host
+	teerminal --> curl http://192.168.1.10:8080
+
+How docker foreward traffic from one port to another? 
+Docker create an etry into the NAT table to append the rule to the prerouting chain.
+This is teh command that docker use to foreward traffic from one port to another:
+	terminal --> iptables -t nat -A DOCKER -j DNAT --dport 8080 --to-destination 127.17.0.3:80
+
+List the rules in IP table
+	terminal --> iptables -nvL -t nat
+
+	# result:
+	Chain DOCKER (2 references)
+	target prot opt source destination
+	RETURN all -- anywhere anywhere
+	DNAT tcp -- anywhere anywhere tcp dpt:8080 to:172.17.0.2:80
+
+
+
+
+
+===============================================================
+Section 9 216. Prerequisite - Container Network Interface (CNI)
+===============================================================
+
+Process of creating network namespaces
+
+Linux network namespaces			Docker
+-------------------------------------------------------------------------------------------
+1. Create Network Namespace		 	1. Create Network Namespace
+2. Create Bridge Network/Interface		2. Create Bridge Network/Interface
+3. Create VETH Pairs (Pipe, Virtual Cable)	3. Create VETH Pairs (Pipe, Virtual Cable)
+4. Attach vEth to Namespace			4. Attach vEth to Namespace			
+5. Attach Other vEth to Bridge			5. Attach Other vEth to Bridge
+6. Assign IP Addresses				6. Assign IP Addresses
+7. Bring the interfaces up			7. Bring the interfaces up
+8. Enable NAT IP Masquerade			8. Enable NAT IP Masquerade
+
+
+
+RKT						Mesos						Kubernetes
+--------------------------------------------------------------------------------------------------------------------------------
+1. Create Network Namespace		       	1. Create Network Namespace			1. Create Network Namespace
+2. Create Bridge Network/Interface		2. Create Bridge Network/Interface		2. Create Bridge Network/Interface
+3. Create VETH Pairs (Pipe, Virtual Cable)	3. Create VETH Pairs (Pipe, Virtual Cable)	3. Create VETH Pairs (Pipe, Cable)
+4. Attach vEth to Namespace			4. Attach vEth to Namespace			4. Attach vEth to Namespace
+5. Attach Other vEth to Bridge			5. Attach Other vEth to Bridge			5. Attach Other vEth to Bridge
+6. Assign IP Addresses				6. Assign IP Addresses				6. Assign IP Addresses
+7. Bring the interfaces up			7. Bring the interfaces up			7. Bring the interfaces up
+8. Enable NAT IP Masquerade			8. Enable NAT IP Masquerade			8. Enable NAT IP Masquerade
+
+
+Process of container management providers is the same but with different terminology.
+
+
+Steps from 2 to 8 are all the same, so there common program (script) that combines them into separate solution for all providers. The solution is with the name 'BRIDGE'. 
+
+bridge
+------------------------------------------
+2. Create Bridge Network/Interface
+3. Create VETH Pairs (Pipe, Virtual Cable)
+4. Attach vEth to Namespace
+5. Attach Other vEth to Bridge
+6. Assign IP Addresses
+7. Bring the interfaces up
+8. Enable NAT IP Masquerade
+------------------------------------------
+
+In Linux We can execute 'bridge' program and add container to specific namespace
+	terminal --> bridge add 2e34dcf34 /var/run/netns/2e34dcf34
+
+	# bridge				- execute the script for steps from 2 to 8 from the process
+	# add					- action
+	# 2e34dcf34				- container id
+	# /var/run/netns/2e34dcf34		- namespace
+
+When rkt or kubernetes create a container they call the 'bridge' program and pass the container_id and namespace to get network configured for that container.
+
+What if we want to create our own bridge program for different type of network? What standarts should we use?
+
+
+Container Networking Interface CNI
+----------------------------------
+
+The 'bridge' program is a plugin that work with CNI. 
+
+CNI defines how plugin must be developed and how container runtimes should invoke them.
+CNI defines a set of responsibilities for container runtimes and plugins.
+
+Responsibilities for container runtimes
+	 Container Runtime must create network namespace
+	 Identify network the container must attach to
+	 Container Runtime to invoke Network Plugin (bridge) when container is ADDed
+	 Container Runtime to invoke Network Plugin (bridge) when container is DELeted
+	 JSON format of the Network Configuration
+
+Responsibilities for plugins
+	 Must support command line arguments ADD/DEL/CHECK
+ 	 Must support parameters container id, network ns etc..
+	 Must manage IP Address assignment to PODs
+	 Must Return results in a specific format
+
+
+CNI comes with created plugins like
+	- BRIDGE
+	- VLAN
+	- IPVLAN
+	- MACVLAN
+	- WINDOWS
+
+External plugin providers are
+	- weaveworks, flannel, cilium, vmware nsx and more. Except Docker!
+
+
+Docker has his own set of standards known as CNM - Container Network Model similar to CNI but with some differrences.
+This does not mean we can't use CNI with docker. For example we can start container in 'none' network and then manually invoke bridge plugin. 
+	terminal --> docker run --network=none nginx
+	terminal --> bridge add 2e34dcf34 /var/run/netns/2e34dcf34
+
+This is also how kubernetes does it. Create container and the invoke the configured plugin that take care for the rest of the network configuration.
+
+
+
+
+=================================
+Section 9 217. Cluster Networking
+=================================
+
+We will go over cluster with one master and two workers (3 nodes in total). 
+
+Each node must have at least one interface connected to a network. Each interface must have IP configured.
+
+Network configuration for ezch node:
+
+Master
+------
+Master Node with name 'master-01', interface eth0 IP 192.168.1.10 and mac address 02:42:75:80:18:4a
+Ports used by the master:
+	- kube-apiserver 		port 6443
+	- kubelet			port 10250
+	- kube-scheduler		port 10259
+	- kube-controller-manager	port 10257
+	- ETCD server			port 2379
+	- ETCD clients			port 2380
+	- API client
+	- kubectl
+
+
+Workers
+-------
+Worker 1 with name 'worker-01', interface eth0 IP 192.168.1.11 and mac address 02:42:ac:11:00:11
+Worker 2 with name 'wprker-02', interface eth0 IP 192.168.1.12 and mac address 02:42:ac:11:00:1c
+	- kubelet			port 10250
+	- services			ports 30000-32767
+
+
+Network	- IP 192.168.1.0
+-------
+
+Documentation for network ports when creating a cluster
+	- https://v1-31.docs.kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#check-required-ports
+
+Most used commands for networking
+	terminal --> ip link						- show interfaces
+	terminal --> ip addr						- show interface's links
+	terminal --> ip addr add 192.168.1.10/24 dev eth0		- attach IP dto specific IP
+	terminal --> ip route						- show routes
+	terminal --> ip route add 192.168.1.0/24 via 192.168.2.1	- foreward traffic to IP address
+	terminal --> cat /proc/sys/net/ipv4/ip_forward			- check in forward option is enabled
+	terminal --> arp						- show arp table
+	terminal --> netstat -plnt					- show listening network ports
+	terminal --> route						- list routes
+
+
+
+====================================================
+Section 9 218. Important Node about CNI and CKA Exam
+====================================================
+
+An important tip about deploying Network Addons in a Kubernetes cluster.
+
+In the upcoming labs, we will work with Network Addons. This includes installing a network plugin in the cluster. While we have used weave-net as an example, please bear in mind that you can use any of the plugins which are described here:
+
+- https://kubernetes.io/docs/concepts/cluster-administration/addons/
+- https://kubernetes.io/docs/concepts/cluster-administration/networking/#how-to-implement-the-kubernetes-networking-model
+
+In the CKA exam, for a question that requires you to deploy a network addon, unless specifically directed, you may use any of the solutions described in the link above.
+
+However, the documentation currently does not contain a direct reference to the exact command to be used to deploy a third-party network addon.
+
+The links above redirect to third-party/vendor sites or GitHub repositories, which cannot be used in the exam. This has been intentionally done to keep the content in the Kubernetes documentation vendor-neutral.
+
+NOTE: In the official exam, all essential CNI deployment details will be provided.
+
+
+=============================================================
+Section 9 220. Practice Test - Explore Kubernetes Environment
+=============================================================
+
+1. How many nodes are part of this cluster?
+-------------------------------------------
+
+List nodes
+	terminal --> k get nodes
+
+	# result:
+	NAME           STATUS   ROLES           AGE     VERSION
+	controlplane   Ready    control-plane   3m15s   v1.31.0
+	node01         Ready    <none>          2m38s   v1.31.0
+	
+- choose '2' as answer
+
+
+
+
+2. What is the Internal IP address of the controlplane node in this cluster?
+----------------------------------------------------------------------------
+
+List nodes with additionla details
+	terminal --> k get nodes -o wide
+
+# result:
+NAME           STATUS   ROLES           AGE     VERSION   INTERNAL-IP
+controlplane   Ready    control-plane   4m26s   v1.31.0   192.168.183.203	# the IP we are searching for
+
+- choose '192.168.183.203' as answer
+
+
+
+
+3. What is the network interface configured for cluster connectivity on the controlplane node?
+----------------------------------------------------------------------------------------------
+node-to-node communication
+
+Find the internal IP of the controlplane node
+	terminal --> k get nodes -o wide			# result: 192.168.183.203
+
+List interfaces with this IP
+	terminal --> ip addr | grep 192.168.183.203
+	OR
+	terminal --> ip addr 				# look manually of IPs in the result info
+
+	# result:     inet 192.168.183.203/32 scope global eth0
+
+- choose 'eth0' as answer
+
+
+
+
+4. What is the MAC address of the interface on the controlplane node?
+---------------------------------------------------------------------
+
+List details for eth0 interface
+	terminal --> ip addr show eth0		# search for eth0
+
+# result:
+3: eth0@if54330: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1410 qdisc noqueue state UP group default 
+    link/ether 22:7b:4a:00:24:59 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 192.168.183.203/32 scope global eth0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::207b:4aff:fe00:2459/64 scope link 
+       valid_lft forever preferred_lft forever
+
+
+- choose '22:7b:4a:00:24:59' as answer
+
+
+
+
+5. What is the IP address assigned to node01?
+---------------------------------------------
+
+List nodes with detailed information
+	terminal --> k get nodes -o wide
+
+# result:
+NAME           STATUS   ROLES           AGE   VERSION   INTERNAL-IP 
+node01         Ready    <none>          16m   v1.31.0   192.168.212.181		# this is the IP we are searching for
+
+- choose '192.168.212.181' as answer
+
+
+
+
+6. What is the MAC address assigned to node01?
+----------------------------------------------
+
+Find the assigned IP address to node01
+	terminal --> k get nodes -o wide		# result: 192.168.212.181
+
+Connect to node01
+	terminal --> ssh node01
+
+Find the interface with that IP
+	terminal --> ip addr | grep 192.168.212.181
+
+	# result:     inet 192.168.212.181/32 scope global eth0
+
+Show details for eth0 interface
+	terminal -> ip addr show eth0
+
+	# result: link/ether 06:8e:e6:6d:bc:5a
+
+- choose '06:8e:e6:6d:bc:5a' as answer
+
+
+
+
+7. We use Containerd as our container runtime. What is the interface/bridge created by Containerd on the controlplane node?
+---------------------------------------------------------------------------------------------------------------------------
+
+Exit of node01
+	terminal --> exit
+
+Show all interfaces type bridge
+	terminal --> ip addr show type bridge
+
+# result:
+5: cni0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1360 qdisc noqueue state UP group default qlen 1000
+    link/ether 52:38:20:fa:fa:76 brd ff:ff:ff:ff:ff:ff
+    inet 172.17.0.1/24 brd 172.17.0.255 scope global cni0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::5038:20ff:fefa:fa76/64 scope link 
+       valid_lft forever preferred_lft forever
+
+- choose 'cni0' as asnwer
+
+
+
+
+8. What is the state of the interface cni0?
+-------------------------------------------
+
+Show all interfaces type bridge
+	terminal --> ip addr show type bridge
+
+# result:
+5: cni0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1360 qdisc noqueue state UP group default qlen 1000	# we have statet UP
+    link/ether 52:38:20:fa:fa:76 brd ff:ff:ff:ff:ff:ff
+    inet 172.17.0.1/24 brd 172.17.0.255 scope global cni0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::5038:20ff:fefa:fa76/64 scope link 
+       valid_lft forever preferred_lft forever
+
+- choose 'UP' as answer
+
+
+
+9. If you were to ping google from the controlplane node, which route does it take?
+-----------------------------------------------------------------------------------
+What is the IP address of the Default Gateway?
+
+List all routes on this host
+	terminal --> ip route
+
+	# result: default via 169.254.1.1 dev eth0 		# we see default gateway
+
+- choose '169.254.1.1' as answer
+
+
+
+10. What is the port the kube-scheduler is listening on in the controlplane node?
+---------------------------------------------------------------------------------
+
+Show netstat help commands
+	termina l--> netstat --help
+
+# result:
+usage: netstat [-vWeenNcCF] [<Af>] -r         netstat {-V|--version|-h|--help}
+       netstat [-vWnNcaeol] [<Socket> ...]
+       netstat { [-vWeenNac] -i | [-cnNe] -M | -s [-6tuw] }
+
+        -r, --route              display routing table
+        -i, --interfaces         display interface table
+        -g, --groups             display multicast group memberships
+        -s, --statistics         display networking statistics (like SNMP)
+        -M, --masquerade         display masqueraded connections
+
+        -v, --verbose            be verbose
+        -W, --wide               don't truncate IP addresses
+        -n, --numeric            don't resolve names
+        --numeric-hosts          don't resolve host names
+        --numeric-ports          don't resolve port names
+        --numeric-users          don't resolve user names
+        -N, --symbolic           resolve hardware names
+        -e, --extend             display other/more information
+        -p, --programs           display PID/Program name for sockets
+        -o, --timers             display timers
+        -c, --continuous         continuous listing
+
+        -l, --listening          display listening server sockets
+        -a, --all                display all sockets (default: connected)
+        -F, --fib                display Forwarding Information Base (default)
+        -C, --cache              display routing cache instead of FIB
+        -Z, --context            display SELinux security context for sockets
+
+  <Socket>={-t|--tcp} {-u|--udp} {-U|--udplite} {-S|--sctp} {-w|--raw}
+           {-x|--unix} --ax25 --ipx --netrom
+  <AF>=Use '-6|-4' or '-A <af>' or '--<af>'; default: inet
+  List of possible address families (which support routing):
+    inet (DARPA Internet) inet6 (IPv6) ax25 (AMPR AX.25) 
+    netrom (AMPR NET/ROM) ipx (Novell IPX) ddp (Appletalk DDP) 
+    x25 (CCITT X.25) 
+
+Show listening port for kube-scheduler
+	terminal --> netstat -npl | grep -i scheduler
+
+	# netstat			- show ports
+	# -npl				- --numeric (don't resolve names), --programs (display PID/Program name for sockets), 											--listening (isplay listening server sockets)
+	# | grep -i scheduler		- show about scheduler object
+
+	# result: tcp        0      0 127.0.0.1:10259         0.0.0.0:*               LISTEN      4224/kube-scheduler 
+
+- choose '10259' as answer
+
+
+
+11. Notice that ETCD is listening on two ports. Which of these have more client connections established?
+--------------------------------------------------------------------------------------------------------
+
+Show listening port for kube-scheduler
+	terminal --> netstat -npl | grep -i etcd
+
+	# netstat			- show ports
+	# -npl				- --numeric (don't resolve names), --programs (display PID/Program name for sockets), 											--listening (isplay listening server sockets)
+	# | grep -i etcd		- show about etcd object
+
+
+# result:
+tcp        0      0 192.168.183.203:2379    0.0.0.0:*               LISTEN      3448/etcd           
+tcp        0      0 192.168.183.203:2380    0.0.0.0:*               LISTEN      3448/etcd           
+tcp        0      0 127.0.0.1:2381          0.0.0.0:*               LISTEN      3448/etcd           
+tcp        0      0 127.0.0.1:2379          0.0.0.0:*               LISTEN      3448/etcd 
+
+Show count for etcd established connections.
+
+Show count connections for port 2379
+	terminal --> netstat -npa | grep -i etcd | grep -i 2379 | wc -l		# result: 61
+
+Show count connections for port 2381
+	terminal --> netstat -npa | grep -i etcd | grep -i 2381 | wc -l		# result: 1
+
+
+- choose '2379' as answer
+
+
+
+12. Correct! That's because 2379 is the port of ETCD to which all control plane components connect to. 2380 is only for etcd peer-to-peer connectivity. When you have multiple controlplane nodes. In this case we don't.
+---------------------------------------------------------------------------------------
+
+- click 'Ok' as answer
+
+
+
+
+
+=============================
+Section 9 221. POD Networking
+=============================
+
+PODs must be connected with a network. Kubernetes DO NOT solve this issue automatically and expect us to install external solution to cover POD's network configuration whan created. Kuberentes have clear requirements for these solutions:
+
+Kubernetes Requirements for Networking Model:
+	 Every POD should have an IP Address
+	 Every POD should be able to communicate with every other POD in the same node.
+	 Every POD should be able to communicate with every other POD on other nodes without NAT.
+
+For example we have 3 Node and LAN network
+	- NODE1 		- IP 192.168.1.11
+	- NODE2			- IP 192.168.1.12
+	- NODE3			- IP 192.168.1.13
+	- LAN			- IP 192.168.1.0
+
+
+To configure network we need to follow the process or intall a solution that does it for us.
+	1. Create Network Namespace
+	2. Create Bridge Network/Interface
+	3. Create VETH Pairs (Pipe, Virtual Cable)
+	4. Attach vEth to Namespace
+	5. Attach Other vEth to Bridge
+	6. Assign IP Addresses
+	7. Bring the interfaces up
+	8. Enable NAT IP Masquerade
+
+We can create our own script to do this actions for us, but  CONTAINER NETWORK INTERFACE (CNI) standards must be met. 'ADD' and 'DEL' sections are set for action when containers are created or deleted.
+This is example script
+--------------------------------
+ADD)
+ # Create veth par
+ # Attach veth pair
+ # Assign IP Address
+ # Bring UP Intedaces
+ ip -n <namespace> link set ...
+DEL)
+ # Delete veth pair
+ ip link del ...
+--------------------------------
+
+
+The Container Runtime on each NODE is responsible for craeting containers.
+
+		Container Runtime
+			|
+			|				# looks at this deirectory to find the scripts passed as argument
+			V
+		/etc/cni/net.d/net-script.conflist
+			|
+			|				# looks at this dir to find the commands passed as arguments
+			V
+		/opt/cni/bin/net-script.sh		
+			|
+			|				# executes the scripts
+			V
+		./net-script.sh add <container> <namespace>
+
+
+
+
+================================
+Section 9 222. CNI in Kubernetes
+================================
+
+kubelet.service
+------------------------------------------------------------------------
+ExecStart=/usr/local/kubelet
+  -- config=/var/lib/ kubelet kubelet config.yaml
+  -- container-runtime=remote
+  -- container-runtime-endpoint=unix:///var/run/containerd/containerd.sock
+  -- image-pull-progress-deadline=2m
+  -- kubeconfig =/var/lib/kubelet/kubeconfig
+  -- network-plugin=cni					# CNI conf
+  -- cni-bin-dir=/opt/cni/bin				# CNI conf
+  -- cni-conf-dir=etc/cni/net.d				# CNI conf
+  -- register-node=true
+  -- v=2
+------------------------------------------------------------------------
+
+CNI in Kubernetes are containerd and cri-o
+
+CNI in Kubernetes is responsible for:
+	 Container Runtime must create network namespace
+	 Identify network the container must attach to
+	 Container Runtime to invoke Network Plugin (bridge) when container is ADDed
+	 Container Runtime to invoke Network Plugin (bridge) when container is DELeted
+	 JSON format of the Network Configuration
+
+CNI looking for Plugins in /opt/cni/bin folder. Installed plugins can be:
+	- weaveworks
+	- flannel
+ 	- cilium
+	- vmware NSX
+
+Witch plugin is used and how is used is specified in configuration file /etc/cni/net.d
+	- bridge.conflist
+	- flannel.conflist
+
+Show kubelet CNI configuration
+	terminal --> ps -aux | grep kubelet
+
+Show supported CNI plugins
+	terminal --> ls /opt/cni/bin
+
+Show configured used CNI
+	terminal --> ls /etc/cni/net.d
+
+	# result: 10-bridge.conf
+	# if more than one file, it will choose one in alphabetical order
+
+Print CNI bridge configuration
+	terminal --> cat /etc/cni/net.d/10-bridge.conf
+
+# result:
+-------------------------------
+{
+    "cniVersion": "0.2.0",
+    "name": "mynet",
+    "type": "bridge",
+    "bridge": "cni0",
+    "isGateway": true,			# if IP address must be assigned
+    "ipMasq": true,			# if address must be added for maquarading (forewarding)
+    "ipam": {				# range of IP addresses that will be assigned to pods and necessary routes
+      "type": "host-local",
+      "subnet": "10.22.0.0/16",
+      "routes": [
+        { "dst": "0.0.0.0/0" }
+    ]
+  }
+}
+-------------------------------
+
+
+
+
+
+================================
+Section 9 223. Note CNI in Weave
+================================
+
+Important Update: -
+
+Before going to the CNI weave lecture, we have an update for the Weave Net installation link. They have announced the end of service for Weave Cloud.
+
+To know more about this, read the blog from the link below: -
+
+https://www.weave.works/blog/weave-cloud-end-of-service
+
+As an impact, the old weave net installation link won’t work anymore:
+-
+terminal --> kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+
+Instead of that, use the below latest link to install the weave net: -
+	terminal --> kubectl apply -f https://github.com/weaveworks/weave/releases/download/v2.8.1/weave-daemonset-k8s.yaml
+
+Reference links: -
+
+https://www.weave.works/docs/net/latest/kubernetes/kube-addon/#-installation
+
+https://github.com/weaveworks/weave/releases
+
+
+
+
+
+========================
+Section 9 224. CNI Weave
+========================
+
+We will describe the configuration and work of this one plugin solution (Weave) and then relate it with other solutions.
+
+Weave deploys agent (service) on each node. The agents save the topology of the entire setup. Then Weave make its own network (WEAVE) and assign IP address to each network.
+
+Single POD can be attached to multple 'bridge' networks. So PODs are connected to Docker 'bridge' network and WEAVE 'bridge' network. The rout configured on the container is the one the traffic will reach its destination with.
+	terminal --> kubectl exec busybox ip route
+	
+	# result: default via 10.244.1.1 dev eth0
+
+
+Deploy WEAVE on Kubernetes cluster
+----------------------------------
+
+WEAVE and WEAVE PEERS can be deployed as services (daemons) on each NODE on the cluster manually. 
+If Kubernetes is set already, the easiest way to deploy WEAVE as PODs in the cluster. Once the base kubernetes system is ready with NODEs and netwroking configured correctly between NODEs and the basic controlplane components ar edeployed, WEAVE can be deployed on the cluster with
+	terminal --> kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+
+	# result:
+	serviceaccount/weave-net created
+	clusterrole.rbac.authorization.k8s.io/weave-net created
+	clusterrolebinding.rbac.authorization.k8s.io/weave-net created
+	role.rbac.authorization.k8s.io/weave-net created
+	rolebinding.rbac.authorization.k8s.io/weave-net created
+	daemonset.extensions/weave-net created			# one weave pod is deployed on all nodes in teh cluster
+
+
+List WEAVE pods
+	terminal --> kubectl get pods –n kube-system
+
+	# result:
+	NAME READY STATUS RESTARTS AGE IP NODE
+	NOMINATED NODE
+	coredns-78fcdf6894-99khw 1/1 Running 0 19m 10.44.0.2 master <none>
+	coredns-78fcdf6894-p7dpj 1/1 Running 0 19m 10.44.0.1 master <none>
+	etcd-master 1/1 Running 0 18m 172.17.0.11 master <none>
+	kube-apiserver-master 1/1 Running 0 18m 172.17.0.11 master <none>
+	kube-scheduler-master 1/1 Running 0 17m 172.17.0.11 master <none>
+	weave-net-5gcmb 2/2 Running 1 19m 172.17.0.30 node02 <none>		# this is weave pod
+	weave-net-fr9n9 2/2 Running 1 19m 172.17.0.11 master <none>		# this is weave pod
+	weave-net-mc6s2 2/2 Running 1 19m 172.17.0.23 node01 <none>		# this is weave pod
+	weave-net-tbzvz 2/2 Running 1 19m 172.17.0.52 node03 <none>		# this is weave pod
+
+Show logs of weave pods
+	terminal --> kubectl logs weave-net-5gcmb weave –n kube-system
+
+
+
+========================================
+Section 9 226. Practice Test - CNI Weave
+========================================
+
+1. Inspect the kubelet service and identify the container runtime endpoint value is set for Kubernetes.
+-------------------------------------------------------------------------------------------------------
+
+Show kubelete services details
+	terminal --> ps -aux | grep -i kubelet | grep container-runtime
+
+	# result: --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock
+
+- choose 'unix:///var/run/containerd/containerd.sock' as answer
+
+
+
+2. What is the path configured with all binaries of CNI supported plugins?
+--------------------------------------------------------------------------
+
+List plugins
+	terminal --> ls /opt/cni/bin
+
+- choose '/opt/cni/bin' as answer
+
+
+
+3. Identify which of the below plugins is not available in the list of available CNI plugins on this host?
+----------------------------------------------------------------------------------------------------------
+
+List plugins
+	terminal --> ls /opt/cni/bin
+
+	# result: 
+	bandwidth  dhcp   firewall  host-device  ipvlan   loopback  portmap  README.md  static  tuning  vrf
+	bridge     dummy  flannel   host-local   LICENSE  macvlan   ptp      sbr        tap     vlan
+
+- choose 'cisco' as answer
+
+
+
+4. What is the CNI plugin configured to be used on this kubernetes cluster?
+---------------------------------------------------------------------------
+
+Show CNI configuration on the cluster
+	terminal --> ls /etc/cni/net.d		
+
+	# result: 10-flannel.conflist
+
+- choose 'flannel' as answer
+
+
+
+5. What binary executable file will be run by kubelet after a container and its associated namespace are created?
+-----------------------------------------------------------------------------------------------------------------
+
+Show CNI configuration on the cluster
+	terminal --> ls /etc/cni/net.d		
+
+	# result: 10-flannel.conflist
+
+Print the config file
+	terminal --> cat /etc/cni/net.d/10-flannel.conflist
+
+# result:
+---------------------------------------
+{
+  "name": "cbr0",
+  "cniVersion": "0.3.1",
+  "plugins": [
+    {
+      "type": "flannel",			# this is the executable
+      "delegate": {
+        "hairpinMode": true,
+        "isDefaultGateway": true
+      }
+    },
+    {
+      "type": "portmap",
+      "capabilities": {
+        "portMappings": true
+      }
+    }
+  ]
+}
+---------------------------------------
+
+
+- choose 'flannel' as answer
+
+
+
+
+
+
+======================================================
+Section 9 228. Practice Test - Deploy Network Solution
+======================================================
+
+
+1. In this practice test we will install weave-net POD networking solution to the cluster. Let us first inspect the setup.
+--------------------------------------------------------------------------------------------------------------------------
+We have deployed an application called app in the default namespace. What is the state of the pod?
+
+
+Show pods
+	terminal --> k get pods -o wide
+
+	# result:
+	NAME   READY   STATUS              RESTARTS   AGE   IP       NODE           NOMINATED NODE   READINESS GATES
+	app    0/1     ContainerCreating   0          45s   <none>   controlplane   <none>           <none>
+
+- choose 'NotRunning' as answer
+
+
+
+2. Inspect why the POD is not running.
+--------------------------------------
+
+Show details abot the pod
+	terminal --> k describe pod app
+
+# result:
+Warning  FailedCreatePodSandBox  2m10s                 kubelet            Failed to create pod sandbox: rpc error: code = Unknown desc = failed to setup network for sandbox "3b7266eabfe51207689279648e42a7673c3e66eca291fdc9e34cb952e25b075c": plugin type="weave-net" name="weave" failed (add): unable to allocate IP address: Post "http://127.0.0.1:6784/ip/3b7266eabfe51207689279648e42a7673c3e66eca291fdc9e34cb952e25b075c": dial tcp 127.0.0.1:6784: connect: connection refused
+
+- choose 'No network Configured' as answer
+
+
+
+3. Deploy weave-net networking solution to the cluster.
+-------------------------------------------------------
+NOTE: - We already have provided a weave manifest file under the /root/weave directory.
+
+Kubernetes Docuemntation
+	- https://kubernetes.io/docs/concepts/cluster-administration/addons/
+	- https://github.com/rajch/weave#using-weave-on-kubernetes
+	- https://rajch.github.io/weave/
+	- https://rajch.github.io/weave/kubernetes/kube-addon#key-points
+
+Dowload the installation files
+	terminal --> wget https://reweave.azurewebsites.net/k8s/v1.29/net.yaml
+
+Verify download
+	terminal --> ls 
+
+	# result: net.yaml  sample.yaml  weave
+
+
+Find the range we have to configure in WEAVE
+--------------------------------------------
+
+List Pods is default namespace to find kube-proxy
+	terminal --> k get pods -n kube-system
+
+# reult:
+NAME                                   READY   STATUS    RESTARTS   AGE
+coredns-77d6fd4654-68jlc               1/1     Running   0          72m
+coredns-77d6fd4654-f6qrp               1/1     Running   0          72m
+etcd-controlplane                      1/1     Running   0          73m
+kube-apiserver-controlplane            1/1     Running   0          73m
+kube-controller-manager-controlplane   1/1     Running   0          73m
+kube-proxy-9k7kz                       1/1     Running   0          72m		# describe this pod
+kube-scheduler-controlplane            1/1     Running   0          73m
+
+
+Describe kube-proxy pod in the default namespace
+	terminal --> k describe pod kube-proxy-9k7kz -n kube-system
+
+kube-system
+-----------------------------------------------------------------------
+Name:                 kube-proxy-9k7kz
+Namespace:            kube-system
+Priority:             2000001000
+Priority Class Name:  system-node-critical
+Service Account:      kube-proxy
+Node:                 controlplane/192.13.1.9
+Start Time:           Tue, 28 Jan 2025 16:21:55 +0000
+Labels:               controller-revision-hash=5976bc5f75
+                      k8s-app=kube-proxy
+                      pod-template-generation=1
+Annotations:          <none>
+Status:               Running
+IP:                   192.13.1.9
+IPs:
+  IP:           192.13.1.9
+Controlled By:  DaemonSet/kube-proxy
+Containers:
+  kube-proxy:
+    Container ID:  containerd://3926cb465a624884fa893094f068befd9fb6ba1f83a44bb7c3335a2354abfdf1
+    Image:         registry.k8s.io/kube-proxy:v1.31.0
+    Image ID:      registry.k8s.io/kube-proxy@sha256:c727efb1c6f15a68060bf7f207f5c7a765355b7e3340c513e582ec819c5cd2fe
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      /usr/local/bin/kube-proxy
+      --config=/var/lib/kube-proxy/config.conf				# 1. see the loaded configs from dir
+      --hostname-override=$(NODE_NAME)
+    State:          Running
+      Started:      Tue, 28 Jan 2025 16:21:56 +0000
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      NODE_NAME:   (v1:spec.nodeName)
+    Mounts:
+      /lib/modules from lib-modules (ro)
+      /run/xtables.lock from xtables-lock (rw)
+      /var/lib/kube-proxy from kube-proxy (rw)						# 2. search for volume kube-proxy
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-tw4g2 (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  kube-proxy:
+    Type:      ConfigMap (a volume populated by a ConfigMap)
+    Name:      kube-proxy					# describe configmap kube-proxy
+    Optional:  false
+  xtables-lock:
+    Type:          HostPath (bare host directory volume)
+    Path:          /run/xtables.lock
+    HostPathType:  FileOrCreate
+  lib-modules:
+    Type:          HostPath (bare host directory volume)
+    Path:          /lib/modules
+    HostPathType:  
+  kube-api-access-tw4g2:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              kubernetes.io/os=linux
+Tolerations:                 op=Exists
+                             node.kubernetes.io/disk-pressure:NoSchedule op=Exists
+                             node.kubernetes.io/memory-pressure:NoSchedule op=Exists
+                             node.kubernetes.io/network-unavailable:NoSchedule op=Exists
+                             node.kubernetes.io/not-ready:NoExecute op=Exists
+                             node.kubernetes.io/pid-pressure:NoSchedule op=Exists
+                             node.kubernetes.io/unreachable:NoExecute op=Exists
+                             node.kubernetes.io/unschedulable:NoSchedule op=Exists
+Events:                      <none>
+-----------------------------------------------------------------------
+
+
+List configmaps in default namespace
+	terminal --> k get cm -n kube-system
+	
+	# result:
+NAME                                                   DATA   AGE
+coredns                                                1      80m
+extension-apiserver-authentication                     6      80m
+kube-apiserver-legacy-service-account-token-tracking   1      80m
+kube-proxy                                             2      80m		# this is the target cnfigmap
+kube-root-ca.crt                                       1      79m
+kubeadm-config                                         1      80m
+kubelet-config                                         1      80m
+weave-net                                              0      79m
+
+
+Print configmap kube-proxy
+	terminal --> k describe cm kube-proxy -n kube-system
+
+kube-proxy configmap
+----------------------------------------------------------------
+Name:         kube-proxy
+Namespace:    kube-system
+Labels:       app=kube-proxy
+Annotations:  kubeadm.kubernetes.io/component-config.hash: sha256:906b8697200819e8263843f43965bb3614545800b82206dcee8ef93a08bc4f4b
+
+Data
+====
+config.conf:
+----
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
+bindAddress: 0.0.0.0
+bindAddressHardFail: false
+clientConnection:
+  acceptContentTypes: ""
+  burst: 0
+  contentType: ""
+  kubeconfig: /var/lib/kube-proxy/kubeconfig.conf
+  qps: 0
+clusterCIDR: 10.244.0.0/16					# this is the range for WEAVE - 10.244.0.0/16
+configSyncPeriod: 0s
+conntrack:
+  maxPerCore: null
+  min: null
+  tcpBeLiberal: false
+  tcpCloseWaitTimeout: null
+  tcpEstablishedTimeout: null
+  udpStreamTimeout: 0s
+  udpTimeout: 0s
+detectLocal:
+  bridgeInterface: ""
+  interfaceNamePrefix: ""
+detectLocalMode: ""
+enableProfiling: false
+healthzBindAddress: ""
+hostnameOverride: ""
+iptables:
+  localhostNodePorts: null
+  masqueradeAll: false
+  masqueradeBit: null
+  minSyncPeriod: 0s
+  syncPeriod: 0s
+ipvs:
+  excludeCIDRs: null
+  minSyncPeriod: 0s
+  scheduler: ""
+  strictARP: false
+  syncPeriod: 0s
+  tcpFinTimeout: 0s
+  tcpTimeout: 0s
+  udpTimeout: 0s
+kind: KubeProxyConfiguration
+logging:
+  flushFrequency: 0
+  options:
+    json:
+      infoBufferSize: "0"
+    text:
+      infoBufferSize: "0"
+  verbosity: 0
+metricsBindAddress: ""
+mode: ""
+nftables:
+  masqueradeAll: false
+  masqueradeBit: null
+  minSyncPeriod: 0s
+  syncPeriod: 0s
+nodePortAddresses: null
+oomScoreAdj: null
+portRange: ""
+showHiddenMetricsForVersion: ""
+winkernel:
+  enableDSR: false
+  forwardHealthCheckVip: false
+  networkName: ""
+  rootHnsEndpointName: ""
+  sourceVip: ""
+
+kubeconfig.conf:
+----
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    server: https://controlplane:6443
+  name: default
+contexts:
+- context:
+    cluster: default
+    namespace: default
+    user: default
+  name: default
+current-context: default
+users:
+- name: default
+  user:
+    tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+
+
+BinaryData
+====
+
+Events:  <none>
+----------------------------------------------------------------
+
+This is the range for WEAVE - 10.244.0.0/16
+
+Edit the dowloaded config file
+	terminal --> vi net.yaml
+
+net.yaml
+----------------------------------------------------------------
+...
+          containers:
+            - name: weave
+              command:
+                - /home/weave/launch.sh
+              env:
+                - name: IPALLOC_RANGE			# added
+                  value: 10.244.0.0/16			# added
+                - name: INIT_CONTAINER
+                  value: 'true'
+                - name: HOSTNAME
+                  valueFrom:
+                    fieldRef:
+                      apiVersion: v1
+                      fieldPath: spec.nodeName
+                - name: CHECKPOINT_DISABLE
+                  value: '1'
+              image: rajchaudhuri/weave-kube:2.9.0
+...
+----------------------------------------------------------------
+save changes - escape, :wq!, enter
+
+
+Verify changes
+	terminal --> cat net.yaml
+
+Apply the file net.yaml
+	terminal --> kubectl apply -f net.yaml
+
+Wait until pods are created and list them
+	terminal --> k get pods -n kube-system
+
+
+
+
+
+
+============================================
+Section 9 229. IP Address Management - Weave
+============================================
+
+CNI Plugin Responsibilities:
+	 Must support arguments ADD/DEL/CHECK
+	 Must support parameters container id, network ns etc..
+	 Must manage IP Address assignment to PODs			# this point is in the current lecture
+	 Must Return results in a specific format
+
+Weave alocate default range of 10.32.0.0/12 for the entire network.
+	- give IPs from 10.32.0.1 to 10.47.255.254	- arount 1,048,574 IPs
+
+These IPs are split and separated to all nodes. These tanges are configurable with additional options passed durring deploy WEAVE to the cluster.
+
+
+
+
+
+===============================================
+Section 9 231. Practice Test - Networking Weave
+===============================================
+
+
+1. How many Nodes are part of this cluster?
+-------------------------------------------
+Including master and worker nodes
+
+List nodes
+	terminal --> k get nodes
+
+# result:
+NAME           STATUS   ROLES           AGE   VERSION
+controlplane   Ready    control-plane   33m   v1.31.0
+node01         Ready    <none>          33m   v1.31.0
+
+- choose '2' as answer
+
+
+
+2. What is the Networking Solution used by this cluster?
+--------------------------------------------------------
+
+Show network configs
+	terminal --> ls /etc/cni/net.d
+
+	# result: 10-weave.conflist
+
+Print file
+	terminal --> cat /etc/cni/net.d/10-weave.conflist
+
+# result:
+---------------------------------
+{
+    "cniVersion": "0.3.0",
+    "name": "weave",
+    "plugins": [
+        {
+            "name": "weave",			# this is the plugin
+            "type": "weave-net",
+            "hairpinMode": true
+        },
+        {
+            "type": "portmap",
+            "capabilities": {"portMappings": true},
+            "snat": true
+        }
+    ]
+}
+---------------------------------
+
+- choose 'weave' as answer
+
+
+
+
+3. How many weave agents/peers are deployed in this cluster?
+------------------------------------------------------------
+
+Show pods in the default namespace with 'weave' in the name
+	terminal --> k get pods -n kube-system
+
+# result:
+NAME                                   READY   STATUS    RESTARTS      AGE
+coredns-77d6fd4654-9mxrs               1/1     Running   0             38m
+coredns-77d6fd4654-jr4sk               1/1     Running   0             38m
+etcd-controlplane                      1/1     Running   0             38m
+kube-apiserver-controlplane            1/1     Running   0             38m
+kube-controller-manager-controlplane   1/1     Running   0             38m
+kube-proxy-49ktm                       1/1     Running   0             38m
+kube-proxy-vjg4s                       1/1     Running   0             38m
+kube-scheduler-controlplane            1/1     Running   0             38m
+weave-net-8xx7x                        2/2     Running   1 (38m ago)   38m		# this 
+weave-net-lpjpp                        2/2     Running   0             38m		# this
+
+- choose '2' as answer
+
+
+
+
+4. On which nodes are the weave peers present?
+----------------------------------------------
+
+Show pods in the default namespace with 'weave' in the name with additional information
+	terminal --> k get pods -n kube-system -o wide
+
+- choose 'one on every node' as answer
+
+
+
+
+5. Identify the name of the bridge network/interface created by weave on each node.
+-----------------------------------------------------------------------------------
+
+Show interfaces with 'weave' in it
+	terminal --> ip addr | grep weave
+
+# result:
+4: weave: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1376 qdisc noqueue state UP group default qlen 1000
+    inet 10.244.0.1/16 brd 10.244.255.255 scope global weave
+7: vethwe-bridge@vethwe-datapath: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1376 qdisc noqueue master weave state UP group default 
+10: vethwepl21c6257@if9: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1376 qdisc noqueue master weave state UP group default 
+12: vethwepl2db40c7@if11: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1376 qdisc noqueue master weave state UP group default 
+
+- choose 'weave' as answer
+
+
+
+6. What is the POD IP address range configured by weave?
+--------------------------------------------------------
+
+Show pods in the default namespace with 'weave' in the name
+	terminal --> k get pods -n kube-system
+
+# result:
+weave-net-8xx7x                        2/2     Running   1 (44m ago)   44m
+weave-net-lpjpp                        2/2     Running   0             43m
+
+
+Show logs for one of the pods
+	terminal --> k logs -n kube-system weave-net-8xx7x 
+
+# result: ipalloc-init:consensus=0 ipalloc-range:10.244.0.0/16
+
+- choose '10.x.x.x' as answer
+
+
+
+
+7. What is the default gateway configured on the PODs scheduled on node01?
+--------------------------------------------------------------------------
+Try scheduling a pod on node01 and check ip route output
+
+Craete a pod definition file with and save it under busybox.yaml name
+	terminal --> k run busybox --image=busybox --dry-run=client -o yaml -- sleep 1000 > busybox.yaml
+
+Verify creation
+	terminal --> ls		# result: busybox.yaml  sample.yaml
+
+
+Configure pod definition file to schedule the pod on node01
+	terminal --> vi busybox.yaml
+
+busybox.yaml
+-------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: busybox
+  name: busybox
+spec:
+  nodeName: node01			# added node specification field
+  containers:
+  - args:
+    - sleep
+    - "1000"
+    image: busybox
+    name: busybox
+    resources: {}
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always
+status: {}
+-------------------------------------
+save changes - escape, :wq!, enter
+
+
+Verify changes
+	terminal --> cat busybox.yaml
+
+Deploy pod
+	terminal --> k apply -f busybox.yaml
+
+Verify pod deployment
+	terminal --> k get pod
+
+Show created pod's configuration route
+	terminal --> k exec busybox -- ip route
+
+	# reuslt: default via 10.244.192.0 dev eth0 
+
+- choose '10.244.192.0' as answer
+
+
+
+
+
+
+=================================
+Section 9 232. Service Networking
+=================================
+
+There are 2 type of services - Cluster IP service and Node Port service.
+
+Cluster IP - Cluster Service
+----------------------------
+If we want to set a pod accessable across the cluster, we create a service of this pod. Service is not bound to a specific node, but the service is only accessable from in the cluster. This type of service is known as Cluster IP. This type is used for DBs and back-end applications. 
+
+NodePort Service
+----------------
+To this Service also is assigned IP but also exposes a port to all NODES. This way external users or application have access to the service.
+
+
+
+How Node Port service work?
+---------------------------
+
+On each kubernetes node there is a kubelet process witch is responsible for creating pods. Each kubelet service on each node watches for changes on the cluster true the kube-apiserver. When a new POD is to be created, it creates the pod on the nodes. It then invokes CNI plugin to configure networking for that POD.
+
+Each Node runs another component called kube-proxy. Kube-proxy watches for cluster changes true kube-apiserver and every time a service is to be created the kube-proxy take action. Services are cluster wide virtual objects. They are NOT assigned to Nodes. When a service is created an IP address is assigned to it from a pre-defined range. The kube-proxy components running on each node get this IP address and creates a forwarding rules on each node on the cluster that say that any traffic coming to this IP (service IP) should go to the IP of the POD. Once that is configured, whenever a POD tries to reach the IP of the service, it is forwarded ti the POD's IP address which is accessable from any Node in the cluster. Its not just IP - its IP and Port combination. When a service is created or deleted the kube-proxy creates or deletes this rules.
+
+
+Kube-proxy suppoerts different modes:
+	- userspace - when kube-proxy listen on a port for each service and proxy connections to the POD by creating ipvs rules
+	- Default option - using iptables
+
+
+Proxy mode can be set using the proxy mode option while configuring kube-proxy service. If this is not set the default mode is iptables.
+	terminal --> kube-proxy --proxy-mode [ userspace | iptables | ipvs ] ...
+
+
+We will look over how kube-proxy configure iptables and we can view them on the Nodes.
+--------------------------------------------------------------------------------------
+
+We have one pod
+	terminal --> kubelet get pods -o wide
+
+	# result: 
+	NAME READY STATUS RESTARTS AGE IP NODE
+	db 1/1 Running 0 14h 10.244.1.2 node-1
+
+
+We have one service 
+	terminal --> kubelet get service
+
+	# result:
+	NAME TYPE CLUSTER-IP PORT(S) AGE
+	db-service ClusterIP 10.103.132.104 3306/TCP 12h
+
+The IP assigned to the service is in range configured in the kube-apiserver option '--service-cluster-ip-range'. By default is set to 10.0.0.0/24
+	terminal --> kube-api-server --service-cluster-ip-range ipNet (Default: 10.0.0.0/24)
+
+In our example we can see this range
+	terminal --> ps aux | grep kube-api-server
+
+	# result:
+	kube-apiserver --authorization-mode=Node,RBAC --service-cluster-iprange=10.96.0.0/12
+	# this range give us IPs from 10.96.0.0 to 10.111.255.255
+
+Pod networking is with range 10.244.0.0/16 - from 10.244.0.0 to 10.244.255.255
+
+These tow ranges should NOT overlap! There souldn't be a case where a pod and a serrvice are assigned to the same IP address.
+
+
+We can see the rules created by kube-proxy
+	terminal --> iptables –L –t net | grep db-service
+
+	# result:
+	KUBE-SVC-XA5OGUC7YRHOS3PU tcp -- anywhere 10.103.132.104 /* default/db-service: cluster IP */ tcp dpt:3306
+	DNAT tcp -- anywhere anywhere /* default/db-service: */ tcp to:10.244.1.2:3306
+	KUBE-SEP-JBWCWHHQM57V2WN7 all -- anywhere anywhere /* default/db-service: */
+
+	# on the first line we have the IP and the port of the service 'anywhere 10.103.132.104', 'dpt:3306'
+	# on the second line we have the IP and the port of the pod 'to:10.244.1.2:3306'
+
+We can see logs of creating this rule
+	terminal --> cat /var/log/kube-proxy.log
+
+	# result:
+	I0307 04:29:29.883941 1 server_others.go:140] Using iptables Proxier.		# proxy type - iptables Proxier
+	I0307 04:29:29.912037 1 server_others.go:174] Tearing down inactive rules.
+	I0307 04:29:30.027360 1 server.go:448] Version: v1.11.8
+	I0307 04:29:30.049773 1 conntrack.go:98] Set sysctl 'net/netfilter/nf_conntrack_max' to 131072
+	I0307 04:29:30.049945 1 conntrack.go:52] Setting nf_conntrack_max to 131072
+	I0307 04:29:30.050701 1 conntrack.go:83] Setting conntrack hashsize to 32768
+	I0307 04:29:30.050701 1 proxier.go:294] Adding new service “default/db-service:3306" at 10.103.132.104:3306/TCP
+
+	# creating rule log - Adding new service “default/db-service:3306" at 10.103.132.104:3306/TCP
+
+The location of the log file can be different. If we dont see the logs we can check the verbosity level of the process as well.
+
+
+
+
+
+================================================
+Section 9 234. Pracice Test - Service Networking
+================================================
+
+1. What network range are the nodes in the cluster part of?
+-----------------------------------------------------------
+
+Show IP ranges of the Nodes
+	terminal --> k get node -o wide
+	
+# result:
+NAME           STATUS   ROLES      AGE   VERSION   INTERNAL-IP   EXTERNAL-IP   OS-IMAGE        KERNEL-VERSION   CONTAINER-RUNTIME
+controlplane   Ready    control-plane 63m   v1.31.0 192.4.112.3   <none>   Ubuntu 22.04.5 LTS  5.4.0-1106-gcp ontainerd://1.6.26
+node01         Ready    <none>   62m   v1.31.0   192.4.112.6   <none>   Ubuntu 22.04.4 LTS   5.4.0-1106-gcp   containerd://1.6.26
+
+# internal IP of the controlplane - 192.4.112.3
+
+
+Find interfaces with this IP
+	terminal --> ip addr | grep 192.4.112.3
+
+	# result:     inet 192.4.112.3/24 brd 192.4.112.255 scope global eth0
+
+Show details for interface eth0
+	terminal --> ip addr show eth0
+
+	# result:
+1271: eth0@if1272: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1450 qdisc noqueue state UP group default 
+    link/ether 02:42:c0:04:70:03 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 192.4.112.3/24 brd 192.4.112.255 scope global eth0
+       valid_lft forever preferred_lft forever
+
+We can see the default inet - 192.4.112.3/24
+
+- choose '192.4.112.0/24' as answer
+
+
+
+
+2. What is the range of IP addresses configured for PODs on this cluster?
+-------------------------------------------------------------------------
+
+Show all cluster components
+	terminal --> k get all --all-namespaces
+
+# result:
+---------------------------------------------------------------------------------------------
+NAMESPACE     NAME                                       READY   STATUS    RESTARTS      AGE
+kube-system   pod/coredns-77d6fd4654-qjcg4               1/1     Running   0             72m
+kube-system   pod/coredns-77d6fd4654-tvjgd               1/1     Running   0             72m
+kube-system   pod/etcd-controlplane                      1/1     Running   0             72m
+kube-system   pod/kube-apiserver-controlplane            1/1     Running   0             72m
+kube-system   pod/kube-controller-manager-controlplane   1/1     Running   0             72m
+kube-system   pod/kube-proxy-8pnpw                       1/1     Running   0             71m
+kube-system   pod/kube-proxy-gfbqw                       1/1     Running   0             72m
+kube-system   pod/kube-scheduler-controlplane            1/1     Running   0             72m
+kube-system   pod/weave-net-lsn9x                        2/2     Running   1 (72m ago)   72m
+kube-system   pod/weave-net-qshbs                        2/2     Running   0             71m
+
+NAMESPACE     NAME                 TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                  AGE
+default       service/kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP                  72m
+kube-system   service/kube-dns     ClusterIP   10.96.0.10   <none>        53/UDP,53/TCP,9153/TCP   72m
+
+NAMESPACE     NAME                        DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR            AGE
+kube-system   daemonset.apps/kube-proxy   2         2         2       2            2           kubernetes.io/os=linux   72m
+kube-system   daemonset.apps/weave-net    2         2         2       2            2           <none>                   72m
+
+NAMESPACE     NAME                      READY   UP-TO-DATE   AVAILABLE   AGE
+kube-system   deployment.apps/coredns   2/2     2            2           72m
+
+NAMESPACE     NAME                                 DESIRED   CURRENT   READY   AGE
+kube-system   replicaset.apps/coredns-77d6fd4654   2         2         2       72m
+---------------------------------------------------------------------------------------------
+
+We can see WEAVE pods for networking (CNI):
+kube-system   pod/weave-net-lsn9x                        2/2     Running   1 (72m ago)   72m
+kube-system   pod/weave-net-qshbs                        2/2     Running   0             71m
+
+
+Show logs of one of the WEAVE pods 
+	terminal --> k logs -n kube-system weave-net-lsn9x
+
+	# on the fifth line we can see 'ipalloc-range:10.244.0.0/16'
+
+We can also search fo the specific option
+	terminal --> k logs -n kube-system weave-net-lsn9x | grep ipalloc-range
+
+- choose '10.244.0.0/16' as answer
+
+
+
+
+3. What is the IP Range configured for the services within the cluster?
+-----------------------------------------------------------------------
+
+We have to look at the configuration of the API server
+
+List configuration files
+	terminal --> ls /etc/kubernetes/manifests
+
+	# result: etcd.yaml  kube-apiserver.yaml  kube-controller-manager.yaml  kube-scheduler.yaml
+
+Print kube-apiserver config file
+	terminal --> cat /etc/kubernetes/manifests/kube-apiserver.yaml
+
+	# '    - --service-cluster-ip-range=10.96.0.0/12'	this is the option we are looking for
+
+
+- choose '10.96.0.0/12' as answer
+
+
+
+
+4. How many kube-proxy pods are deployed in this cluster?
+---------------------------------------------------------
+
+List pods in default namespace
+	terminal --> k get pods -n kube-system
+
+	# result:
+	NAME                                   READY   STATUS    RESTARTS      AGE
+	coredns-77d6fd4654-qjcg4               1/1     Running   0             81m
+	coredns-77d6fd4654-tvjgd               1/1     Running   0             81m
+	etcd-controlplane                      1/1     Running   0             81m
+	kube-apiserver-controlplane            1/1     Running   0             81m
+	kube-controller-manager-controlplane   1/1     Running   0             81m
+	kube-proxy-8pnpw                       1/1     Running   0             81m	# this 
+	kube-proxy-gfbqw                       1/1     Running   0             81m	# this 
+	kube-scheduler-controlplane            1/1     Running   0             81m
+	weave-net-lsn9x                        2/2     Running   1 (81m ago)   81m
+	weave-net-qshbs                        2/2     Running   0             81m
+
+- choose '2' as answer
+
+
+
+5. What type of proxy is the kube-proxy configured to use?
+----------------------------------------------------------
+
+List pods in default namespace and find proxy-pods
+	terminal --> k get pods -n kube-system
+
+	# result:
+	kube-proxy-8pnpw                       1/1     Running   0             81m	
+	kube-proxy-gfbqw                       1/1     Running   0             81m	
+
+
+Show logs for one of the pods
+	terminal --> k logs kube-proxy-8pnpw -n kube-system
+
+	# result: I0129 07:10:19.506356       1 server_linux.go:169] "Using iptables Proxier"
+
+
+- choose 'iptables' as answer
+
+
+
+
+6. How does this Kubernetes cluster ensure that a kube-proxy pod runs on all nodes in the cluster?
+--------------------------------------------------------------------------------------------------
+Inspect the kube-proxy pods and try to identify how they are deployed.
+
+List all system components
+	terminal --> k get all --all-namespaces
+
+# result:
+---------------------------------------------------------------------------------------------
+NAMESPACE     NAME                                       READY   STATUS    RESTARTS      AGE
+kube-system   pod/coredns-77d6fd4654-qjcg4               1/1     Running   0             94m
+kube-system   pod/coredns-77d6fd4654-tvjgd               1/1     Running   0             94m
+kube-system   pod/etcd-controlplane                      1/1     Running   0             94m
+kube-system   pod/kube-apiserver-controlplane            1/1     Running   0             94m
+kube-system   pod/kube-controller-manager-controlplane   1/1     Running   0             94m
+kube-system   pod/kube-proxy-8pnpw                       1/1     Running   0             93m
+kube-system   pod/kube-proxy-gfbqw                       1/1     Running   0             94m
+kube-system   pod/kube-scheduler-controlplane            1/1     Running   0             94m
+kube-system   pod/weave-net-lsn9x                        2/2     Running   1 (94m ago)   94m
+kube-system   pod/weave-net-qshbs                        2/2     Running   0             93m
+
+NAMESPACE     NAME                 TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                  AGE
+default       service/kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP                  94m
+kube-system   service/kube-dns     ClusterIP   10.96.0.10   <none>        53/UDP,53/TCP,9153/TCP   94m
+
+NAMESPACE     NAME                        DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR            AGE
+kube-system   daemonset.apps/kube-proxy   2         2         2       2            2           kubernetes.io/os=linux   94m
+kube-system   daemonset.apps/weave-net    2         2         2       2            2           <none>                   94m
+
+NAMESPACE     NAME                      READY   UP-TO-DATE   AVAILABLE   AGE
+kube-system   deployment.apps/coredns   2/2     2            2           94m
+
+NAMESPACE     NAME                                 DESIRED   CURRENT   READY   AGE
+kube-system   replicaset.apps/coredns-77d6fd4654   2         2         2       94m
+---------------------------------------------------------------------------------------------
+
+We have entity under DAEMONSET. That mean we use daemonset to deploy kube-proxy pod on every Node.
+
+NAMESPACE     NAME                        DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR            AGE
+kube-system   daemonset.apps/kube-proxy   2         2         2       2            2           kubernetes.io/os=linux   94m
+
+
+- choose 'using daemonset' as answer
+
+
+
+
+
+================================
+Section 9 235. DNS in Kubernetes
+================================
+
+Pre-requisite
+	 What is DNS?			- Domain Name System
+	 Host/NS Lookup, Dig utility
+	 Recorded Types A, CNAME
+	 Domain Name Hierarchy
+
+Objectives
+	 What names are assigned to what objects?
+	 Service DNS records
+	 POD DNS Recrods
+
+Kubernetes deploys build in DNS server by default when we set up a cluster. If we set up cluster manually then we have to do it by ourself.
+
+
+We have two PODs and one of them have a service
+	- web-pod 		- IP 10.244.2.5
+	- web-service		- IP 10.107.37.188
+	
+	- test-pod		- IP 10.244.1.5
+
+DNS server maps the web-service with the web-pod. We can now access web-pod true web-service from test-pod when they are all in one namespace (default namespace).
+	test-pod terminal --> curl http://web-service
+
+If test-pod is in the 'default' namespace and web-pod and web-service are in the 'apps' namespace, we can access the web-service with adding the namespace, 'svc' and '.cluster.local' at the end of the command . The '.apps.svc.cluster.local' are the subdomain names created by DNS server for each namespace.
+	terminal --> curl http://web-service.apps.svc.cluster.local
+
+This is the fully qualified domain name for the web-service.
+
+Records for PODs are not created automatically in the DNS server. We can enable automatic records for pods in the next lecture. DNS server generates name for each pod from its IP address replaceing the dots ('.') with dashes '-'. 
+Example IP 10.244.2.5 -> 10-244-2-5. Name space stay the same and type is set ot 'pod'. Root domain is alway cluster.local.
+
+Access web-pod
+	terminal --> curl http://10-244-2-5.apps.pd.cluster.local
+
+
+
+
+
+====================================
+Section 9 236. CoreDNS in Kubernetes
+====================================
+
+We have two pods
+	- test-pod 		- IP 10.244.1.5
+	- web-pod		- IP 10.244.2.5
+
+We can set manually connection with adding entry in the hosts file
+
+Add connection in the test-pod for web-pod
+	terminal --> cat >> /etc/hosts
+
+	# web	10.244.2.5
+
+Add connection in the web-pod for test-pod
+	terminal --> cat >> /etc/hosts
+
+	# test	10.244.1.5
+
+
+For many pods the manual configuration is not recommended so we add a DNS server with IP 10.96.0.10. 
+
+DNS servet table
+	web		10.244.2.5
+	test		10.244.1.5
+
+Adding a configuration in one centralized place is managable
+	test-pod terminal --> cat >> /etc/resolv.conf
+	web-pod  terminal --> cat >> /etc/resolv.conf
+
+	# nameserver	10.96.0.10
+
+When adding another pod (db) we 
+	1. add the pod IP in the DNS server table 
+	2. set the DNS address on the pod
+
+DNS servet table with tranformed pod names. It gives names only for services.
+	10-244-2-5		10.244.2.5
+	10-244-1-5		10.244.1.5
+	10-244-2-15		10.244.2.15
+
+Add DNS server IP on db pod
+	terminal --> cat >> /etc/resolv.conf
+
+	# namespace		10.96.0.10
+
+
+DNS server in Kubernetes is CoreDNS. CoreDNS si deployed as 2 pods in a replicaset in a Deployment, but we will look over them as one pod for now. This pod has './coredns' executable. CoreDNS have a configuration file located at /etc/coredns/Corefile
+
+Print CoreDNS configuration file
+	terminal --> cat /etc/coredns/Corefile
+
+We have different plugins to responsible for different activities like errors, health check, monitoring, status etc.
+
+The kubernetes plugin is 'kubernetes'.
+
+Corefile
+------------------------------------------------
+.:53 {
+    errors
+    health
+    kubernetes cluster.local in-addr.arpa ip6.arpa {
+        pods insecure					# option responsible for creating recor for pod in the cluster
+        upstream					
+        fallthrough in-addr.arpa ip6.arpa
+    }
+    prometheus :9153
+    proxy. /etc/resolv.conf
+    cache 30
+    reload
+}
+------------------------------------------------
+
+This Corefile is passed in to the pod as configmap object
+	terminal --> k get configmap -n kube-system
+
+	# result:
+	NAME 	DATA 	AGE
+	coredns 1 	168d
+
+If we want to modify this configuration, we can edit the configmap object.
+
+
+We now have CoreDNS pod up and running using the appropriate kubernetes plugin. It watches the kubernetes cluster for new pods or services and if any pod or service is created it adds it name and address in its database.
+
+Next step is for POD to points to DNS server. 
+
+The DNS server has it own service called kube-dns by default.
+	terminal --> k get service -n kube-system
+
+# result:
+NAME 		TYPE 		CLUSTER-IP 	EXTERNAL-IP 	PORT(S)
+kube-dns 	ClusterIP 	10.96.0.10 	<none> 		53/UDP,53/TCP
+
+The IP address of this service is configured as the nameserver of pods automatically by the kubelet.
+
+We can see the config file of the kubelet
+	terminal --> cat /var/lib/kubelet.config.yaml
+
+------------------------------------
+...
+clusterDNS:
+- 10.96.0.10
+clusterDomain: cluster.local
+------------------------------------
+
+We can access all services with all subdomain names
+	terminal --> host web-service
+	terminal --> host web-service.default
+	terminal --> host web-service.default.svc
+	terminal --> host web-service.default.svc.cluster.local
+
+We can manually lookup at the service using lookup tool, it will return fully qulified domain name of the web-service
+	terminal --> host web-service
+
+	# result: web-service.default.svc.cluster.local has address 10.97.206.196
+
+We can manually search for the pod address, we need to use FQDN (fully qualified domain name)
+	terminal --> host 10-244-2-5.default.pod.cluster.local
+
+	# result: web-service.default.svc.cluster.local has address 10.97.206.196
+
+
+
+
+
+==========================================
+Section 9 238. Practice Test - Explore DNS
+==========================================
+
+
+1. Identify the DNS solution implemented in this cluster.
+---------------------------------------------------------
+
+List pods in default namespace and see the dns pods
+	terminal --> k get pods -n kube-system
+
+# result:
+NAME                                   READY   STATUS    RESTARTS   AGE
+coredns-77d6fd4654-gcltd               1/1     Running   0          2m32s	# coredns
+coredns-77d6fd4654-vxzqx               1/1     Running   0          2m32s	# coredns
+etcd-controlplane                      1/1     Running   0          2m37s
+kube-apiserver-controlplane            1/1     Running   0          2m37s
+kube-controller-manager-controlplane   1/1     Running   0          2m37s
+kube-proxy-lmr4j                       1/1     Running   0          2m32s
+kube-scheduler-controlplane            1/1     Running   0          2m37s
+
+- choose 'CoreDNS' as answer
+
+
+
+
+2. How many pods of the DNS server are deployed?
+------------------------------------------------
+
+List pods in default namespace and see the dns pods
+	terminal --> k get pods -n kube-system
+
+# result:
+NAME                                   READY   STATUS    RESTARTS   AGE
+coredns-77d6fd4654-gcltd               1/1     Running   0          2m32s	# coredns
+coredns-77d6fd4654-vxzqx               1/1     Running   0          2m32s	# coredns
+etcd-controlplane                      1/1     Running   0          2m37s
+kube-apiserver-controlplane            1/1     Running   0          2m37s
+kube-controller-manager-controlplane   1/1     Running   0          2m37s
+kube-proxy-lmr4j                       1/1     Running   0          2m32s
+kube-scheduler-controlplane            1/1     Running   0          2m37s
+
+- choose '2' as answer
+
+
+
+
+3. What is the name of the service created for accessing CoreDNS?
+-----------------------------------------------------------------
+
+List services in the default namespace
+	terminal --> k get svc -n kube-system
+
+	# result:
+	NAME       TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)                  AGE
+	kube-dns   ClusterIP   172.20.0.10   <none>        53/UDP,53/TCP,9153/TCP   4m49s
+
+- choose 'kobe-dns' as answr
+
+
+
+4. What is the IP of the CoreDNS server that should be configured on PODs to resolve services?
+----------------------------------------------------------------------------------------------
+
+The DNS server  is accessed by its service IP
+
+List services in the default namespace
+	terminal --> k get svc -n kube-system
+
+	# result:
+	NAME       TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)                  AGE
+	kube-dns   ClusterIP   172.20.0.10   <none>        53/UDP,53/TCP,9153/TCP   4m49s
+
+- choose '172.20.0.10' as answr
+
+
+
+5. Where is the configuration file located for configuring the CoreDNS service?
+-------------------------------------------------------------------------------
+
+List pods in default namespace
+	terminal --> k get pods -n kube-system
+
+	# result:
+	NAME                                   READY   STATUS    RESTARTS   AGE
+	coredns-77d6fd4654-gcltd               1/1     Running   0          8m4s
+	coredns-77d6fd4654-vxzqx               1/1     Running   0          8m4s
+
+Show details for one of the codedns pods
+	terminal --> k describe pod coredns-77d6fd4654-gcltd -n kube-system
+
+----------------------------------------------
+...
+Args:
+      -conf
+      /etc/coredns/Corefile				# this is the file we are looking for
+    State:          Running
+...
+----------------------------------------------
+
+- choose '/etc/coredns/Corefile' as answer
+
+
+
+
+6. How is the Corefile passed into the CoreDNS POD?
+---------------------------------------------------
+
+List pods in default namespace
+	terminal --> k get pods -n kube-system
+
+	# result:
+	NAME                                   READY   STATUS    RESTARTS   AGE
+	coredns-77d6fd4654-gcltd               1/1     Running   0          8m4s
+	coredns-77d6fd4654-vxzqx               1/1     Running   0          8m4s
+
+Show details for one of the codedns pods
+	terminal --> k get pod coredns-77d6fd4654-gcltd -n kube-system -o yaml
+
+----------------------------------------------
+...
+containers:
+  - args:
+    - -conf
+    - /etc/coredns/Corefile			# we can see config file location
+...
+  volumes:
+  - configMap:					# we can see that the volume is passed as configmap
+      defaultMode: 420
+      items:
+      - key: Corefile
+        path: Corefile
+      name: coredns
+...
+    volumeMounts:
+    - mountPath: /etc/coredns
+      name: config-volume			# we can see that the volumeMount is config-colume
+      readOnly: true
+      recursiveReadOnly: Disabled
+...
+----------------------------------------------
+
+- choose 'Configured as Configmap object' as answer
+
+
+
+
+
+7. What is the name of the ConfigMap object created for Corefile?
+-----------------------------------------------------------------
+
+List pods in default namespace
+	terminal --> k get pods -n kube-system
+
+	# result:
+	NAME                                   READY   STATUS    RESTARTS   AGE
+	coredns-77d6fd4654-gcltd               1/1     Running   0          8m4s
+	coredns-77d6fd4654-vxzqx               1/1     Running   0          8m4s
+
+Show details for one of the codedns pods
+	terminal --> k get pod coredns-77d6fd4654-gcltd -n kube-system -o yaml
+
+----------------------------------------------
+...
+containers:
+  - args:
+    - -conf
+    - /etc/coredns/Corefile			# we can see config file location
+...
+  volumes:
+  - configMap:					# we can see that the volume is passed as configmap
+      defaultMode: 420
+      items:
+      - key: Corefile
+        path: Corefile
+      name: coredns				# this is the name of the configmap object
+...
+----------------------------------------------
+
+- choose 'coredns' as answer
+
+
+
+
+8. What is the root domain/zone configured for this kubernetes cluster?
+-----------------------------------------------------------------------
+
+List pods in default namespace
+	terminal --> k get pods -n kube-system
+
+	# result:
+	NAME                                   READY   STATUS    RESTARTS   AGE
+	coredns-77d6fd4654-gcltd               1/1     Running   0          8m4s
+	coredns-77d6fd4654-vxzqx               1/1     Running   0          8m4s
+
+Show details for one of the codedns pods
+	terminal --> k get pod coredns-77d6fd4654-gcltd -n kube-system -o yaml
+
+----------------------------------------------
+...
+containers:
+  - args:
+    - -conf
+    - /etc/coredns/Corefile			# we can see config file location
+...
+  volumes:
+  - configMap:					# we can see that the volume is passed as configmap
+      defaultMode: 420
+      items:
+      - key: Corefile
+        path: Corefile
+      name: coredns				# this is the name of the configmap object
+...
+----------------------------------------------
+
+List configmaps
+	terminal --> k get cm -n kube-system
+
+# result:
+NAME                                                   DATA   AGE
+coredns                                                1      23m
+extension-apiserver-authentication                     6      23m
+kube-apiserver-legacy-service-account-token-tracking   1      23m
+kube-proxy                                             2      23m
+kube-root-ca.crt                                       1      23m
+kubeadm-config                                         1      23m
+kubelet-config                                         1      23m
+
+Describe coredns configmap
+	terminal --> k describe cm coredns -n kube-system
+
+# result:
+----------------------------------------------
+...
+.:53 {
+    errors
+    health {
+       lameduck 5s
+    }
+    ready
+    kubernetes cluster.local in-addr.arpa ip6.arpa {		# cluster.local is the root domain
+       pods insecure
+       fallthrough in-addr.arpa ip6.arpa
+       ttl 30
+    }
+...
+----------------------------------------------
+
+- choose 'cluster.local' as answer
+
+
+
+
+9. We have deployed a set of PODs and Services in the default and payroll namespaces. Inspect them and go to the next question.
+-------------------------------------------------------------------------------------------------------------------------------
+
+List pods in the current namespace
+	terminal --> k get pods
+
+# result:
+NAME              READY   STATUS    RESTARTS   AGE
+hr                1/1     Running   0          25m
+simple-webapp-1   1/1     Running   0          25m
+test              1/1     Running   0          25m
+
+
+List pods in the 'payroll' namespace
+	terminal --> k get pods -n payroll
+
+# result:
+NAME   READY   STATUS    RESTARTS   AGE
+web    1/1     Running   0          27m
+
+- click 'Ok' button
+
+
+
+
+10. What name can be used to access the hr web server from the test Application?
+--------------------------------------------------------------------------------
+You can execute a curl command on the test pod to test. Alternatively, the test Application also has a UI. Access it using the tab at the top of your terminal named test-app.
+
+
+List pods in the current namespace
+	terminal --> k get pods
+
+# result:
+NAME              READY   STATUS    RESTARTS   AGE
+hr                1/1     Running   0          25m
+simple-webapp-1   1/1     Running   0          25m
+test              1/1     Running   0          25m
+
+
+List pods in the 'payroll' namespace
+	terminal --> k get pods -n payroll
+
+# result:
+NAME   READY   STATUS    RESTARTS   AGE
+web    1/1     Running   0          27m
+
+
+List services in the default namespace
+	terminal --> k get svc 
+
+# result:
+NAME           TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
+kubernetes     ClusterIP   172.20.0.1       <none>        443/TCP        30m
+test-service   NodePort    172.20.11.8      <none>        80:30080/TCP   29m
+web-service    ClusterIP   172.20.232.251   <none>        80/TCP         29m
+
+We asume that the test service is fot test pod. We can show details for web-service to see for what pod it is for
+	terminal --> k describe svc web-service
+
+	# result: 
+	Selector:  name=hr		# web-service is for hr pod
+	Port:     <unset>  80/TCP	# use port 80
+
+Open the Test App tab above top right corner of the console and set
+	- Host Name: web-service
+	- Host Port: 80
+	- click 'TEST' buton
+	- we have to receive success!
+
+- choose 'web-service' as answer
+
+
+
+
+11. Which of the names CANNOT be used to access the HR service from the test pod?
+---------------------------------------------------------------------------------
+
+We know services can be called from all FQDN names, but pods CAN'T.
+
+We can test all posibilities in the 'Test App' tab.
+
+The only answer that DO NOT match service and its FQDN is web-service.default.pod
+
+- choose 'web-service.default.pod' as answer
+
+
+
+12. Which of the below name can be used to access the payroll service from the test application?
+------------------------------------------------------------------------------------------------
+
+List pods in the 'payroll' namespace
+	terminal --> k get pods -n payroll
+
+	# result:
+	NAME   READY   STATUS    RESTARTS   AGE
+	web    1/1     Running   0          27m
+
+
+List services in 'payroll' namespace
+	terminal --> k get svc -n payroll
+
+	# result:
+	NAME          TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)   AGE
+	web-service   ClusterIP   172.20.244.167   <none>        80/TCP    40m
+
+
+Show details for the service web-service
+	terminal --> k describe svc web-service -n payroll
+
+# result:
+---------------------------------------------
+Name:                     web-service
+Namespace:                payroll
+Labels:                   <none>
+Annotations:              <none>
+Selector:                 name=web			# this is the target pod
+Type:                     ClusterIP
+IP Family Policy:         SingleStack
+IP Families:              IPv4
+IP:                       172.20.244.167
+IPs:                      172.20.244.167
+Port:                     <unset>  80/TCP
+TargetPort:               80/TCP
+Endpoints:                172.17.0.4:80
+Session Affinity:         None
+Internal Traffic Policy:  Cluster
+Events:                   <none>
+---------------------------------------------
+
+So we can access the web app true web-service.payroll, because we need to specify the namespace. Otherwise we will access the hr pod.
+
+We can test on Test App tab
+
+- choose 'web-service.payroll' as answer
+
+
+
+
+
+13. Which of the below name CANNOT be used to access the payroll service from the test application?
+---------------------------------------------------------------------------------------------------
+
+The only one option that is not applicable is web-sevice.payroll.svc.cluster, because '.cluster.local' is the root domain name
+
+- choose 'web-sevice.payroll.svc.cluster' as answer
+
+
+
+14. We just deployed a web server - webapp - that accesses a database mysql - server. However the web server is failing to connect to the database server. Troubleshoot and fix the issue.
+--------------------------------------------------------------------------------------
+They could be in different namespaces. First locate the applications. The web server interface can be seen by clicking the tab Web Server at the top of your terminal.
+
+List deployments	
+	terminal --> k get deploy
+
+	# result:
+	NAME     READY   UP-TO-DATE   AVAILABLE   AGE
+	webapp   1/1     1            1           66s
+
+List pods in all namespaces
+	terminal --> k get pods -A
+
+# result:
+--------------------------------------------------------------------------------------
+NAMESPACE      NAME                                   READY   STATUS    RESTARTS   AGE
+default        hr                                     1/1     Running   0          50m
+default        simple-webapp-1                        1/1     Running   0          50m
+default        test                                   1/1     Running   0          50m
+default        webapp-6c9b6dccfb-mt4ls                1/1     Running   0          113s		# this app is trying to connect
+kube-flannel   kube-flannel-ds-fxkf9                  1/1     Running   0          51m
+kube-system    coredns-77d6fd4654-gcltd               1/1     Running   0          51m
+kube-system    coredns-77d6fd4654-vxzqx               1/1     Running   0          51m
+kube-system    etcd-controlplane                      1/1     Running   0          51m
+kube-system    kube-apiserver-controlplane            1/1     Running   0          51m
+kube-system    kube-controller-manager-controlplane   1/1     Running   0          51m
+kube-system    kube-proxy-lmr4j                       1/1     Running   0          51m
+kube-system    kube-scheduler-controlplane            1/1     Running   0          51m
+payroll        mysql                                  1/1     Running   0          113s		# to this app
+payroll        web                                    1/1     Running   0          50m
+--------------------------------------------------------------------------------------
+
+When we Open the 'Web Server' tab above top right corner of the console we can see that the status is FAILED with message:
+Environment Variables: DB_Host=mysql; DB_Database=Not Set; DB_User=root; DB_Password=paswrd; 2003: Can't connect to MySQL server on 'mysql:3306' (-2 Name does not resolve)
+From webapp-6c9b6dccfb-mt4ls!
+
+
+Show services in payroll namespace
+	terminal --> k get svc -n payroll
+
+NAME          TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
+mysql         ClusterIP   172.20.79.171    <none>        3306/TCP   4m41s
+web-service   ClusterIP   172.20.244.167   <none>        80/TCP     53m
+
+
+
+print deplyment web-app
+	terminal --> k describe deploy webapp
+
+	# result:
+------------------------------
+    Environment:
+      DB_Host:      mysql		# we need to specify the namespace
+      DB_User:      root
+      DB_Password:  paswrd
+------------------------------
+
+Edit the deployment
+	terminal --> k edit deploy webapp
+
+------------------------------
+    spec:
+      containers:
+      - env:
+        - name: DB_Host
+          value: mysql.payroll			# modified
+        - name: DB_User
+          value: root
+        - name: DB_Password
+          value: paswrd
+        image: mmumshad/simple-webapp-mysql
+------------------------------
+
+Check the Web Server tab. We should receive Access.
+
+- click 'Check' button
+
+
+
+
+
+15. From the hr pod nslookup the mysql service and redirect the output to a file /root/CKA/nslookup.out
+-------------------------------------------------------------------------------------------------------
+
+Do the nslookup
+	terminal --> k exec hr -- nslookup mysql.payroll
+
+# result:
+-----------------------------------------------
+Server:         172.20.0.10
+Address:        172.20.0.10#53
+
+** server can't find mysql.apyroll: NXDOMAIN
+
+command terminated with exit code 1
+-----------------------------------------------
+
+
+Redirect the result in file located in /root/CKA/nslookup.out
+	terminal --> k exec hr -- nslookup mysql.payroll > /root/CKA/nslookup.out
+
+Verify file creation
+	terminal --> cat /root/CKA/nslookup.out
+
+- click 'Check' button
+
+
+
+
+
+
+======================
+Section 9 239. Ingress
+======================
+
+Recap services and ingress.
+
+We have simple scenario - web-app for online store - www.my-online-strore.com
+	- We have web-app (online store) in deployment with web-service (NodePort - accessable from outside users) on port 38080
+	- We have MySQL POD with mysql-service (ClusterIP type - only internal)
+
+Our app is accessabe on http://<node_ip>:38080. Whenever traffic increases, we increase the web-app pod replicas in the deployment to handle the additionla traffic. And the service takes care of splitting traffic between the pods.
+
+We dont want users to type <node_id> and ports so we set an additional proxy-server to forward traffic from www.my-online-strore.com to http://<node_ip>:38080.
+
+On Google Cloud Platform we can set our web-service to be type 'LoadBalabncer' and GCP will create automatically a proxy-server (load balancer) configured to rout traffic to the service ports on all the nodes and return information to kubernetes. The load balancer has an external IP that can be provided to users to access the application.
+
+Next we provide new video streaming service to our clients. We want the users to access the service on www.my-online-strore.com/watch. We want the old services to be accessable on www.my-online-strore.com/wear. We deploy the streming service as separate deployment on the same cluster. We create video-service (type LoadBalancer) with port 38282. GCP also provides separate proxy-server (load balancer) for the streaming service. We must set third proxy-server (load balancer) for the separate services. Having many proxy servers (load balancers) can increase drasticly our payments on the cloud and we must be aware. We must enable ssh (secure) communication for the proxy servers in one place. That a lot of manual work and resources.
+
+How to minimize services and payments on the cloud? What can we use to do that? - Ingress
+
+We can set our proxy servers infrastructure in the cluster and manage it automatically with Ingress. We can look over Ingress like a layer 7 load balancer build in to the Kubernetes cluster that can be configured using native kubernetes primitives just like any other object in Kubernetes.
+
+We still have to expose Ingress as NodePort type service or LoadBalancer for GCP, but this is just one time configuration. We are going to perform all load balancing, authentication, SSL and URL based routing configuration on the Ingress controller.
+
+
+Ingress
+=======
+
+1. Deploy load balancing tools like nginx, haproxy or traefik - Ingress Controller 
+2. Specify a set of rules to configure Ingress - Ingress Resources
+	- created by definition files like other objects in kubernetes
+
+Kubernetes cluster DO NOT come with Ingress Controller by default !
+
+
+Ingress Controller
+------------------
+
+Deploy Ingress Controller
+	- GSE - Google layer 7 http(s) load balabncer		# suported and maintained by the kubernetes project
+	- nginx							# suported and maintained by the kubernetes project
+	- Contour
+	- Haproxy
+	- traefik
+	- Istio
+
+In this case we will use nginx as example.
+
+Ingress Controller has more than just nginx deployed. There is additional inteligence build in to monitor kubernetes cluster for new definitions or Ingress Resources and configure the nginx server accordingly. 
+
+The nginx controller is deployed as just another deployment in kubernetes. This is pecial nginx image for ingress controller that has his own requirements.
+
+nginx-ingress-controller.yaml - Deployment
+------------------------------------------------------------
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: nginx-ingress-controller
+spec:
+  replicas: 1
+  selector: matchLabels:
+    name: nginx-ingress
+  template: 
+    metadata:
+      labels:
+	name: nginx-ingress
+    spec:
+      containers:
+	- name: nginx-ingress-controller
+	  image:quay.io/kubernetes-ingress- controller/nginx-ingress-controller:0.21.0
+      args:
+	- /nginx-ingress-controller
+	- --configmap=$(POD_NAMESPACE)/nginx-configuration
+      env:
+	- name: POD_NAME
+	  valueFrom: 
+	    fieldRef:
+	      fieldPath: metadata.name
+	- name: POD_NAMESPACE
+	  valueFrom: 
+	    fieldRef:
+	      fieldPath: metadata.namespace
+      ports:
+	- name: http
+	  containerPort: 80
+	- name: https
+	  containerPort: 443
+------------------------------------------------------------
+
+
+Nignx has a set of configuration options that must be passed
+	- err-lo-path
+	- keep-alive
+	- ssl-protocols
+	- more
+
+In order to decaouple ths configuration data from nginx controller image, we must create a configmap object and pass them in. Below is empty configmap object that will help us manage configuration settings in the future.
+
+ConfigMap
+-----------------------------
+kind: ConfigMap 
+apiVersion: v1 
+metadata:
+  name: nginx-configuration
+-----------------------------
+
+
+We have to create a service type NodePort to expose the Ingress Controller to the external world.
+
+ingress-service.yaml - Service
+------------------------------------------------------------
+apiVersion: v1 
+kind: Service 
+metadata:
+  name: nginx-ingress
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    targetPort: 80 protocol: TCP name: http
+  - port: 443
+    targetPort: 443 
+    protocol: TCP name: https
+  selector:
+    name: nginx-ingress
+------------------------------------------------------------
+
+
+We need a service account with set of permissions to manage the additional inteligence for monitoring the kubernetes cluster for ingress resources and configure the nginx server when something is changed. Below is the empty service account object definition file.
+
+service-account.yaml - Auth
+------------------------------------------------------------
+apiVersion: v1 kind: ServiceAccount 
+metadata:
+  name: nginx-ingress-serviceaccount
+------------------------------------------------------------
+Additional we have to configure Roles, ClusterRoler and RoleBindings
+
+
+What we have mandatory for creation of simples form of Ingress Controller:
+	- Deployment
+	- Service
+	- ConfigMap
+	- Auth - Service Account
+
+
+
+
+Ingress Resources
+=================
+
+Ingress Resources are set of rules and configurations applied on the Ingress Controller.
+
+Examples rule types
+	Type 1 - forward traffic to specific application 
+	Type 2 - rout traffic to specific application based on a URL (/wear, /watch)
+	Type 3 - route user based on the domain name itself (wear.my-online-strore.com or watch.my-online-strore.com)
+
+
+Ingress Reousrce is created with kubernetes definition file in this case:
+
+ingress-wear.yaml
+------------------------------------------------------------
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-wear
+spec:
+  backend:
+    serviceName: wear-service
+    servicePort: 80
+------------------------------------------------------------
+
+Create the Ingress Resource
+	terminal --> kubectl create –f ingress-wear.yaml
+	
+	# result: ingress.extensions/ingress-wear created
+
+List Ingress Resources
+	terminal --> kubectl get ingress
+
+	# result: ingress-wear * 80 2s
+
+New Ingress is now created and rout all incoming traffic directly to the wear service.
+
+We use rules when we want to rout traffic based on different conditions.
+	- www.my-online-store.com		- Rule 1
+	- www.wear.my-online-store.com		- Rule 2
+	- www.watch.my-online-store.com		- Rule 3
+	- Everything Else			- Rule 4
+
+Rule 1
+	- www.my-online-store.com/wear			- /wear
+	- www.my-online-store.com/watch			- /watch
+	- www.my-online-store.com/			- 404 not found
+
+Rule 2
+	- www.wear.my-online-store.com/return		- different backend services for returning products
+	- www.wear.my-online-store.com/support		- different backend services for customer support
+
+Rule 3
+	- www.wear.my-online-store.com/movies		- path /movies
+	- www.wear.my-online-store.com/tv		- path /tv
+
+Rule 4
+	- www.listen.my-online-store.com/		- 404 not foound page
+	- www.eat.my-online-store.com/			- 404 not foound page
+	- www.drink.my-online-store.com/		- 404 not foound page
+
+
+
+Configure Ingress Resources in Kubernetes
+-----------------------------------------
+
+Type 1 - forward traffic to specific application:
+
+ingress-wear-watch.yaml
+--------------------------------------------------
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-wear-watch
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /wear
+        backend:
+    	  serviceName: wear-service
+    	  servicePort: 80
+
+      - path: /watch
+        backend:
+    	  serviceName: watch-service
+    	  servicePort: 80
+--------------------------------------------------
+
+Create Ingress Resource
+	terminal --> k create -f ingress-wear-watch.yaml
+
+Show details of Ingress Resources
+	terminal --> k describe ingress-wear-watch
+
+# result:
+----------------------------------------------------
+Name: ingress-wear-watch
+Namespace: default Address:
+Rules:
+  Host Path Backends
+  ---- ---- --------
+  *
+     /wear wear-service:80 (<none>)				# BE service 1
+     /watch watch-service:80 (<none>) 				# BE service 2
+Annotations:
+Events:
+  Type 		Reason 	Age 	From 			Message 
+  ---- 		------ 	--- 	---- 			-------
+  Normal 	CREATE 	14s 	nginx-ingress-controller Ingress default/ingress-wear-watch
+----------------------------------------------------
+
+
+
+Type 3 - route user based on the domain name itself (wear.my-online-strore.com or watch.my-online-strore.com):
+
+ingress-wear-watch.yaml
+--------------------------------------------------
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-wear-watch
+spec:
+  rules:					# we have 2 rules
+  - host: wear.my-online-store.com		# we specify the incoming traffic from host 1
+    http:
+      paths:
+      - backend:
+	  serviceName: wear-service
+	  servicePort: 80
+  - host: watch.my-online-store.com		# we specify the incoming traffic from host 2
+    http:
+      paths:
+      - backend:
+	  serviceName: watch-service
+	  servicePort: 80
+--------------------------------------------------
+
+
+
+
+
+===============================
+Section 9 240. Article: Ingress
+===============================
+
+As we already discussed Ingress in our previous lecture. Here is an update.
+
+In this article, we will see what changes have been made in previous and current versions in Ingress.
+
+Like in apiVersion, serviceName and servicePort etc.
+
+Now, in k8s version 1.20+ we can create an Ingress resource from the imperative way like this:-
+
+ingress-wear-watch.yaml
+--------------------------------------------------
+apiVersion: networking.k8s.io/v1			# changed
+kind: Ingress
+metadata:
+  name: ingress-wear-watch
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /wear
+        backend:
+    	  service					# changed
+	    name: wear-service
+    	    port:
+	      number: 80
+
+      - path: /watch
+        backend:
+    	  service					# changed
+	    name: watch-service
+    	    port:
+	      number: 80
+--------------------------------------------------
+
+Format:
+	terminal --> kubectl create ingress <ingress-name> --rule="host/path=service:port"
+
+Example:
+	terminal --> kubectl create ingress ingress-test --rule="wear.my-online-store.com/wear*=wear-service:80"
+
+
+Find more information and examples in the below reference link:
+	- https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#-em-ingress-em-
+
+References:
+	- https://kubernetes.io/docs/concepts/services-networking/ingress
+	- https://kubernetes.io/docs/concepts/services-networking/ingress/#path-types
+
+
+
+
+
+=======================================================
+Section 9 241. Ingress - Annotations and rewrite-target
+=======================================================
+
+Different ingress controllers have different options that can be used to customise the way it works. NGINX Ingress controller has many options that can be seen here (https://kubernetes.github.io/ingress-nginx/examples/). I would like to explain one such option that we will use in our labs. The Rewrite (https://kubernetes.github.io/ingress-nginx/examples/rewrite/) target option.
+
+Our watch app displays the video streaming webpage at http://<watch-service>:<port>/
+
+Our wear app displays the apparel webpage at http://<wear-service>:<port>/
+
+
+We must configure Ingress to achieve the below. When user visits the URL on the left, his request should be forwarded internally to the URL on the right. Note that the /watch and /wear URL path are what we configure on the ingress controller so we can forwarded users to the appropriate application in the backend. The applications don't have this URL/Path configured on them:
+
+http://<ingress-service>:<ingress-port>/watch --> http://<watch-service>:<port>/
+http://<ingress-service>:<ingress-port>/wear --> http://<wear-service>:<port>/
+
+
+Without the rewrite-target option, this is what would happen:
+
+http://<ingress-service>:<ingress-port>/watch --> http://<watch-service>:<port>/watch
+http://<ingress-service>:<ingress-port>/wear --> http://<wear-service>:<port>/wear
+
+
+Notice watch and wear at the end of the target URLs. The target applications are not configured with /watch or /wear paths. They are different applications built specifically for their purpose, so they don't expect /watch or /wear in the URLs. And as such the requests would fail and throw a 404 not found error.
+
+
+To fix that we want to "ReWrite" the URL when the request is passed on to the watch or wear applications. We don't want to pass in the same path that user typed in. So we specify the rewrite-target option. This rewrites the URL by replacing whatever is under rules->http->paths->path which happens to be /pay in this case with the value in rewrite-target. This works just like a search and replace function.
+
+For example: replace(path, rewrite-target)
+In our case: replace("/path","/")
+
+--------------------------------------------------
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: test-ingress
+  namespace: critical-space
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /pay
+        backend:
+          serviceName: pay-service
+          servicePort: 8282
+--------------------------------------------------
+
+
+
+In another example given here (https://kubernetes.github.io/ingress-nginx/examples/rewrite/), this could also be:
+
+replace("/something(/|$)(.*)", "/$2")
+
+
+--------------------------------------------------
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+  name: rewrite
+  namespace: default
+spec:
+  rules:
+  - host: rewrite.bar.com
+    http:
+      paths:
+      - backend:
+          serviceName: http-svc
+          servicePort: 80
+        path: /something(/|$)(.*)
+--------------------------------------------------
+
+
+
+
+
+
+
+
+==================================================
+Section 9 243. Ingress - Practice Test - Ingrees-1
+==================================================
+
+
+1. We have deployed Ingress Controller, resources and applications. Explore the setup.
+--------------------------------------------------------------------------------------
+Note: They are in different namespaces.
+
+List nodes
+	terminal --> k get nodes
+
+# result:
+NAME           STATUS   ROLES           AGE     VERSION
+controlplane   Ready    control-plane   2m55s   v1.31.0
+
+
+List deployments in all namespaces
+	terminal --> k get deploy -A
+
+# result:
+
+NAMESPACE       NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
+app-space       default-backend            1/1     1            1           2m6s
+app-space       webapp-video               1/1     1            1           2m6s
+app-space       webapp-wear                1/1     1            1           2m6s
+ingress-nginx   ingress-nginx-controller   1/1     1            1           2m5s	# we can see ingress namespace
+kube-system     coredns                    2/2     2            2           3m33s
+
+
+List pods in default namespace 
+	terminal --> k get pods -n kube-system
+
+# result: no ingress pods in default namespace
+
+NAME                                   READY   STATUS    RESTARTS   AGE
+coredns-77d6fd4654-dpbxm               1/1     Running   0          5m29s
+coredns-77d6fd4654-smrjm               1/1     Running   0          5m29s
+etcd-controlplane                      1/1     Running   0          5m34s
+kube-apiserver-controlplane            1/1     Running   0          5m34s
+kube-controller-manager-controlplane   1/1     Running   0          5m34s
+kube-proxy-cshnv                       1/1     Running   0          5m28s 
+kube-scheduler-controlplane            1/1     Running   0          5m34s
+
+
+List pods in ingress-nginx namespace
+	terminal --> k get pods -n ingress-nginx
+
+# result:
+
+NAME                                        READY   STATUS      RESTARTS   AGE
+ingress-nginx-admission-create-w5897        0/1     Completed   0          6m43s
+ingress-nginx-admission-patch-vt6rp         0/1     Completed   0          6m43s
+ingress-nginx-controller-7f45764b55-574xp   1/1     Running     0          6m44s
+
+
+- click 'Ok' button
+
+
+
+
+2. Which namespace is the Ingress Controller deployed in?
+---------------------------------------------------------
+
+List deployments in all namespaces
+	terminal --> k get deploy -A
+
+# result:
+
+NAMESPACE       NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
+app-space       default-backend            1/1     1            1           2m6s
+app-space       webapp-video               1/1     1            1           2m6s
+app-space       webapp-wear                1/1     1            1           2m6s
+ingress-nginx   ingress-nginx-controller   1/1     1            1           2m5s	# we can see ingress namespace
+kube-system     coredns                    2/2     2            2           3m33s
+
+
+List pods in ingress-nginx namespace
+	terminal --> k get pods -n ingress-nginx
+
+# result:
+
+NAME                                        READY   STATUS      RESTARTS   AGE
+ingress-nginx-admission-create-w5897        0/1     Completed   0          6m43s
+ingress-nginx-admission-patch-vt6rp         0/1     Completed   0          6m43s
+ingress-nginx-controller-7f45764b55-574xp   1/1     Running     0          6m44s
+
+
+- choose 'ingress-nginx' as answer
+
+
+
+
+3. What is the name of the Ingress Controller Deployment?
+---------------------------------------------------------
+
+List deployments in ingress-nginx namespace
+	terminal --> k get deploy -n ingress-nginx
+
+# result:
+
+NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
+ingress-nginx-controller   1/1     1            1           10m
+
+- choose 'ingress-nginx-controller' as answer
+
+
+
+
+4. Which namespace are the applications deployed in?
+----------------------------------------------------
+
+List deployments in all namespaces
+	terminal --> k get deploy -A
+
+# result: # we can see in app-space namespace 2 webapp pods and 1 backend pod
+
+NAMESPACE       NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
+app-space       default-backend            1/1     1            1           2m6s
+app-space       webapp-video               1/1     1            1           2m6s
+app-space       webapp-wear                1/1     1            1           2m6s
+ingress-nginx   ingress-nginx-controller   1/1     1            1           2m5s	
+kube-system     coredns                    2/2     2            2           3m33s
+
+
+- choose 'app-space' as asnwer
+
+
+
+
+5. How many applications are deployed in the app-space namespace?
+-----------------------------------------------------------------
+Count the number of deployments in this namespace.
+
+
+List deployments in all namespaces
+	terminal --> k get deploy -A
+
+# result: # we can see in app-space namespace 2 webapp pods and 1 backend pod
+
+NAMESPACE       NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
+app-space       default-backend            1/1     1            1           2m6s
+app-space       webapp-video               1/1     1            1           2m6s
+app-space       webapp-wear                1/1     1            1           2m6s
+ingress-nginx   ingress-nginx-controller   1/1     1            1           2m5s	
+kube-system     coredns                    2/2     2            2           3m33s
+
+
+- choose '3' as asnwer
+
+
+
+
+6. Which namespace is the Ingress Resource deployed in?
+-------------------------------------------------------
+
+List Ingress Controller Resources in all namespaces
+	terminal --> k get ingress -A
+
+# result:
+
+NAMESPACE   NAME                 CLASS    HOSTS   ADDRESS          PORTS   AGE
+app-space   ingress-wear-watch   <none>   *       172.20.187.214   80      15m
+
+
+- choose 'app-space' as answer
+
+
+
+
+7. What is the name of the Ingress Resource?
+--------------------------------------------
+
+List Ingress Resources in all namespaces
+	terminal --> k get ingress -A
+
+# result:
+
+NAMESPACE   NAME                 CLASS    HOSTS   ADDRESS          PORTS   AGE
+app-space   ingress-wear-watch   <none>   *       172.20.187.214   80      15m
+
+
+- choose 'ingress-wear-watch' as answer
+
+
+
+
+8. What is the Host configured on the Ingress Resource?
+-------------------------------------------------------
+The host entry defines the domain name that users use to reach the application like www.google.com
+
+
+Show Ingress Resource details
+	terminal --> k describe ingress ingress-wear-watch -n app-space
+
+	# k 						- common kubernetes command
+	# describe					- show details for object
+	# ingress					- target object type
+	# ingress-wear-watch				- target object name
+	# -n app-space					- namespace of the object
+
+# result:
+-----------------------------------------------------------------
+Name:             ingress-wear-watch
+Labels:           <none>
+Namespace:        app-space
+Address:          172.20.187.214
+Ingress Class:    <none>
+Default backend:  <default>
+Rules:
+  Host        Path  Backends
+  ----        ----  --------
+  *           							# '*' mean 'all'
+              /wear    wear-service:8080 (172.17.0.4:8080)
+              /watch   video-service:8080 (172.17.0.5:8080)
+Annotations:  nginx.ingress.kubernetes.io/rewrite-target: /
+              nginx.ingress.kubernetes.io/ssl-redirect: false
+Events:
+  Type    Reason  Age                From                      Message
+  ----    ------  ----               ----                      -------
+  Normal  Sync    17m (x2 over 17m)  nginx-ingress-controller  Scheduled for sync
+-----------------------------------------------------------------
+
+
+- choose 'All Hosts (*)' as answer
+
+
+
+
+9. What backend is the /wear path on the Ingress configured with?
+-----------------------------------------------------------------
+
+Show Ingress Resource details
+	terminal --> k describe ingress ingress-wear-watch -n app-space
+
+	# k 						- common kubernetes command
+	# describe					- show details for object
+	# ingress					- target object type
+	# ingress-wear-watch				- target object name
+	# -n app-space					- namespace of the object
+
+# result:
+-----------------------------------------------------------------
+Name:             ingress-wear-watch
+Labels:           <none>
+Namespace:        app-space
+Address:          172.20.187.214
+Ingress Class:    <none>
+Default backend:  <default>
+Rules:
+  Host        Path  Backends
+  ----        ----  --------
+  *           							
+              /wear    wear-service:8080 (172.17.0.4:8080)	# This si the answer
+              /watch   video-service:8080 (172.17.0.5:8080)
+Annotations:  nginx.ingress.kubernetes.io/rewrite-target: /
+              nginx.ingress.kubernetes.io/ssl-redirect: false
+Events:
+  Type    Reason  Age                From                      Message
+  ----    ------  ----               ----                      -------
+  Normal  Sync    17m (x2 over 17m)  nginx-ingress-controller  Scheduled for sync
+-----------------------------------------------------------------
+
+
+- choose 'wear-service' as answer
+
+
+
+
+10. At what path is the video streaming application made available on the Ingress?
+----------------------------------------------------------------------------------
+
+Show Ingress Resource details
+	terminal --> k describe ingress ingress-wear-watch -n app-space
+
+	# k 						- common kubernetes command
+	# describe					- show details for object
+	# ingress					- target object type
+	# ingress-wear-watch				- target object name
+	# -n app-space					- namespace of the object
+
+# result:
+-----------------------------------------------------------------
+Name:             ingress-wear-watch
+Labels:           <none>
+Namespace:        app-space
+Address:          172.20.187.214
+Ingress Class:    <none>
+Default backend:  <default>
+Rules:
+  Host        Path  Backends
+  ----        ----  --------
+  *           							
+              /wear    wear-service:8080 (172.17.0.4:8080)	
+              /watch   video-service:8080 (172.17.0.5:8080)	# This si the answer
+Annotations:  nginx.ingress.kubernetes.io/rewrite-target: /
+              nginx.ingress.kubernetes.io/ssl-redirect: false
+Events:
+  Type    Reason  Age                From                      Message
+  ----    ------  ----               ----                      -------
+  Normal  Sync    17m (x2 over 17m)  nginx-ingress-controller  Scheduled for sync
+-----------------------------------------------------------------
+
+
+- choose '/watch' as answer
+
+
+
+11. If the requirement does not match any of the configured paths in the Ingress, to which service are the requests forwarded?
+------------------------------------------------------------------------------------------------------------------------------
+
+Show Ingress Resource details
+	terminal --> k describe ingress ingress-wear-watch -n app-space
+
+	# k 						- common kubernetes command
+	# describe					- show details for object
+	# ingress					- target object type
+	# ingress-wear-watch				- target object name
+	# -n app-space					- namespace of the object
+
+# result:
+-----------------------------------------------------------------
+Name:             ingress-wear-watch
+Labels:           <none>
+Namespace:        app-space
+Address:          172.20.187.214
+Ingress Class:    <none>
+Default backend:  <default>		# This si the answer					
+Rules:
+  Host        Path  Backends
+  ----        ----  --------
+  *           							
+              /wear    wear-service:8080 (172.17.0.4:8080)	
+              /watch   video-service:8080 (172.17.0.5:8080)	
+Annotations:  nginx.ingress.kubernetes.io/rewrite-target: /
+              nginx.ingress.kubernetes.io/ssl-redirect: false
+Events:
+  Type    Reason  Age                From                      Message
+  ----    ------  ----               ----                      -------
+  Normal  Sync    17m (x2 over 17m)  nginx-ingress-controller  Scheduled for sync
+-----------------------------------------------------------------
+
+
+- choose 'default-backend-service' as answer
+
+
+
+
+12. Now view the Ingress Service using the tab at the top of the terminal. Which page do you see?
+-------------------------------------------------------------------------------------------------
+Click on the tab named Ingress.
+
+Click on the Ingress tab above top right corner of the console
+
+- choose '404 Error page' as answer
+
+
+
+13. View the applications by appending /wear and /watch to the URL you opened in the previous step.
+---------------------------------------------------------------------------------------------------
+
+Open  https://30080-port-cqnnpgyoy3sex3f7.labs.kodekloud.com/wear
+Open  https://30080-port-cqnnpgyoy3sex3f7.labs.kodekloud.com/watch
+
+# both pages works
+
+- click 'Ok' as answer
+
+
+
+
+14. You are requested to change the URLs at which the applications are made available.
+--------------------------------------------------------------------------------------
+Make the video application available at /stream.
+
+
+Ingress: ingress-wear-watch
+Path: /stream
+Backend Service: video-service
+Backend Service Port: 8080
+
+
+Edit Ingress Resource
+	terminal --> k edit ingress ingress-wear-watch -n app-space
+
+	# k 						- common kubernetes command
+	# edit						- edit details for object
+	# ingress					- target object type
+	# ingress-wear-watch				- target object name
+	# -n app-space					- namespace of the object
+
+
+# result:
+-----------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  creationTimestamp: "2025-01-30T17:30:54Z"
+  generation: 1
+  name: ingress-wear-watch
+  namespace: app-space
+  resourceVersion: "798"
+  uid: f7e50de5-1560-4cb9-a46f-42e51a0d1dea
+spec:
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: wear-service
+            port:
+              number: 8080
+        path: /wear				
+        pathType: Prefix
+      - backend:
+          service:
+            name: video-service
+            port:
+              number: 8080
+        path: /stream			# modified to /stream
+        pathType: Prefix
+status:
+  loadBalancer:
+    ingress:
+    - ip: 172.20.123.160
+-----------------------------------------------------------
+save changes - escape, :wq!, enter
+
+Verify changes
+	terminal --> k describe ingress ingress-wear-watch -n app-space
+
+	OR
+
+	Open https://30080-port-cqnnpgyoy3sex3f7.labs.kodekloud.com/weatch - 404 page must appear
+	Open https://30080-port-cqnnpgyoy3sex3f7.labs.kodekloud.com/stream - working page
+
+- click 'Check' button
+
+
+
+15. View the Video application using the /stream URL in your browser.
+---------------------------------------------------------------------
+Click on the Ingress tab above your terminal, if its not open already, and append /stream to the URL in the browser.
+
+Open https://30080-port-cqnnpgyoy3sex3f7.labs.kodekloud.com/stream - working page
+
+- click 'Ok' button
+
+
+
+
+16. A user is trying to view the /eat URL on the Ingress Service. Which page would he see?
+------------------------------------------------------------------------------------------
+If not open already, click on the Ingress tab above your terminal, and append /eat to the URL in the browser.
+
+
+Open https://30080-port-cqnnpgyoy3sex3f7.labs.kodekloud.com/eat - 404 page
+
+- choose '404 Error page' as answer
+
+
+
+
+17. Due to increased demand, your business decides to take on a new venture. You acquired a food delivery company. Their applications have been migrated over to your cluster.
+----------------------------------------------------------------------------------------
+Inspect the new deployments in the app-space namespace.
+
+List pods in app-space namespace
+	terminal --> k get pods -n app-space
+
+# result:
+
+NAME                               READY   STATUS    RESTARTS   AGE
+default-backend-5cd488d85c-zhcbn   1/1     Running   0          12m
+webapp-food-57d799b775-9hblf       1/1     Running   0          48s
+webapp-video-cb475db9c-r4czr       1/1     Running   0          12m
+webapp-wear-6886df6554-vxmg6       1/1     Running   0          12m
+
+
+- click 'Ok' button
+
+
+
+
+18. You are requested to add a new path to your ingress to make the food delivery application available to your customers.
+--------------------------------------------------------------------------------------------------------------------------
+Make the new application available at /eat.
+
+Ingress: ingress-wear-watch
+Path: /eat
+Backend Service: food-service
+Backend Service Port: 8080
+
+Edit Ingress Resource
+	terminal --> k edit ingress ingress-wear-watch -n app-space
+
+	# k 						- common kubernetes command
+	# edit						- edit details for object
+	# ingress					- target object type
+	# ingress-wear-watch				- target object name
+	# -n app-space					- namespace of the object
+
+
+# result:
+-----------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  creationTimestamp: "2025-01-30T17:30:54Z"
+  generation: 1
+  name: ingress-wear-watch
+  namespace: app-space
+  resourceVersion: "798"
+  uid: f7e50de5-1560-4cb9-a46f-42e51a0d1dea
+spec:
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: wear-service
+            port:
+              number: 8080
+        path: /wear				
+        pathType: Prefix
+      - backend:
+          service:
+            name: video-service
+            port:
+              number: 8080
+        path: /stream			
+        pathType: Prefix
+      - backend:			# added from here
+          service:
+            name: food-service
+            port:
+              number: 8080
+        path: /eat			
+        pathType: Prefix		# to here
+status:
+  loadBalancer:
+    ingress:
+    - ip: 172.20.123.160
+-----------------------------------------------------------
+save changes - escape, :wq!, enter
+
+Verify changes
+	terminal --> k describe ingress ingress-wear-watch -n app-space
+
+	OR
+
+	Open https://30080-port-cqnnpgyoy3sex3f7.labs.kodekloud.com/eat - working page
+
+- click 'Check' button
+
+
+
+19. View the Food delivery application using the /eat URL in your browser.
+--------------------------------------------------------------------------
+Click on the Ingress tab above your terminal, if its not open already, and append /eat to the URL in the browser.
+
+Open https://30080-port-cqnnpgyoy3sex3f7.labs.kodekloud.com/eat - working page
+
+
+
+
+
+20. A new payment service has been introduced. Since it is critical, the new application is deployed in its own namespace.
+--------------------------------------------------------------------------------------------------------------------------
+Identify the namespace in which the new application is deployed.
+
+List pods in all namespaces
+	terminal --> k get pods -A
+
+# result:
+
+NAMESPACE        NAME                                        READY   STATUS      RESTARTS   AGE
+app-space        default-backend-5cd488d85c-zhcbn            1/1     Running     0          19m
+app-space        webapp-food-57d799b775-9hblf                1/1     Running     0          7m46s
+app-space        webapp-video-cb475db9c-r4czr                1/1     Running     0          19m
+app-space        webapp-wear-6886df6554-vxmg6                1/1     Running     0          19m
+critical-space   webapp-pay-6888bbb889-ff5jk                 1/1     Running     0          90s	  # this is the payment app
+ingress-nginx    ingress-nginx-admission-create-v65v5        0/1     Completed   0          19m
+ingress-nginx    ingress-nginx-admission-patch-n27cr         0/1     Completed   0          19m
+ingress-nginx    ingress-nginx-controller-7f45764b55-6vkvt   1/1     Running     0          19m
+kube-flannel     kube-flannel-ds-rw5vg                       1/1     Running     0          21m
+kube-system      coredns-77d6fd4654-26f27                    1/1     Running     0          21m
+kube-system      coredns-77d6fd4654-jw6ws                    1/1     Running     0          21m
+kube-system      etcd-controlplane                           1/1     Running     0          21m
+kube-system      kube-apiserver-controlplane                 1/1     Running     0          21m
+kube-system      kube-controller-manager-controlplane        1/1     Running     0          21m
+kube-system      kube-proxy-rd5b9                            1/1     Running     0          21m
+kube-system      kube-scheduler-controlplane                 1/1     Running     0          21m
+
+
+- choose 'critical-space' as answer
+
+
+
+21. What is the name of the deployment of the new application?
+--------------------------------------------------------------
+
+List deployments in the 'critical-space' namespace
+	terminal --> k get deploy -n critical-space
+
+# result:
+
+NAME         READY   UP-TO-DATE   AVAILABLE   AGE
+webapp-pay   1/1     1            1           4m50s
+
+- choose 'webapp-pay' as answer
+
+
+
+22. You are requested to make the new application available at /pay.
+--------------------------------------------------------------------
+Identify and implement the best approach to making this application available on the ingress controller and test to make sure its working. Look into annotations: rewrite-target as well.
+
+
+Ingress Created
+Path: /pay
+Configure correct backend service
+Configure correct backend port
+
+Best practice is to create Ingress Resource fot this app in his namespace
+
+Show service in the 'critical-space' namespace - find webapp-pay pod service
+	terminal --> k get svc -n critical-space
+
+# result:
+
+NAME          TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
+pay-service   ClusterIP   172.20.79.21   <none>        8282/TCP   9m30s
+
+# we will use the service name - pay-service
+# we will use the service port - 8282
+
+
+Show help commands for creating a Ingress
+	terminal --> k create ingress -h
+
+We will use the first example:
+  # Create a single ingress called 'simple' that directs requests to foo.com/bar to svc
+  # svc1:8080 with a TLS secret "my-cert"
+  kubectl create ingress simple --rule="foo.com/bar=svc1:8080,tls=my-cert"
+
+Create Ingress definition file
+	terminal --> kubectl create ingress ingress-pay -n critical-space --rule="/pay=pay-service:8282"
+
+	# kubectl					- common kubernetes command
+	# create					- create object
+	# ingress					- object type
+	# ingress-pay					- object name
+	# -n app-space					- namespace of the object
+	# --rule="/pay=pay-service:8282"		- specify the path (/pay),service (pay-service) and the port (:8282)
+
+	# result: ingress.networking.k8s.io/ingress-pay created
+
+
+Verify Ingress creation
+	terminal --> k get ingress -n critical-space
+
+# result:
+
+NAME          CLASS    HOSTS   ADDRESS   PORTS   AGE
+ingress-pay   <none>   *                 80      26s
+
+
+Print the created Ingress
+	terminal --> k describe ingress ingress-pay -n critical-space
+
+# result:
+-----------------------------------------------------------
+Name:             ingress-pay
+Labels:           <none>
+Namespace:        critical-space
+Address:          172.20.123.160
+Ingress Class:    <none>
+Default backend:  <default>
+Rules:
+  Host        Path  Backends
+  ----        ----  --------
+  *           
+              /pay   pay-service:8282 (172.17.0.11:8080)
+Annotations:  <none>
+Events:
+  Type    Reason  Age                 From                      Message
+  ----    ------  ----                ----                      -------
+  Normal  Sync    71s (x2 over 103s)  nginx-ingress-controller  Scheduled for sync
+-----------------------------------------------------------
+
+Check if the service is working
+	Open https://30080-port-cqnnpgyoy3sex3f7.labs.kodekloud.com/pay - 404 Error page
+
+Check the work of the pod
+	terminal --> k get pods -n critical-space
+
+# result:
+
+NAME                          READY   STATUS    RESTARTS   AGE
+webapp-pay-6888bbb889-ff5jk   1/1     Running   0          19m
+
+Show logs of the pod	
+	terminal --> k logs webapp-pay-6888bbb889-ff5jk -n critical-space
+
+# result:
+
+ * Serving Flask app 'app' (lazy loading)
+ * Environment: production
+   WARNING: This is a development server. Do not use it in a production deployment.
+   Use a production WSGI server instead.
+ * Debug mode: off
+ * Running on all addresses.
+   WARNING: This is a development server. Do not use it in a production deployment.
+ * Running on http://172.17.0.11:8080/ (Press CTRL+C to quit)
+172.17.0.9 - - [30/Jan/2025 18:07:33] "GET /pay HTTP/1.1" 404 -
+
+
+We need to set Annotation beacuse the app do not have /pay path.
+
+In Section 9 241. Ingress - Annotations and rewrite-target, we can see how to do it
+
+Edit the Ingress Resource and set Annotations
+	terminal --> k edit ingress ingress-pay -n critical-space
+
+	# k 						- common kubernetes command
+	# edit						- edit details for object
+	# ingress					- target object type
+	# ingress-wear-watch				- target object name
+	# -n app-space					- namespace of the object
+
+
+# result:
+-----------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  creationTimestamp: "2025-01-30T18:04:39Z"
+  generation: 1
+  name: ingress-pay
+  namespace: critical-space
+  resourceVersion: "3802"
+  uid: ea3a999d-492e-4ced-8b14-823206c64661
+  annotations:						# added
+    nginx.ingress.kubernetes.io/rewrite-target: /	# added
+spec:
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: pay-service
+            port:
+              number: 8282
+        path: /pay
+        pathType: Exact
+status:
+  loadBalancer:
+    ingress:
+    - ip: 172.20.123.160
+-----------------------------------------------------------
+save changes - escape, :wq!, enter
+
+Open https://30080-port-cqnnpgyoy3sex3f7.labs.kodekloud.com/pay - Working page
+
+- click 'Check' button
+
+
+
+
+23. View the Payment application using the /pay URL in your browser.
+--------------------------------------------------------------------
+Click on the Ingress tab above your terminal, if its not open already, and append /pay to the URL in the browser.
+
+Open https://30080-port-cqnnpgyoy3sex3f7.labs.kodekloud.com/pay - Working page
+
+- click 'Ok' button
+
+
+
+
+==================================================
+Section 9 245. Ingress - Practice Test - Ingrees-2
+==================================================
+
+In this practice Test we will deploy Ingress Controller.
+
+Set alias
+	terminal --> alias k=kubectl
+
+
+1. We have deployed two applications. Explore the setup.
+--------------------------------------------------------
+Note: They are in a different namespace.
+
+
+List all pods
+	terminal --> k get pods -A
+
+# result:
+
+NAMESPACE      NAME                                   READY   STATUS    RESTARTS   AGE
+app-space      default-backend-5cd488d85c-8lmgl       1/1     Running   0          41s
+app-space      webapp-video-cb475db9c-jgn9m           1/1     Running   0          41s
+app-space      webapp-wear-6886df6554-hdl2g           1/1     Running   0          41s
+kube-flannel   kube-flannel-ds-gxd66                  1/1     Running   0          2m38s
+kube-system    coredns-77d6fd4654-f42zx               1/1     Running   0          2m38s
+kube-system    coredns-77d6fd4654-hntkp               1/1     Running   0          2m38s
+kube-system    etcd-controlplane                      1/1     Running   0          2m42s
+kube-system    kube-apiserver-controlplane            1/1     Running   0          2m42s
+kube-system    kube-controller-manager-controlplane   1/1     Running   0          2m42s
+kube-system    kube-proxy-rrrch                       1/1     Running   0          2m38s
+kube-system    kube-scheduler-controlplane            1/1     Running   0          2m42s
+
+
+- click 'Ok' button
+
+
+
+
+2. Let us now deploy an Ingress Controller. First, create a namespace called ingress-nginx.
+-------------------------------------------------------------------------------------------
+We will isolate all ingress related objects into its own namespace.
+
+Name: ingress-nginx
+
+Show namespace create help commands 
+	terminal --> k create namespace -h
+
+# we will use the example
+  # Create a new namespace named my-namespace
+  kubectl create namespace my-namespace
+
+Create namespace ingress-nginx
+	terminal --> k create namespace ingress-nginx
+
+	# result: namespace/ingress-nginx created
+
+
+Check if the namespace is created
+	terminal --> k get ns			# ns - short syntax for namespace
+
+# result:
+
+NAME              STATUS   AGE
+app-space         Active   4m59s
+default           Active   7m4s
+ingress-nginx     Active   22s			# created
+kube-flannel      Active   6m59s
+kube-node-lease   Active   7m4s
+kube-public       Active   7m4s
+kube-system       Active   7m4s
+
+
+- click 'Check' button
+
+
+
+2. The NGINX Ingress Controller requires a ConfigMap object. Create a ConfigMap object with name ingress-nginx-controller in the ingress-nginx namespace.
+----------------------------------------------------------------------------------------------------
+No data needs to be configured in the ConfigMap.
+
+Name: ingress-nginx-controller
+
+Show create configmap help commands
+	terminal --> k create configmap -h
+
+Create ingress-nginx-controller configmap in the ingress-nginx namespace
+	terminal --> k create configmap ingress-nginx-controller -n ingress-nginx
+	
+	# result: configmap/ingress-nginx-controller created
+
+- click 'Check' button
+
+
+
+3. The NGINX Ingress Controller requires two ServiceAccounts. Create both ServiceAccount with name ingress-nginx and ingress-nginx-admission in the ingress-nginx namespace.
+-------------------------------------------------------------------------------------------------------
+Use the spec provided below.
+
+Name: ingress-nginx
+Name: ingress-nginx-admission
+
+Show create service-account help commands
+	terminal --> k create sa -h
+
+# we will use the example
+  # Create a new service account named my-service-account
+  kubectl create serviceaccount my-service-account
+
+Create the service accounts
+	terminal --> k create sa ingress-nginx -n ingress-nginx
+	terminal --> k create sa ingress-nginx-admission -n ingress-nginx
+
+	# result: serviceaccount/ingress-nginx created
+	# result: serviceaccount/ingress-nginx-admission created
+
+Verify service accounts creation
+	terminal --> k get sa -n ingress-nginx
+
+# result:
+
+NAME                      SECRETS   AGE
+default                   0         10m
+ingress-nginx             0         107s
+ingress-nginx-admission   0         99s
+
+- click 'Check' button
+
+
+
+
+5. We have created the Roles, RoleBindings, ClusterRoles, and ClusterRoleBindings for the ServiceAccount. Check it out!!
+------------------------------------------------------------------------------------------------------------------------
+
+List roles in ingress-nginx namespace
+	terminal --> k get roles -n ingress-nginx
+
+# result:
+
+NAME                      CREATED AT
+ingress-nginx             2025-01-30T18:54:08Z
+ingress-nginx-admission   2025-01-30T18:54:09Z
+
+Show details for ingress-nginx role
+	terminal --> k describe role ingress-nginx -n ingress-nginx
+
+# result:
+-----------------------------------------------------------------
+Name:         ingress-nginx
+Labels:       app.kubernetes.io/component=controller
+              app.kubernetes.io/instance=ingress-nginx
+              app.kubernetes.io/managed-by=Helm
+              app.kubernetes.io/name=ingress-nginx
+              app.kubernetes.io/part-of=ingress-nginx
+              app.kubernetes.io/version=1.1.2
+              helm.sh/chart=ingress-nginx-4.0.18
+Annotations:  <none>
+PolicyRule:
+  Resources                           Non-Resource URLs  Resource Names               Verbs
+  ---------                           -----------------  --------------               -----
+  events                              []                 []                           [create patch]
+  configmaps                          []                 []                           [get list watch create]
+  endpoints                           []                 []                           [get list watch]
+  pods                                []                 []                           [get list watch]
+  secrets                             []                 []                           [get list watch]
+  services                            []                 []                           [get list watch]
+  ingressclasses.networking.k8s.io    []                 []                           [get list watch]
+  ingresses.networking.k8s.io         []                 []                           [get list watch]
+  configmaps                          []                 [ingress-controller-leader]  [get update]
+  namespaces                          []                 []                           [get]
+  ingresses.networking.k8s.io/status  []                 []                           [update]
+-----------------------------------------------------------------
+
+
+
+List RoleBindings in ingress-nginx namespace
+	terminal --> k get rolebindings -n ingress-nginx
+
+# result:
+
+NAME                      ROLE                           AGE
+ingress-nginx             Role/ingress-nginx             117s
+ingress-nginx-admission   Role/ingress-nginx-admission   117s
+
+
+List ClusterRoles in ingress-nginx namespace
+	terminal --> k get clusterroles -n ingress-nginx
+
+List ClusterRoleBindings in ingress-nginx namespace
+	terminal --> k get clusterrolebindings -n ingress-nginx
+
+
+- click 'Ok' button
+
+
+
+
+6. Let us now deploy the Ingress Controller. Create the Kubernetes objects using the given file.
+------------------------------------------------------------------------------------------------
+The Deployment and it's service configuration is given at /root/ingress-controller.yaml. There are several issues with it. Try to fix them.
+
+Note: Do not edit the default image provided in the given file. The image validation check passes when other issues are resolved.
+
+
+Deployed in the correct namespace.
+Replicas: 1
+Use the right image
+Namespace: ingress-nginx
+Service name: ingress-nginx-controller
+NodePort: 30080
+
+
+Show files 
+	terminal --> ls			# result: ingress-controller.yaml
+
+Print ingress-controller.yaml file
+	terminal --> cat ingress-controller.yaml
+
+
+#  result:
+
+ingress-controller.yaml
+-------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/version: 1.1.2
+    helm.sh/chart: ingress-nginx-4.0.18
+  name: ingress-nginx-controller
+  namespace: ingress-
+spec:
+  minReadySeconds: 0
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: controller
+      app.kubernetes.io/instance: ingress-nginx
+      app.kubernetes.io/name: ingress-nginx
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx
+        app.kubernetes.io/name: ingress-nginx
+    spec:
+      containers:
+      - args:
+        - /nginx-ingress-controller
+        - --publish-service=$(POD_NAMESPACE)/ingress-nginx-controller
+        - --election-id=ingress-controller-leader
+        - --watch-ingress-without-class=true
+        - --default-backend-service=app-space/default-http-backend
+        - --controller-class=k8s.io/ingress-nginx
+        - --ingress-class=nginx
+        - --configmap=$(POD_NAMESPACE)/ingress-nginx-controller
+        - --validating-webhook=:8443
+        - --validating-webhook-certificate=/usr/local/certificates/cert
+        - --validating-webhook-key=/usr/local/certificates/key
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: LD_PRELOAD
+          value: /usr/local/lib/libmimalloc.so
+        image: registry.k8s.io/ingress-nginx/controller:v1.1.2@sha256:28b11ce69e57843de44e3db6413e98d09de0f6688e33d4bd384002a44f78405c
+        imagePullPolicy: IfNotPresent
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /wait-shutdown
+        livenessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /healthz
+            port: 10254
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: controller
+        ports:
+        - name: http
+            containerPort: 80
+          protocol: TCP
+        - containerPort: 443
+          name: https
+          protocol: TCP
+        - containerPort: 8443
+          name: webhook
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: 10254
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          requests:
+            cpu: 100m
+            memory: 90Mi
+        securityContext:
+          allowPrivilegeEscalation: true
+          capabilities:
+            add:
+            - NET_BIND_SERVICE
+            drop:
+            - ALL
+          runAsUser: 101
+        volumeMounts:
+        - mountPath: /usr/local/certificates/
+          name: webhook-cert
+          readOnly: true
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        kubernetes.io/os: linux
+      serviceAccountName: ingress-nginx
+      terminationGracePeriodSeconds: 300
+      volumes:
+      - name: webhook-cert
+        secret:
+          secretName: ingress-nginx-admission
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/version: 1.1.2
+    helm.sh/chart: ingress-nginx-4.0.18
+  name: ingress-controller
+  namespace: ingress-nginx
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 80
+    nodeport: 30080
+  selector:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/name: ingress-nginx
+  type: NodePort
+-------------------------------------------------------------
+
+
+Try to create the controller
+	terminal --> k create -f ingress-controller.yaml
+
+# result: error: error parsing ingress-controller.yaml: error converting YAML to JSON: yaml: line 73: mapping values are not allowed in this context
+
+
+
+Edit the file ad fix the issues
+	terminal --> vi ingress-controller.yaml
+
+-------------------------------------------------------------
+...
+        ports:
+        - name: http
+          containerPort: 80			# fixed identation
+          protocol: TCP
+        - containerPort: 443
+...
+  namespace: ingress-nginx				# fixed namespace
+...
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/version: 1.1.2
+    helm.sh/chart: ingress-nginx-4.0.18
+  name: ingress-nginx-controller			# fixed service name
+  namespace: ingress-nginx
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 80
+    nodePort: 30080					# fixed typo from 'nodeport' to 'nodePort'
+  selector:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/name: ingress-nginx
+  type: NodePort
+...
+-------------------------------------------------------------
+save changes - escape, :wq!, enter
+
+Create the controller
+	terminal --> k create -f ingress-controller.yaml
+
+If additional error appears - fix it
+	terminal --> vi ingress-controller.yaml
+
+Apply changes
+	terminal --> k aplly -f ingress-controller.yaml
+
+- click 'Check' button
+
+
+
+
+7. Create the ingress resource to make the applications available at /wear and /watch on the Ingress service.
+-------------------------------------------------------------------------------------------------------------
+Also, make use of rewrite-target annotation field: - nginx.ingress.kubernetes.io/rewrite-target: /
+
+Ingress resource comes under the namespace scoped, so don't forget to create the ingress in the app-space namespace.
+
+
+Ingress Created
+
+Path: /wear
+Path: /watch
+Configure correct backend service for /wear
+Configure correct backend service for /watch
+Configure correct backend port for /wear service
+Configure correct backend port for /watch service
+
+
+Show all pods
+	terminal --> k get pods -A
+
+# result:
+
+NAMESPACE       NAME                                        READY   STATUS      RESTARTS        AGE
+app-space       default-backend-5cd488d85c-lbgbv            1/1     Running     0               14m
+app-space       webapp-video-cb475db9c-zfdwr                1/1     Running     0               14m
+app-space       webapp-wear-6886df6554-zjgrf                1/1     Running     0               14m
+ingress-nginx   ingress-nginx-admission-create-667fm        0/1     Completed   0               12m
+ingress-nginx   ingress-nginx-controller-864cdc9fb8-7txkn   1/1     Running     5 (8m33s ago)   10m
+kube-flannel    kube-flannel-ds-wzln6                       1/1     Running     0               17m
+kube-system     coredns-77d6fd4654-62d7r                    1/1     Running     0               17m
+kube-system     coredns-77d6fd4654-dvb6b                    1/1     Running     0               17m
+kube-system     etcd-controlplane                           1/1     Running     0               18m
+kube-system     kube-apiserver-controlplane                 1/1     Running     0               18m
+kube-system     kube-controller-manager-controlplane        1/1     Running     0               18m
+kube-system     kube-proxy-d66jz                            1/1     Running     0               17m
+kube-system     kube-scheduler-controlplane                 1/1     Running     0               18m
+
+
+Show services in all namespaces
+	terminal --> k get svc -A
+
+# result:
+
+NAMESPACE       NAME                                 TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                  AGE
+app-space       default-http-backend                 ClusterIP   172.20.122.149   <none>        80/TCP                   23m
+app-space       video-service                        ClusterIP   172.20.45.128    <none>        8080/TCP                 23m
+app-space       wear-service                         ClusterIP   172.20.167.9     <none>        8080/TCP                 23m
+default         kubernetes                           ClusterIP   172.20.0.1       <none>        443/TCP                  27m
+ingress-nginx   ingress-nginx-controller             NodePort    172.20.203.252   <none>        80:30080/TCP             17m
+ingress-nginx   ingress-nginx-controller-admission   ClusterIP   172.20.87.189    <none>        443/TCP                  21m
+kube-system     kube-dns                             ClusterIP   172.20.0.10      <none>        53/UDP,53/TCP,9153/TCP   27m
+
+# We will use 'video-service' and 'wear-service'
+
+Show details for wear-service
+	terminal --> k describe svc wear-service -n app-space
+
+# result:
+
+Name:                     wear-service
+Namespace:                app-space
+Labels:                   <none>
+Annotations:              <none>
+Selector:                 app=webapp-wear
+Type:                     ClusterIP
+IP Family Policy:         SingleStack
+IP Families:              IPv4
+IP:                       172.20.167.9
+IPs:                      172.20.167.9
+Port:                     <unset>  8080/TCP		# use port 8080
+TargetPort:               8080/TCP
+Endpoints:                172.17.0.4:8080
+Session Affinity:         None
+Internal Traffic Policy:  Cluster
+Events:                   <none>
+
+
+
+Show details for video-service
+	terminal --> k describe svc video-service -n app-space
+
+# result:
+
+Name:                     video-service
+Namespace:                app-space
+Labels:                   <none>
+Annotations:              <none>
+Selector:                 app=webapp-video
+Type:                     ClusterIP
+IP Family Policy:         SingleStack
+IP Families:              IPv4
+IP:                       172.20.45.128
+IPs:                      172.20.45.128
+Port:                     <unset>  8080/TCP		# use port 8080
+TargetPort:               8080/TCP
+Endpoints:                172.17.0.5:8080
+Session Affinity:         None
+Internal Traffic Policy:  Cluster
+Events:                   <none>
+
+
+
+Show ingress create help command
+	terminal --> k create ingress -h
+
+Create Ingress definition file
+	terminal --> kubectl create ingress ingress-wear-watch -n app-space --rule="/wear=wear-service:8080" --rule="/watch=video-service:8080" 
+
+	# kubectl					- common kubernetes command
+	# create					- create object
+	# ingress					- object type
+	# ingress-nginx					- object name
+	# -n app-space					- namespace of the object
+	# --rule="/wear=wear-service:8080"		- specify the path (/wear),service (pay-service) and the port (:8080)
+	# --rule="/watch=video-service:8080"		- specify the path (/watch),service (video-service) and the port (:8080)
+
+	# result: ingress.networking.k8s.io/ingress-wear-watch created
+
+
+Verify the creation
+	terminal --> k get ingress -n app-space
+
+# result:
+
+NAME                 CLASS    HOSTS   ADDRESS   PORTS   AGE
+ingress-wear-watch   <none>   *                 80      34s
+
+
+
+Add annotation in the Ingress
+	terminal --> k edit ingress ingress-wear-watch -n app-space
+
+--------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  creationTimestamp: "2025-01-30T20:06:16Z"
+  generation: 1
+  name: ingress-wear-watch
+  namespace: ingress-nginx
+  resourceVersion: "3338"
+  uid: 57e77ae0-e2e5-4876-8638-52cdf9f0ce64
+  annotations:            				# added
+    nginx.ingress.kubernetes.io/rewrite-target: /	# added
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"	# optional
+spec:
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: wear-service
+            port:
+              number: 8080
+        path: /wear
+        pathType: Exact
+      - backend:
+          service:
+            name: video-service
+            port:
+              number: 8080
+        path: /watch
+        pathType: Exact
+status:
+  loadBalancer:
+    ingress:
+    - ip: 172.20.203.252
+--------------------------------------------------------
+save changes - escape, :wq!, enter
+
+# result: ingress.networking.k8s.io/ingress-wear-watch edited
+
+
+- click 'Check' button
+
+
+
+
+8. Access the application using the Ingress tab on top of your terminal.
+------------------------------------------------------------------------
+Make sure you can access the right applications at /wear and /watch paths.
+
+Open https://30080-port-o57osybckmfg3ja2.labs.kodekloud.com/wear - working page
+Open https://30080-port-o57osybckmfg3ja2.labs.kodekloud.com/watch - working page
+
+- click 'Ok' button
+
+
+
+==========================================
+Section 9 252. Introduction to Gateway API
+==========================================
+
+
+Ingress Limitations
+-------------------
+
+We can have different services developed by different teams or organizations.
+
+ingress-wear-watch.yanl
+-------------------------------
+apiVersion: extension/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-wear-watch
+spec:
+  rules:
+  - host: wear.my-online-store.com			# wear service managed by team/organization 1
+    http:
+      paths:
+      - backend:
+	  serviceNmae: wear-service
+	  servicePort: 80
+  - host: watch.my-online-store.com			# video service managed by team/organization 2
+    http: 
+      paths:
+      - backend:
+	  serviceNmae: watch-service
+	  servicePort: 80
+-------------------------------
+
+
+No support for:
+	- Multi-tenancy
+	- Namespace Isolation
+	- No RBAC for Features
+	- No Resource Isolation
+
+
+
+
+More Ingress limitations:
+	- supports only http rules such as host matching or path matching
+
+ingress-wear-watch.yanl
+-------------------------------
+apiVersion: extension/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-wear-watch
+  annotations: wear.my-online-store.com			# additional configuration are passed with annotations
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+
+spec:
+  rules:
+  - host: wear.my-online-store.com				# host matching		
+    http:
+      paths: /foo						# path matching
+      - backend:
+	  serviceNmae: wear-service
+	  servicePort: 80
+  - host: watch.my-online-store.com			
+    http: 							# HTTP Only
+      paths:
+      - backend:
+	  serviceNmae: watch-service
+	  servicePort: 80
+-------------------------------
+
+
+No native support for:
+	- TCP/UDP routing
+	- Traffic splitting/weighting	
+	- Header manipulation
+	- Authentication
+	- Rate limiting
+	- Redirects
+	- Rewriting
+	- Middleware
+	- WebSocket support
+	- Custom error pages
+	- Session affinity
+	- Cross-origin resource sharing (CORS)
+
+
+This lead to complex annotations specified in different Ingress rules in different controllers:
+
+NGINX Controller
+----------------
+Ingress-cors.yaml
+-------------------------------------------------------
+apiVersion: networking.k8s.io.v1
+kind: Ingress
+metadata:
+  name: cors-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, PUT, POST"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://allowed-origin.com"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+-------------------------------------------------------
+
+
+traefik Controller
+------------------
+Ingress.yaml
+-------------------------------------------------------
+apiVersion: networking.k8s.io.v1
+kind: Ingress
+metadata:
+  name: traefik-ingress
+  annotations:
+    # CORS Configuration
+    traefik.ingress.kubernetes.io/headers.customresponseheaders:
+      Access-Control-Allow-Origin: '*'
+      Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS
+      Access-Control-Allow-Headers: Content-Type,Authorization
+      Access-Control-Allow-Credentials: true
+      Access-Control-Max-Age: 3600
+-------------------------------------------------------
+
+
+
+Solution for this issues is "Gateway API".
+Gateway API is official kubernetes project focused on layer 4 and layer 7 routing. This project represent next generation Ingress, Load Balancing and Srvice Mesh APIs.
+
+
+Gateway API
+===========
+
+We have Ingress serives developed by the different teams/organization.
+
+ingress-wear-watch.yanl
+-------------------------------
+apiVersion: extension/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-wear-watch
+spec:
+  rules:
+  - host: wear.my-online-store.com			# wear service managed by team/organization 1
+    http:
+      paths:
+      - backend:
+	  serviceNmae: wear-service
+	  servicePort: 80
+  - host: watch.my-online-store.com			# video service managed by team/organization 2
+    http: 
+      paths:
+      - backend:
+	  serviceNmae: watch-service
+	  servicePort: 80
+-------------------------------
+
+
+Gateway API introduces 3 different objects managed by 3 different personas.
+
+1. Infrastructure Providers configure GatewayClass:
+   GatewayClass defines what the underline network infrastructure would be - Nginx, Traefik or other load balancers.
+		
+2. Cluster Operators configure Gateway - instances of the GatewayClass
+
+3. Application Developers configure HTTPRoute, TCPRoute, GRPCRoute
+
+
+GatewayClass
+============
+
+gateway-class.yaml
+-------------------------------------
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: example-class
+spec:
+  controllerName: example:com/gateway-controller		# deploy and connect a controller for gateway
+-------------------------------------
+
+Like Ingress we mmust deploy a controller for Gateway.
+
+
+
+Gateway
+=======
+
+gateway.yaml
+-------------------------------------
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: example-gateway
+spec:
+  gatewayClassName: example-class
+  listeners:
+  - name: http
+    protocol: HTTP
+    port: 80
+-------------------------------------
+
+
+
+
+
+HTTPRoute
+=========
+
+
+gateway.yaml
+-------------------------------------
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: example-httpsroute
+spec:
+  parentRefs:
+  - name: example-gateway
+  hostnames:
+  - "www.example.com"
+  rules:
+  - matches:
+    - path:
+	type: PathPrefix
+	value: /login
+    backendRefs:
+    - name: example-svc
+      port: 8080
+-------------------------------------
+
+
+
+
+Ingress vs Gateway API
+======================
+
+
+Ingress-cors.yaml
+----------------------------------
+apiVErsion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: secure-app
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  tls:
+  - hosts:
+    - secure.example.com
+    secretName: tls-secret
+----------------------------------
+
+
+
+gateway.yaml
+----------------------------------
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: secure-gateway
+spec:
+  gatewayClassName: example-gc
+  listeners:
+  - name: https
+    port: 443
+    protocol: HTTPS
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - kind: Secret
+	name: tls-secret
+    allowedRoutes:
+      kinds:
+      - kind: HTTPRoute
+----------------------------------
+
+
+Igress configuration for secure is passed in annotations.
+Gateway configuration is more well structured and easy to read.
+
+
+
+Example for NGINX specific annotations:
+
+canary-ingress.yaml
+----------------------------------
+apiVErsion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: canary-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-weight: "20"		# 20%, the other 80% goes to another ingress conf
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+	pathType: Perfix
+	backend:
+	  service:
+ 	    name: app-v2
+	    port
+	      number: 80
+----------------------------------
+
+
+Equivalent for Gateway API
+----------------------------------
+app-gateway.yaml
+kind: HTTPRoute
+metadata:
+  name: split-traffic
+spec:
+  parantRefs:
+  - name: app-gateway
+  rules:
+  - backendRefs:
+    - name: app-v1
+      port: 80
+      weight: 80			# 80%
+    - name: app-v2
+      port: 80
+      weight: 20			# 20%
+----------------------------------
+
+All configurations are visible in one place. No hidden primary configuration needed. We can see both services - v1 and v2. Traffic split is explicitly defined - 20% goes to v1, 80% goes to v2. No annotations needed. This a native feature so this will work the same way across any given API implementation. This configurations work with any controller too.
+
+
+
+
+We saw earlier complex annotation configurations for specific controllers:
+
+NGINX Controller
+----------------
+Ingress-cors.yaml
+-------------------------------------------------------
+apiVersion: networking.k8s.io.v1
+kind: Ingress
+metadata:
+  name: cors-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, PUT, POST"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://allowed-origin.com"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+-------------------------------------------------------
+
+
+traefik Controller
+------------------
+Ingress.yaml
+-------------------------------------------------------
+apiVersion: networking.k8s.io.v1
+kind: Ingress
+metadata:
+  name: traefik-ingress
+  annotations:
+    # CORS Configuration
+    traefik.ingress.kubernetes.io/headers.customresponseheaders:
+      Access-Control-Allow-Origin: '*'
+      Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS
+      Access-Control-Allow-Headers: Content-Type,Authorization
+      Access-Control-Allow-Credentials: true
+      Access-Control-Max-Age: 3600
+-------------------------------------------------------
+
+
+
+This is the Gateway API configuration for them:
+
+http-route.yaml
+-------------------------------------------------------
+apiVErsion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: cors-route
+spec:
+  parentRefs:
+  - name: my-gateway
+  rules:
+  - matches:
+    - path:
+	type: PathPrefix
+	value: /api
+    filters:
+    # CORS configuration using responce header modification
+    - type: ResponceHeaderModifier
+      responceHeaderModifier:
+	add:
+	- name: Access-Control-Allow-Origin
+	  value: "*"
+	- name: Access-Control-Allow-Methods
+	  value: "GET,POST,PUT,DELETE,OPTIONS"	
+	- name: Access-Control-Allow-Headers
+	  value: "Content-Type,Authorization"
+	- name: Access-Control-Allow-Creadentials
+	  value: "true"
+	- name: Access-Control-Max-Age
+	  value: "3600"
+    backendRefs:
+    - name: api-service
+-------------------------------------------------------
+
+No annotations needed.
+Everithing is defined under "spec" section.
+The configuration is more readable and self documenting.
+This config will work consistently across any Gateway API implementation.
+
+
+
+
+
+==========================================
+Section 9 252. Introduction to Gateway API
+==========================================
+
+
+1. Which API resource is used to define a Gateway in Kubernetes?
+----------------------------------------------------------------
+
+The Gateway resource is used to define an instance of a Gateway API implementation. It acts as an entry point for traffic into the cluster. GatewayClass defines a type of Gateway, but not an actual instance.
+
+- choose 'Gateway' as answer
+
+
+
+
+2. What is the purpose of the allowedRoutes field in a Gateway?
+---------------------------------------------------------------
+
+The allowedRoutes field determines which namespaces can bind their HTTPRoute, TCPRoute, or other routes to the Gateway.
+Setting namespaces.from: All allows routes from all namespaces to attach.
+
+
+- choose 'To specify which namespaces can attach routes to the Gateway' as answer
+
+
+
+
+3. Which of the following protocols is NOT supported by the Kubernetes Gateway API?
+-----------------------------------------------------------------------------------
+
+The Kubernetes Gateway API supports HTTP, HTTPS, TCP, UDP, and TLS protocols.
+However, ICMP is not supported, as it is not a transport-layer protocol used for application traffic.
+
+
+- choose 'ICMP' as answer
+
+
+
+
+4. How does a GatewayClass differ from a Gateway?
+-------------------------------------------------
+
+A GatewayClass is similar to an IngressClass; it defines the controller-specific behavior of a Gateway.
+A Gateway is an instance that references a GatewayClass to determine its underlying implementation.
+
+- choose 'GatewayClass defines how a Gateway is implemented by a controller' as answer
+
+
+
+
+5. What is the primary advantage of using Gateway API over Ingress?
+-------------------------------------------------------------------
+
+The Gateway API provides more advanced routing capabilities than Ingress, including:
+
+Multi-protocol support (HTTP, TCP, UDP, etc.)
+Better extensibility with Routes and Filters
+More granular access control using AllowedRoutes
+Unlike Ingress, which is primarily HTTP-based, Gateway API is designed for flexibility across multiple protocols.
+
+
+- choose 'It supports more advanced routing and mult-protocol support.' as answer
+
+
+
+
+
+6. To use the Gateway API, a controller is required. In this lab, we will install NGINX Gateway Fabric as the controller. Follow these steps to complete the installation:
+-------------------------------------------------------------------------------------------------------------
+
+1. Install the Gateway API resources
+	terminal --> kubectl kustomize "https://github.com/nginx/nginx-gateway-fabric/config/crd/gateway-api/standard?ref=v1.5.1" | kubectl apply -f -
+
+# result:
+customresourcedefinition.apiextensions.k8s.io/gatewayclasses.gateway.networking.k8s.io created
+customresourcedefinition.apiextensions.k8s.io/gateways.gateway.networking.k8s.io created
+customresourcedefinition.apiextensions.k8s.io/grpcroutes.gateway.networking.k8s.io created
+customresourcedefinition.apiextensions.k8s.io/httproutes.gateway.networking.k8s.io created
+customresourcedefinition.apiextensions.k8s.io/referencegrants.gateway.networking.k8s.io created
+
+
+
+2. Deploy the NGINX Gateway Fabric CRDs
+	terminal --> kubectl apply -f https://raw.githubusercontent.com/nginx/nginx-gateway-fabric/v1.6.1/deploy/crds.yaml
+
+# result:
+customresourcedefinition.apiextensions.k8s.io/clientsettingspolicies.gateway.nginx.org created
+customresourcedefinition.apiextensions.k8s.io/nginxgateways.gateway.nginx.org created
+customresourcedefinition.apiextensions.k8s.io/nginxproxies.gateway.nginx.org created
+customresourcedefinition.apiextensions.k8s.io/observabilitypolicies.gateway.nginx.org created
+customresourcedefinition.apiextensions.k8s.io/snippetsfilters.gateway.nginx.org created
+customresourcedefinition.apiextensions.k8s.io/upstreamsettingspolicies.gateway.nginx.org created
+
+
+
+3. Deploy NGINX Gateway Fabric
+	terminal --> kubectl apply -f https://raw.githubusercontent.com/nginx/nginx-gateway-fabric/v1.6.1/deploy/nodeport/deploy.yaml
+
+# result:
+namespace/nginx-gateway created
+serviceaccount/nginx-gateway created
+clusterrole.rbac.authorization.k8s.io/nginx-gateway created
+clusterrolebinding.rbac.authorization.k8s.io/nginx-gateway created
+configmap/nginx-includes-bootstrap created
+service/nginx-gateway created
+deployment.apps/nginx-gateway created
+gatewayclass.gateway.networking.k8s.io/nginx created
+nginxgateway.gateway.nginx.org/nginx-gateway-config created
+
+
+
+4. Verify the Deployment
+	terminal --> kubectl get pods -n nginx-gateway
+
+	# result:
+	NAME                            READY   STATUS    RESTARTS   AGE
+	nginx-gateway-96f76cdcf-sp45f   2/2     Running   0          11s
+
+
+
+5. View the nginx-gateway service
+	terminal --> kubectl get svc -n nginx-gateway nginx-gateway -o yaml
+
+# result:
+------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","kind":"Service","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"nginx-gateway","app.kubernetes.io/name":"nginx-gateway","app.kubernetes.io/version":"1.6.1"},"name":"nginx-gateway","namespace":"nginx-gateway"},"spec":{"externalTrafficPolicy":"Local","ports":[{"name":"http","port":80,"protocol":"TCP","targetPort":80},{"name":"https","port":443,"protocol":"TCP","targetPort":443}],"selector":{"app.kubernetes.io/instance":"nginx-gateway","app.kubernetes.io/name":"nginx-gateway"},"type":"NodePort"}}
+  creationTimestamp: "2025-03-03T12:28:31Z"
+  labels:
+    app.kubernetes.io/instance: nginx-gateway
+    app.kubernetes.io/name: nginx-gateway
+    app.kubernetes.io/version: 1.6.1
+  name: nginx-gateway
+  namespace: nginx-gateway
+  resourceVersion: "1368"
+  uid: 75915dd7-3991-4853-a37b-679a74a16c2c
+spec:
+  clusterIP: 172.20.93.47
+  clusterIPs:
+  - 172.20.93.47
+  externalTrafficPolicy: Local
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: http
+    nodePort: 30746
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  - name: https
+    nodePort: 32713
+    port: 443
+    protocol: TCP
+    targetPort: 443
+  selector:
+    app.kubernetes.io/instance: nginx-gateway
+    app.kubernetes.io/name: nginx-gateway
+  sessionAffinity: None
+  type: NodePort
+status:
+  loadBalancer: {}
+------------------------------------------------
+
+
+
+
+6. Update the nginx-gateway service to expose ports 30080 for HTTP and 30081 for HTTPS
+	terminal --> kubectl patch svc nginx-gateway -n nginx-gateway --type='json' -p='[
+  {"op": "replace", "path": "/spec/ports/0/nodePort", "value": 30080},
+  {"op": "replace", "path": "/spec/ports/1/nodePort", "value": 30081}
+]'
+
+# result:
+service/nginx-gateway patched
+
+
+- click 'Check' button 
+
+
+
+
+
+7. Create a Kubernetes Gateway resource with the following specifications:
+--------------------------------------------------------------------------
+1. Name: nginx-gateway
+2. Namespace: nginx-gateway
+3. Gateway Class Name: nginx
+4. Listeners:
+	- Protocol: HTTP
+	- Port: 80
+	- Name: http
+	- Allowed Routes: All namespaces
+
+
+Create a gateway definition file
+	terminal --> vi gateway.yaml
+
+gateway.yaml
+--------------------------------------------
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: nginx-gateway
+  namespace: nginx-gateway
+spec:
+  gatewayClassName: nginx
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes: 
+       namespaces: 
+        from: All
+--------------------------------------------
+save changes - escape, :wq!, enter
+
+
+Deply the gateway with the created file
+	terminal --> k apply -f gateway.yaml
+
+	# result: gateway.gateway.networking.k8s.io/nginx-gateway created
+
+
+Verify the gateway deployemnt
+	terminal --> k get gateways -n nginx-gateway
+
+	# result:
+	NAME            CLASS   ADDRESS   PROGRAMMED   AGE
+	nginx-gateway   nginx             True         39s
+
+- click 'Check' button
+
+
+
+
+
+8. A new pod named frontend-app and a service called frontend-svc have been deployed in the default namespace. Expose the service on the / path by utilizing an HTTPRoute named frontend-route.
+--------------------------------------------------------------------------------------------------------------
+
+
+List pods
+	terminal --> k get pods,svc
+
+	# result:
+	NAME               READY   STATUS    RESTARTS   AGE
+	pod/frontend-app   1/1     Running   0          69s
+
+	NAME                   TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)   AGE
+	service/frontend-svc   ClusterIP   172.20.253.234   <none>        80/TCP    69s
+	service/kubernetes     ClusterIP   172.20.0.1       <none>        443/TCP   18m
+
+
+
+Create HTTPRoute definition file
+	terminal --> vi frontend-route.yaml
+
+
+frontend-route.yaml
+-------------------------------------
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: frontend-route
+  namespace: default
+spec:
+  parentRefs:
+  - name: nginx-gateway
+    namespace: nginx-gateway
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: frontend-svc
+      port: 80
+-------------------------------------
+save changes- escape, :wq!, enter
+
+
+Apply the HTTPRoute
+	terminal --> k apply -f frontend-route.yaml
+
+	# result: httproute.gateway.networking.k8s.io/frontend-route created
+
+- click 'Check' button
+
+
+
+
+
+
+
+
+
