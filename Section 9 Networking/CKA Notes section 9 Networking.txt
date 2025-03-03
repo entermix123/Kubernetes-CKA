@@ -28,7 +28,8 @@ Section 9 240. Article: Ingress
 Section 9 241. Ingress - Annotations and rewrite-target
 Section 9 243. Ingress - Practice Test - Ingrees-1
 Section 9 245. Ingress - Practice Test - Ingrees-2
-
+Section 9 252. Introduction to Gateway API
+Section 9 253. Practice Test - Gateway API
 
 
 
