@@ -102,7 +102,7 @@ spec:
     spec:
       containers:
       - name: nginx-container
-	image: nginx:1.7.1		# chaged version
+	image: nginx:1.7.1		# add version
   replicas: 3
   selector:
     matchLabels:
@@ -221,6 +221,14 @@ Execute the script at /root/curl-test.sh.
 Run command:
 	terminal --> ./curl-test.sh
 
+	# result:
+	Hello, Application Version: v1 ; Color: blue OK
+
+	Hello, Application Version: v1 ; Color: blue OK
+
+	Hello, Application Version: v1 ; Color: blue OK
+	...
+
 - click 'Ok' button
 
 
@@ -232,6 +240,10 @@ Run command:
 List deployments
 	terminal --> k get deploy
 
+	# result:
+	NAME       READY   UP-TO-DATE   AVAILABLE   AGE
+	frontend   4/4     4            4           106s
+
 - choose '4' as answer
 
 
@@ -242,8 +254,14 @@ List deployments
 List deployemnts
 	terminal --> k get deploy
 
+	# result:
+	NAME       READY   UP-TO-DATE   AVAILABLE   AGE
+	frontend   4/4     4            4           2m27s
+
 Show used image in the target deployemnt
 	terminal --> k describe deploy frontend | grep Image
+
+	# result:     Image:         kodekloud/webapp-color:v1
 
 OR 
 
@@ -281,8 +299,15 @@ Show used strategy in the target deployemnt
 ---------------------------------------------------------------------------------------------------------------
 Do not delete and re-create the deployment. Only set the new image name for the existing deployment.
 
+Task approach
+	1. Edit the existing deployment and apply changes
+
 List deployments
 	terminal --> k get deploy
+
+	# result:
+	NAME       READY   UP-TO-DATE   AVAILABLE   AGE
+	frontend   4/4     4            4           5m49s
 
 
 Option 1:
@@ -292,17 +317,7 @@ Update deployemnt configs
 
 frontedn deployment
 ------------------------------------------------
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  annotations:
-    deployment.kubernetes.io/revision: "2"
-  creationTimestamp: "2025-01-08T14:15:38Z"
-  generation: 2
-  name: frontend
-  namespace: default
-  resourceVersion: "1204"
-  uid: f28139c6-3a4d-4055-9620-f81bb2912a55
+...
 spec:
   minReadySeconds: 20
   progressDeadlineSeconds: 600
@@ -325,47 +340,16 @@ spec:
       containers:
       - image: kodekloud/webapp-color:v2			# changed
         imagePullPolicy: IfNotPresent
-        name: simple-webapp
-        ports:
-        - containerPort: 8080
-          protocol: TCP
-        resources: {}
-        terminationMessagePath: /dev/termination-log
-        terminationMessagePolicy: File
-      dnsPolicy: ClusterFirst
-      restartPolicy: Always
-      schedulerName: default-scheduler
-      securityContext: {}
-      terminationGracePeriodSeconds: 30
-status:
-  availableReplicas: 3
-  conditions:
-  - lastTransitionTime: "2025-01-08T14:16:02Z"
-    lastUpdateTime: "2025-01-08T14:16:02Z"
-    message: Deployment has minimum availability.
-    reason: MinimumReplicasAvailable
-    status: "True"
-    type: Available
-  - lastTransitionTime: "2025-01-08T14:15:38Z"
-    lastUpdateTime: "2025-01-08T14:36:09Z"
-    message: ReplicaSet "frontend-74649f5d7c" is progressing.
-    reason: ReplicaSetUpdated
-    status: "True"
-    type: Progressing
-  observedGeneration: 2
-  readyReplicas: 5
-  replicas: 5
-  unavailableReplicas: 2
-  updatedReplicas: 2
+...
 ------------------------------------------------
 save changes - escape, :wq!, enter
 
-
-Update deployemnt
-	terminal --> k apply deployemnt frontend
+# result: deployment.apps/frontend edited
 
 Verify the change
 	terminal --> k describe deploy frontend
+
+	# We can see changed line 'Image:         kodekloud/webapp-color:v2'
 
 
 Option 2:
@@ -373,7 +357,16 @@ Option 2:
 Show details of the deployment and copy the container name
 	terminal --> k describe deployment frontend
 
+	# result:
+	-----------------
+	...
+	  Containers:
+	   simple-webapp:
+	...
+	-----------------
+
 	# container name is 'simple-webapp'
+
 
 Update the deployment without updating the deployment config
 	terminal --> k set image deploy frontend simple-webapp=kodekloud/webapp-color:v2
@@ -400,7 +393,15 @@ Execute the script at /root/curl-test.sh.
 Run tests
 	terminal --> ./curl-test.sh
 
-	# we can see that there are new colors in the tests results
+	# result:
+	Hello, Application Version: v2 ; Color: green OK
+
+	Hello, Application Version: v2 ; Color: green OK
+
+	Hello, Application Version: v2 ; Color: green OK
+	...
+
+	# we can see that there is a new colors in the tests results
 	# if we run the tests few times, all colors wull be changed 
 	# that is how rollingupdate work
 
@@ -415,14 +416,26 @@ Consider the current strategy settings and number of PODs - 4
 List pods
 	terminal --> k get pods
 
-	# number of pods are 4
+	# result:
+	NAME                        READY   STATUS    RESTARTS   AGE
+	frontend-854b57fbbf-ccrbc   1/1     Running   0          6m56s
+	frontend-854b57fbbf-fts95   1/1     Running   0          6m34s
+	frontend-854b57fbbf-nqzpn   1/1     Running   0          6m56s
+	frontend-854b57fbbf-tws7p   1/1     Running   0          6m34s
+
+	# we have 4 pods
+
 
 Show details about the deployment
 	terminal --> k describe deploy frontend
 
-We have fields:
+# in the result We have fields:
+-----------------------------------
+...
 	MinReadySeconds:        20
 	RollingUpdateStrategy:  25% max unavailable, 25% max surge
+...
+-----------------------------------
 
 - choose '1' as answer
 
@@ -435,23 +448,18 @@ Delete and re-create the deployment if necessary. Only update the strategy type 
 
 List deployemnts
 	terminal --> k get deploy
+	
+	# result:
+	NAME       READY   UP-TO-DATE   AVAILABLE   AGE
+	frontend   4/4     4            4           15m
+
 
 Update deployemnt configs
 	terminal --> k edit deploy frontend
 
 frontedn deployment
 ------------------------------------------------
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  annotations:
-    deployment.kubernetes.io/revision: "2"
-  creationTimestamp: "2025-01-08T14:15:38Z"
-  generation: 2
-  name: frontend
-  namespace: default
-  resourceVersion: "1204"
-  uid: f28139c6-3a4d-4055-9620-f81bb2912a55
+...
 spec:
   minReadySeconds: 20
   progressDeadlineSeconds: 600
@@ -463,52 +471,17 @@ spec:
   strategy:						# removed additional lines
     type: Recreate					# changed
   template:
-    metadata:
-      creationTimestamp: null
-      labels:
-        name: webapp
-    spec:
-      containers:
-      - image: kodekloud/webapp-color:v2			
-        imagePullPolicy: IfNotPresent
-        name: simple-webapp
-        ports:
-        - containerPort: 8080
-          protocol: TCP
-        resources: {}
-        terminationMessagePath: /dev/termination-log
-        terminationMessagePolicy: File
-      dnsPolicy: ClusterFirst
-      restartPolicy: Always
-      schedulerName: default-scheduler
-      securityContext: {}
-      terminationGracePeriodSeconds: 30
-status:
-  availableReplicas: 3
-  conditions:
-  - lastTransitionTime: "2025-01-08T14:16:02Z"
-    lastUpdateTime: "2025-01-08T14:16:02Z"
-    message: Deployment has minimum availability.
-    reason: MinimumReplicasAvailable
-    status: "True"
-    type: Available
-  - lastTransitionTime: "2025-01-08T14:15:38Z"
-    lastUpdateTime: "2025-01-08T14:36:09Z"
-    message: ReplicaSet "frontend-74649f5d7c" is progressing.
-    reason: ReplicaSetUpdated
-    status: "True"
-    type: Progressing
-  observedGeneration: 2
-  readyReplicas: 5
-  replicas: 5
-  unavailableReplicas: 2
-  updatedReplicas: 2
+...
 ------------------------------------------------
 save changes - escape, :wq!, enter
+
+# result: deployment.apps/frontend edited
 
 
 Verify the change
 	terminal --> k describe deploy frontend | grep StrategyType
+
+	# result: StrategyType:       Recreate
 
 
 - click 'Check' button
@@ -523,6 +496,10 @@ Do not delete and re-create the deployment. Only set the new image name for the 
 List deployments
 	terminal --> k get deploy
 
+	# result:
+	NAME       READY   UP-TO-DATE   AVAILABLE   AGE
+	frontend   4/4     4            0           20m
+
 
 Option 1:
 ---------
@@ -531,17 +508,7 @@ Update deployemnt configs
 
 frontedn deployment
 ------------------------------------------------
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  annotations:
-    deployment.kubernetes.io/revision: "2"
-  creationTimestamp: "2025-01-08T14:15:38Z"
-  generation: 2
-  name: frontend
-  namespace: default
-  resourceVersion: "1204"
-  uid: f28139c6-3a4d-4055-9620-f81bb2912a55
+...
 spec:
   minReadySeconds: 20
   progressDeadlineSeconds: 600
@@ -561,47 +528,17 @@ spec:
       containers:
       - image: kodekloud/webapp-color:v3			# changed		
         imagePullPolicy: IfNotPresent
-        name: simple-webapp
-        ports:
-        - containerPort: 8080
-          protocol: TCP
-        resources: {}
-        terminationMessagePath: /dev/termination-log
-        terminationMessagePolicy: File
-      dnsPolicy: ClusterFirst
-      restartPolicy: Always
-      schedulerName: default-scheduler
-      securityContext: {}
-      terminationGracePeriodSeconds: 30
-status:
-  availableReplicas: 3
-  conditions:
-  - lastTransitionTime: "2025-01-08T14:16:02Z"
-    lastUpdateTime: "2025-01-08T14:16:02Z"
-    message: Deployment has minimum availability.
-    reason: MinimumReplicasAvailable
-    status: "True"
-    type: Available
-  - lastTransitionTime: "2025-01-08T14:15:38Z"
-    lastUpdateTime: "2025-01-08T14:36:09Z"
-    message: ReplicaSet "frontend-74649f5d7c" is progressing.
-    reason: ReplicaSetUpdated
-    status: "True"
-    type: Progressing
-  observedGeneration: 2
-  readyReplicas: 5
-  replicas: 5
-  unavailableReplicas: 2
-  updatedReplicas: 2
+...
 ------------------------------------------------
 save changes - escape, :wq!, enter
 
+# result: deployment.apps/frontend edited
 
-Update deployemnt
-	terminal --> k apply deployemnt frontend
 
 Verify the change
-	terminal --> k describe deploy frontend
+	terminal --> k describe deploy frontend | grep Image
+
+	# result:     Image:         kodekloud/webapp-color:v3
 
 
 Option 2:
@@ -621,7 +558,9 @@ Update the deployment without updating the deployment config
 	# simple-webapp=kodekloud/webapp-color:v3	- container name and imagename
 
 Verify the change
-	terminal --> k describe deploy frontend
+	terminal --> k describe deploy frontend | grep Image
+
+	# result:     Image:         kodekloud/webapp-color:v3
 
 
 - click 'Check' button
@@ -635,6 +574,14 @@ Execute the script at /root/curl-test.sh.
 
 Run tests
 	terminal --> ./curl-test.sh
+
+	# result:
+	Hello, Application Version: v3 ; Color: red OK
+
+	Hello, Application Version: v3 ; Color: red OK
+
+	Hello, Application Version: v3 ; Color: red OK
+	...
 
 	# we can see that all test result changed to red at once
 	# that is how recrate strategy work

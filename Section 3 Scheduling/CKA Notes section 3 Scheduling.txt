@@ -209,9 +209,9 @@ Show pod's state
 Section 3 56. Labels and Selectors
 ==================================
 
-Labels and Selectors give us the possibility to filter object by different criteria.
+Labels and Selectors give us the possibility to group and filter object by different criteria.
 
-Labels are properties of every objects.
+Labels are properties of every object.
 Selectors are the criteria we are filtering on.
 
 example for pod-definition.yaml file
@@ -303,7 +303,8 @@ metadata:
   labels:
     app: App1
     funtion: Front-End
-  annotation: 1.34	# annotation information
+  annotations: 
+      buildversion: 1.34	# annotation information
 
 spec:
   replicas: 3
@@ -344,16 +345,35 @@ Show all object (pods) in dev environment
 	# --no-headers				- exclude headers of the result table
 
 Show count of all filtered objects
-	terminal --> kubectl get all --selector env=prod --no-headers | wc -l
+	terminal --> kubectl get all --selector env=dev --no-headers | wc -l
 
 	# kubectl				- common kubernetes command
 	# get					- used action
 	# all					- object kind
-	# --selector env=prod			- set selector for environment
+	# --selector env=dev			- set selector for environment
 	# --no-headers				- exclude headers of the result table
 	# | wc -l				- show count of lines in the result
 
+Show all pods in 'dev' environment
+	terminal --> k get pods --selector env=dev
+
+	# result:
+	NAME          READY   STATUS    RESTARTS   AGE
+	app-1-525l2   1/1     Running   0          7m5s
+	app-1-9nt54   1/1     Running   0          7m5s
+	app-1-mf5wv   1/1     Running   0          7m5s
+	db-1-72vr5    1/1     Running   0          7m5s
+	db-1-hxjjj    1/1     Running   0          7m5s
+	db-1-njc7d    1/1     Running   0          7m5s
+	db-1-wjfzv    1/1     Running   0          7m5s
+
+Show count of the pods in 'dev' environment
+	terminal --> k get pods --selector env=dev --no-headers | wc -l
+
+	# result: 7
+
 - choose '7' as answer
+
 
 
 
@@ -421,110 +441,69 @@ Show the pod in prod environment, finance bu and frontend tier
 ------------------------------------------------
 Once you fix the issue, create the replicaset from the definition file.
 
+Trye to create the replicaset
+	ternubal --> k create -f replicaset-definition-1.yaml
 
-Task approach
-	option 1 - edit the pod
-		- creates temporary file with the edited pod definition
-		- replace the existing pod with the new using the temporary definition file
-	option 2 - craete new definition file from existing pod
-		- edit the definition file
-		- apply changes
+# result:
+The ReplicaSet "replicaset-1" is invalid: spec.template.metadata.labels: Invalid value: map[string]string{"tier":"nginx"}: `selector` does not match template `labels`
 
-Option 1
---------
-Edit the pod configuration and change the memory limit to 20Mi
-	terminal --> kubectl edit pod elephant
 
------------------------------------------
-...
+Print the replicaset definition file
+	terminal --> cat replicaset-definition-1.yaml
+
+replicaset-definition-1.yaml
+-----------------------------
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+   name: replicaset-1
 spec:
-  containers:
-  - args:
-    - --vm
-    - "1"
-    - --vm-bytes
-    - 15M
-    - --vm-hang
-    - "1"
-    command:
-    - stress
-    image: polinux/stress
-    imagePullPolicy: Always
-    name: mem-stress
-    resources:
-      limits:
-        memory: 20Mi			# change from 10Mi to 20Mi
-      requests:
-        memory: 5Mi
-...
------------------------------------------
-save changes - escape, :wq!, enter
-exit the error screen - escape, :q!, enter
-
-We receive message:
-error: pods "elephant" is invalid
-A copy of your changes has been stored to "/tmp/kubectl-edit-808191089.yaml"
-error: Edit cancelled, no valid changes were saved.
-
-Recreate 'elephant' pod
-	terminal --> kubectl replace --force -f /tmp/kubectl-edit-808191089.yaml
-
-	# kubectl 				- common kubernetes command
-	# replace				- recreate object
-	# --force				- delete object and create new one
-	# -f /tmp/kubectl-edit-1577548652.yaml	- used definition file
-
-	# result:
-	pod "elephant" deleted
-	pod/elephant replaced
+   replicas: 2
+   selector:
+      matchLabels:
+        tier: front-end			# this is different from template labels
+   template:
+     metadata:
+       labels:
+        tier: nginx			# this is different from replicaset selector
+     spec:
+       containers:
+       - name: nginx
+         image: nginx
+-----------------------------
 
 
-Option 2
---------
 
-Create definition file from existing pod
-	terminal --> k get pod elephant -o yaml > elephant.yaml
+Edit the replicaset definition file
+	terminal --> vi replicaset-definition-1.yaml
 
-Edit the definition file
-	terminal --> vi elephant.yaml
-
-elephant.yaml
------------------------------------------
-...
+replicaset-definition-1.yaml
+-----------------------------
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+   name: replicaset-1
 spec:
-  containers:
-  - args:
-    - --vm
-    - "1"
-    - --vm-bytes
-    - 15M
-    - --vm-hang
-    - "1"
-    command:
-    - stress
-    image: polinux/stress
-    imagePullPolicy: Always
-    name: mem-stress
-    resources:
-      limits:
-        memory: 20Mi			# change from 10Mi to 20Mi
-      requests:
-        memory: 5Mi
-...
------------------------------------------
+   replicas: 2
+   selector:
+      matchLabels:
+        tier: nginx
+   template:
+     metadata:
+       labels:
+        tier: nginx
+     spec:
+       containers:
+       - name: nginx
+         image: nginx
+-----------------------------
 save changes - escape, :wq!, enter
 
-Delete the existing pod
-	terminal --> k delete pod elephant
 
-Create new pod with the craeted pod definition file
-	terminal --> k apply -f elephant.yaml
+Try to create the replicaset again
+	ternubal --> k create -f replicaset-definition-1.yaml
 
-Verify pod creation 
-	terminal --> kubectl get pods -o wide
-
-Verify memory limit in elephant pod details
-	terminal --> kubectl describe pod elephant
+	# result: replicaset.apps/replicaset-1 created
 
 
 - cklick 'Check' button
