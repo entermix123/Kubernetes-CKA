@@ -3180,6 +3180,9 @@ We still have to expose Ingress as NodePort type service or LoadBalancer for GCP
 Ingress
 =======
 
+Manually configuring ingress type controller
+--------------------------------------------
+
 1. Deploy load balancing tools like nginx, haproxy or traefik - Ingress Controller 
 2. Specify a set of rules to configure Ingress - Ingress Resources
 	- created by definition files like other objects in kubernetes
@@ -3221,7 +3224,7 @@ spec:
     spec:
       containers:
 	- name: nginx-ingress-controller
-	  image:quay.io/kubernetes-ingress- controller/nginx-ingress-controller:0.21.0
+	  image:quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.21.0
       args:
 	- /nginx-ingress-controller
 	- --configmap=$(POD_NAMESPACE)/nginx-configuration
@@ -3296,8 +3299,9 @@ What we have mandatory for creation of simples form of Ingress Controller:
 	- Service
 	- ConfigMap
 	- Auth - Service Account
-
-
+		- Roles
+		- ClusterRoles
+		- RoleBindings
 
 
 Ingress Resources
@@ -3314,7 +3318,7 @@ Examples rule types
 Ingress Reousrce is created with kubernetes definition file in this case:
 
 ingress-wear.yaml
-------------------------------------------------------------
+--------------------------------
 apiVersion: extensions/v1beta1
 kind: Ingress
 metadata:
@@ -3323,7 +3327,10 @@ spec:
   backend:
     serviceName: wear-service
     servicePort: 80
-------------------------------------------------------------
+--------------------------------
+
+When we configure ingress we need to refer to the oficial Kubernetes documentation to take the latest changes
+- https://kubernetes.io/docs/concepts/services-networking/ingress/
 
 Create the Ingress Resource
 	terminal --> kubectl create –f ingress-wear.yaml
@@ -3399,6 +3406,8 @@ Show details of Ingress Resources
 ----------------------------------------------------
 Name: ingress-wear-watch
 Namespace: default Address:
+Address:
+Default backend: default-http-backend:80 (<none>)		# if serivce is not found, redirect to the default backend address
 Rules:
   Host Path Backends
   ---- ---- --------
@@ -3412,6 +3421,7 @@ Events:
   Normal 	CREATE 	14s 	nginx-ingress-controller Ingress default/ingress-wear-watch
 ----------------------------------------------------
 
+We can configure the default backend service to show the user nice message, but not the default 404 Not Found.
 
 
 Type 3 - route user based on the domain name itself (wear.my-online-strore.com or watch.my-online-strore.com):
@@ -3437,8 +3447,6 @@ spec:
 	  serviceName: watch-service
 	  servicePort: 80
 --------------------------------------------------
-
-
 
 
 
@@ -3591,48 +3599,48 @@ Note: They are in different namespaces.
 List nodes
 	terminal --> k get nodes
 
-# result:
-NAME           STATUS   ROLES           AGE     VERSION
-controlplane   Ready    control-plane   2m55s   v1.31.0
+	# result:
+	NAME           STATUS   ROLES           AGE     VERSION
+	controlplane   Ready    control-plane   2m55s   v1.32.0
 
 
 List deployments in all namespaces
 	terminal --> k get deploy -A
 
-# result:
+	# result:
 
-NAMESPACE       NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
-app-space       default-backend            1/1     1            1           2m6s
-app-space       webapp-video               1/1     1            1           2m6s
-app-space       webapp-wear                1/1     1            1           2m6s
-ingress-nginx   ingress-nginx-controller   1/1     1            1           2m5s	# we can see ingress namespace
-kube-system     coredns                    2/2     2            2           3m33s
+	NAMESPACE       NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
+	app-space       default-backend            1/1     1            1           2m6s
+	app-space       webapp-video               1/1     1            1           2m6s
+	app-space       webapp-wear                1/1     1            1           2m6s
+	ingress-nginx   ingress-nginx-controller   1/1     1            1           2m5s	# we can see ingress namespace
+	kube-system     coredns                    2/2     2            2           3m33s
 
 
 List pods in default namespace 
 	terminal --> k get pods -n kube-system
 
-# result: no ingress pods in default namespace
+	# result: no ingress pods in default namespace
 
-NAME                                   READY   STATUS    RESTARTS   AGE
-coredns-77d6fd4654-dpbxm               1/1     Running   0          5m29s
-coredns-77d6fd4654-smrjm               1/1     Running   0          5m29s
-etcd-controlplane                      1/1     Running   0          5m34s
-kube-apiserver-controlplane            1/1     Running   0          5m34s
-kube-controller-manager-controlplane   1/1     Running   0          5m34s
-kube-proxy-cshnv                       1/1     Running   0          5m28s 
-kube-scheduler-controlplane            1/1     Running   0          5m34s
+	NAME                                   READY   STATUS    RESTARTS   AGE
+	coredns-77d6fd4654-dpbxm               1/1     Running   0          5m29s
+	coredns-77d6fd4654-smrjm               1/1     Running   0          5m29s
+	etcd-controlplane                      1/1     Running   0          5m34s
+	kube-apiserver-controlplane            1/1     Running   0          5m34s
+	kube-controller-manager-controlplane   1/1     Running   0          5m34s
+	kube-proxy-cshnv                       1/1     Running   0          5m28s 
+	kube-scheduler-controlplane            1/1     Running   0          5m34s
 
 
 List pods in ingress-nginx namespace
 	terminal --> k get pods -n ingress-nginx
 
-# result:
+	# result:
 
-NAME                                        READY   STATUS      RESTARTS   AGE
-ingress-nginx-admission-create-w5897        0/1     Completed   0          6m43s
-ingress-nginx-admission-patch-vt6rp         0/1     Completed   0          6m43s
-ingress-nginx-controller-7f45764b55-574xp   1/1     Running     0          6m44s
+	NAME                                        READY   STATUS      RESTARTS   AGE
+	ingress-nginx-admission-create-w5897        0/1     Completed   0          6m43s
+	ingress-nginx-admission-patch-vt6rp         0/1     Completed   0          6m43s
+	ingress-nginx-controller-7f45764b55-574xp   1/1     Running     0          6m44s
 
 
 - click 'Ok' button
@@ -3646,25 +3654,25 @@ ingress-nginx-controller-7f45764b55-574xp   1/1     Running     0          6m44s
 List deployments in all namespaces
 	terminal --> k get deploy -A
 
-# result:
+	# result:
 
-NAMESPACE       NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
-app-space       default-backend            1/1     1            1           2m6s
-app-space       webapp-video               1/1     1            1           2m6s
-app-space       webapp-wear                1/1     1            1           2m6s
-ingress-nginx   ingress-nginx-controller   1/1     1            1           2m5s	# we can see ingress namespace
-kube-system     coredns                    2/2     2            2           3m33s
+	NAMESPACE       NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
+	app-space       default-backend            1/1     1            1           2m6s
+	app-space       webapp-video               1/1     1            1           2m6s
+	app-space       webapp-wear                1/1     1            1           2m6s
+	ingress-nginx   ingress-nginx-controller   1/1     1            1           2m5s	# we can see ingress namespace
+	kube-system     coredns                    2/2     2            2           3m33s
 
 
 List pods in ingress-nginx namespace
 	terminal --> k get pods -n ingress-nginx
 
-# result:
+	# result:
 
-NAME                                        READY   STATUS      RESTARTS   AGE
-ingress-nginx-admission-create-w5897        0/1     Completed   0          6m43s
-ingress-nginx-admission-patch-vt6rp         0/1     Completed   0          6m43s
-ingress-nginx-controller-7f45764b55-574xp   1/1     Running     0          6m44s
+	NAME                                        READY   STATUS      RESTARTS   AGE
+	ingress-nginx-admission-create-w5897        0/1     Completed   0          6m43s
+	ingress-nginx-admission-patch-vt6rp         0/1     Completed   0          6m43s
+	ingress-nginx-controller-7f45764b55-574xp   1/1     Running     0          6m44s
 
 
 - choose 'ingress-nginx' as answer
@@ -3678,10 +3686,10 @@ ingress-nginx-controller-7f45764b55-574xp   1/1     Running     0          6m44s
 List deployments in ingress-nginx namespace
 	terminal --> k get deploy -n ingress-nginx
 
-# result:
+	# result:
 
-NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
-ingress-nginx-controller   1/1     1            1           10m
+	NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
+	ingress-nginx-controller   1/1     1            1           10m
 
 - choose 'ingress-nginx-controller' as answer
 
@@ -3694,14 +3702,14 @@ ingress-nginx-controller   1/1     1            1           10m
 List deployments in all namespaces
 	terminal --> k get deploy -A
 
-# result: # we can see in app-space namespace 2 webapp pods and 1 backend pod
+	# result: we can see in app-space namespace 2 webapp pods and 1 backend pod
 
-NAMESPACE       NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
-app-space       default-backend            1/1     1            1           2m6s
-app-space       webapp-video               1/1     1            1           2m6s
-app-space       webapp-wear                1/1     1            1           2m6s
-ingress-nginx   ingress-nginx-controller   1/1     1            1           2m5s	
-kube-system     coredns                    2/2     2            2           3m33s
+	NAMESPACE       NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
+	app-space       default-backend            1/1     1            1           2m6s
+	app-space       webapp-video               1/1     1            1           2m6s
+	app-space       webapp-wear                1/1     1            1           2m6s
+	ingress-nginx   ingress-nginx-controller   1/1     1            1           2m5s	
+	kube-system     coredns                    2/2     2            2           3m33s
 
 
 - choose 'app-space' as asnwer
@@ -3720,9 +3728,9 @@ List deployments in all namespaces
 # result: # we can see in app-space namespace 2 webapp pods and 1 backend pod
 
 NAMESPACE       NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
-app-space       default-backend            1/1     1            1           2m6s
-app-space       webapp-video               1/1     1            1           2m6s
-app-space       webapp-wear                1/1     1            1           2m6s
+app-space       default-backend            1/1     1            1           2m6s	# 1
+app-space       webapp-video               1/1     1            1           2m6s	# 2
+app-space       webapp-wear                1/1     1            1           2m6s	# 3
 ingress-nginx   ingress-nginx-controller   1/1     1            1           2m5s	
 kube-system     coredns                    2/2     2            2           3m33s
 
@@ -3940,6 +3948,8 @@ Click on the Ingress tab above top right corner of the console
 13. View the applications by appending /wear and /watch to the URL you opened in the previous step.
 ---------------------------------------------------------------------------------------------------
 
+Open the Ingress tab and set '/wear' and then '/watch' to the browser link
+
 Open  https://30080-port-cqnnpgyoy3sex3f7.labs.kodekloud.com/wear
 Open  https://30080-port-cqnnpgyoy3sex3f7.labs.kodekloud.com/watch
 
@@ -4010,6 +4020,8 @@ status:
 -----------------------------------------------------------
 save changes - escape, :wq!, enter
 
+# result: ingress.networking.k8s.io/ingress-wear-watch edited
+
 Verify changes
 	terminal --> k describe ingress ingress-wear-watch -n app-space
 
@@ -4056,7 +4068,7 @@ List pods in app-space namespace
 
 NAME                               READY   STATUS    RESTARTS   AGE
 default-backend-5cd488d85c-zhcbn   1/1     Running   0          12m
-webapp-food-57d799b775-9hblf       1/1     Running   0          48s
+webapp-food-57d799b775-9hblf       1/1     Running   0          48s	# this is the new app for food
 webapp-video-cb475db9c-r4czr       1/1     Running   0          12m
 webapp-wear-6886df6554-vxmg6       1/1     Running   0          12m
 
@@ -4131,6 +4143,8 @@ status:
 -----------------------------------------------------------
 save changes - escape, :wq!, enter
 
+# result: ingress.networking.k8s.io/ingress-wear-watch edited
+
 Verify changes
 	terminal --> k describe ingress ingress-wear-watch -n app-space
 
@@ -4202,7 +4216,6 @@ webapp-pay   1/1     1            1           4m50s
 22. You are requested to make the new application available at /pay.
 --------------------------------------------------------------------
 Identify and implement the best approach to making this application available on the ingress controller and test to make sure its working. Look into annotations: rewrite-target as well.
-
 
 Ingress Created
 Path: /pay
@@ -4347,6 +4360,8 @@ status:
     - ip: 172.20.123.160
 -----------------------------------------------------------
 save changes - escape, :wq!, enter
+
+# result: ingress.networking.k8s.io/ingress-pay edited
 
 Open https://30080-port-cqnnpgyoy3sex3f7.labs.kodekloud.com/pay - Working page
 
@@ -4746,14 +4761,15 @@ Edit the file ad fix the issues
 
 -------------------------------------------------------------
 ...
+  namespace: ingress-nginx				# fixed namespace
+...
         ports:
         - name: http
           containerPort: 80			# fixed identation
           protocol: TCP
         - containerPort: 443
 ...
-  namespace: ingress-nginx				# fixed namespace
-...
+
 apiVersion: v1
 kind: Service
 metadata:
@@ -4786,6 +4802,10 @@ save changes - escape, :wq!, enter
 Create the controller
 	terminal --> k create -f ingress-controller.yaml
 
+	# result:
+	deployment.apps/ingress-nginx-controller created
+	service/ingress-nginx-controller created
+
 If additional error appears - fix it
 	terminal --> vi ingress-controller.yaml
 
@@ -4805,7 +4825,6 @@ Ingress resource comes under the namespace scoped, so don't forget to create the
 
 
 Ingress Created
-
 Path: /wear
 Path: /watch
 Configure correct backend service for /wear
@@ -4817,22 +4836,22 @@ Configure correct backend port for /watch service
 Show all pods
 	terminal --> k get pods -A
 
-# result:
+	# result:
 
-NAMESPACE       NAME                                        READY   STATUS      RESTARTS        AGE
-app-space       default-backend-5cd488d85c-lbgbv            1/1     Running     0               14m
-app-space       webapp-video-cb475db9c-zfdwr                1/1     Running     0               14m
-app-space       webapp-wear-6886df6554-zjgrf                1/1     Running     0               14m
-ingress-nginx   ingress-nginx-admission-create-667fm        0/1     Completed   0               12m
-ingress-nginx   ingress-nginx-controller-864cdc9fb8-7txkn   1/1     Running     5 (8m33s ago)   10m
-kube-flannel    kube-flannel-ds-wzln6                       1/1     Running     0               17m
-kube-system     coredns-77d6fd4654-62d7r                    1/1     Running     0               17m
-kube-system     coredns-77d6fd4654-dvb6b                    1/1     Running     0               17m
-kube-system     etcd-controlplane                           1/1     Running     0               18m
-kube-system     kube-apiserver-controlplane                 1/1     Running     0               18m
-kube-system     kube-controller-manager-controlplane        1/1     Running     0               18m
-kube-system     kube-proxy-d66jz                            1/1     Running     0               17m
-kube-system     kube-scheduler-controlplane                 1/1     Running     0               18m
+	NAMESPACE       NAME                                        READY   STATUS      RESTARTS        AGE
+	app-space       default-backend-5cd488d85c-lbgbv            1/1     Running     0               14m
+	app-space       webapp-video-cb475db9c-zfdwr                1/1     Running     0               14m
+	app-space       webapp-wear-6886df6554-zjgrf                1/1     Running     0               14m
+	ingress-nginx   ingress-nginx-admission-create-667fm        0/1     Completed   0               12m
+	ingress-nginx   ingress-nginx-controller-864cdc9fb8-7txkn   1/1     Running     5 (8m33s ago)   10m
+	kube-flannel    kube-flannel-ds-wzln6                       1/1     Running     0               17m
+	kube-system     coredns-77d6fd4654-62d7r                    1/1     Running     0               17m
+	kube-system     coredns-77d6fd4654-dvb6b                    1/1     Running     0               17m
+	kube-system     etcd-controlplane                           1/1     Running     0               18m
+	kube-system     kube-apiserver-controlplane                 1/1     Running     0               18m
+	kube-system     kube-controller-manager-controlplane        1/1     Running     0               18m
+	kube-system     kube-proxy-d66jz                            1/1     Running     0               17m
+	kube-system     kube-scheduler-controlplane                 1/1     Running     0               18m
 
 
 Show services in all namespaces
@@ -5401,7 +5420,7 @@ This config will work consistently across any Gateway API implementation.
 
 
 ==========================================
-Section 9 252. Introduction to Gateway API
+Section 9 253. Practice Test - Gateway API
 ==========================================
 
 
