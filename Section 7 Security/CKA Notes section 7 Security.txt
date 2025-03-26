@@ -1,5 +1,14 @@
 CONTENT
 
+Section 7 145. Security Introduction
+Section 7 147. Kubernetes Security Primitives
+Section 7 148. Authentication
+Section 7 149. Article to Setting up Basic Authentication
+Section 7 150. TLS Certificates Introduction
+Section 7 151. TLS Certificates Basics
+Section 7 152. TLS in Kubernetes
+Section 7 153. TLS in Kubernetes - Certificates Creation
+Section 7 154. View Certificate Details
 Section 7 155. Download Kubernetes Certificate Health Check Spreadsheet
 Section 7 156. Practice Test - View Certificates
 Section 7 158. Certificates API
@@ -53,11 +62,12 @@ Section 7 147. Kubernetes Security Primitives
 Secure Host
 	- password based authentication disabled
 	- SSH key based authentication only
+	- any other additional security measures on the phisical or virtual infrastructure that host Kubernetes
 
-We should set rules over kube-api server to ensure proper work.
+
+We should set rules over kube-api server to ensure proper and secure work.
 
 Who can access kube-apiserver? What can they do?
-
 
 How can access kube-apiserver?
 ------------------------------
@@ -68,8 +78,10 @@ How can access kube-apiserver?
 	- Service Accounts (for machines)
 
 
-What can they do?
------------------
+Once thay gain access to the cluster
+
+What can they do is define by the authorization mechanisms?
+-----------------------------------------------------------
 	- RBAC Authorization	(RBAC - Role Based Access Control)
 	- ABAC Authorization	(ABAC - Attribute Based Access Control)
 	- Node Authorization
@@ -92,7 +104,7 @@ Types of roles that exists
 	- End Users 	- Uses applications (end users auth is managed by the applications, so we will not discuss them)
 	- Bots		- Third party users for integration puproses
 
-We will focus on authentication mechanisms for accessing to the kubernetes cluster.
+We will focus on authentication mechanisms for secure accessing to the kubernetes cluster.
 
 Kubernetes CAN manage Service Accounts.
 ---------------------------------------
@@ -112,7 +124,9 @@ When admin or developer make a requeest to kube-apiserver, the server auhenticat
 How kube-apiserver authenticate admins and developers?
 ======================================================
 
-Kubernetes have Static Password File, Static Token File, Certificates or Identity Service (third party auth protocols like LDAP)
+All User access is managed by hte kubeapi-server. Whether accessing with kubectl or direct request with curl, kubeapi-server authenticate the user and then process the request.
+
+There are different authentication mechanisms that can be configured. Kubernetes can have Static Password File, Static Token File, Certificates or Identity Service (third party auth protocols like LDAP)
 
 
 Static Password File and Static Token File - the basic auth
@@ -144,7 +158,7 @@ We can pass token details to the kube-apiserver
 	--token-auth-file=user-token-details.csv
 
 Option 1:
-If we manage the system manuallyWe we have to restart the kube-apiserver for this options to take effect.
+If we manage the system manually we have to restart the kube-apiserver for this options to take effect.
 
 Option 2:
 If we manage the system with kubeadm tool, we have to change the kube-apiserver pod definition file and the kubeadm tool will automatically restart the kube-apiserver once we update this file - /etc/kubernetes/manifests/kube-apiserver.yaml
@@ -158,11 +172,11 @@ Specify the username and password in the request
 
 	# -u "user1:password123"			- specify user credentials
 
-Specify the token and isername in the request
+Specify the token and username in the request
 	terminal --> curl -v -k https://master-node-ip:6443/api/v1/pods --header "Authoriztion: Bearer KSdfsdsdh5ggh3ads8fdsef"
 
 Conclusion
-- Basic authentication that stores passwords in plane text is not recommended approach.
+- Basic authentication that stores passwords in plane text is not recommended mechanism.
 - Consider volume mount while providing the auth file in a kubernetes setup (when use kubeadm tool)
 - Setup Role Based Authorization for the new users
 
@@ -1829,6 +1843,8 @@ We can call the api server for a list of pods manually (with curl command)
 	# --cert admin.crt				- suer certificate
 	# --cacert ca.crt				- Certificates Authority (CA) certificate
 
+The command is validated ny the kubeapi-server.
+
 
 We can call the api server for a list of pods with kubectl command 
 	terminal --> kubectl get pods --server my-kubeplayground:6443 --client-key admin.key --client-certificate admin.crt --certificate-authority ca.crt
@@ -1841,7 +1857,7 @@ We can call the api server for a list of pods with kubectl command
 	# --certificate-authority ca.crt	- Certificates Authority (CA) certificate
 
 We can set all options from the kubectl command in config file and the jsut pass the file in the command.
-	terminal -->kubectl get pods --kubeconfig config
+	terminal --> kubectl get pods --kubeconfig config
 
 If we set the config file in '$HOME/.kube/' directory, kubectl will load it for us so we don't have to specify it at all
 	terminal --> kubectl get pods
@@ -1863,25 +1879,30 @@ KubeConfig file have 3 sections
 	- Clusters 
 		- different environaments - Development, Production
 		- different organizations - Mycompany1, Mycompany2
+		- different cloud providers - AWS, google
 
 	- Users
 		- user accounts that have access to clusters
 			- Admin, Dev User, Prod User
-		- user accounts have different previleges on different clusters
+		- user accounts can have different previleges on different clusters
 
 	- Contexts
-		- With context we don't have to specify certificates and clusters in each command.
+		- Contexts marry Clusters and Users together. Context define which User Account is used to access which cluster
 			- Admin@Production - This context can access Production with Admin rights.
-			- Dev@Mycompany1   - This user can access Myconpany1 with developer rights
-		
+			- Dev@google - This user can access google provider with developer rights to test the app.
+		# We are not creating new users or configuring any user access or authorization in the cluster with this process. 
+		# We are using existing users with their existing privileges and defining what user we are going to use to access
+		# what cluster
+		# This way we dont have to specify the user certificates and server address in every kubectl command
+
 
 How this fit in the previous example?
-
-In Cluster we have
+-------------------------------------
+In Cluster section goes
 	--server my-kubeplayground:6443
 	--certificate-authority ca.crt
 
-In Users we have
+In Users section goes
 	--client-key admin.key
 	--client-certificate admin.crt
 
@@ -1889,32 +1910,37 @@ In Contexts we have
 	MyKubeAdmin@MyKubePlayground
 
 
+Real KubeConfig file:
+=====================
+
 KubeConfig
 ------------------------------------------------------
 apiVersion: v1
 kind: Config
 
-clusters:
+clusters:					# array, config clusters data
 - name: my-kube-playground
   cluster:
     certificate-authority: ca.crt
     server: httos://my-kube-playground:6443
 
-contexts:
+contexts:					# array, link Clusters config and Users config together
 - name my-kube-admin@my-kube-playground
   context:
     cluster: my-kube-playground
     user: my-kube-admin
 
-users:
-- name:
+users:						# array, config users data
+- name: my-kube-admin
   user:
     client-certificate: admin.crt
     client-key: admin.key
 ------------------------------------------------------
 
 
-We can specify all clusters and user we can use
+
+
+We can specify all clusters and user we can use:
 
 KubeConfig
 ------------------------------------------------------
@@ -1929,13 +1955,13 @@ clusters:
 	...
 - name: production
 	...
-- name: mycompany1
+- name: google
 	...
 
 contexts:
 - name my-kube-admin@my-kube-playground
 	...
-- name dev-user@company1
+- name dev-user@google
 	...
 - name admin@production
 	...
@@ -1947,13 +1973,21 @@ users:
 - nameL prod-user
 ------------------------------------------------------
 
+We dont have to create any Kubernetes object. The file is used as it is and is read by the kubectl command and the required values are used. 
+
 How kubectl command know what context to use very time?
 	- filed 'current-context:' in the file is the default context used by kubectl
 
-We can specify different config file for kubectl to use by passing it in the command
-	terminal --> terminal --> config view --kubeconfig=my-custom-config
+By default kubeconfig file us used from '$HOME/.kube/' directory.
+We can view current kubeconfig file
+	terminal --> kubectl config view
 
-Print Config file
+We can specify different config file for kubectl to use by passing it in the command
+	terminal --> config view --kubeconfig=my-custom-config
+
+We can move the custom kubeconfig file in the '$HOME/.kube/' directory so its become a default kubeconfig file.
+
+Print KubeConfig file
 	terminal --> kubectl config view 
 
 	# we can see default context and all clusters and users used
@@ -1999,7 +2033,7 @@ kind: Config
 clusters:
 - name: my-kube-playground
   cluster:
-    certificate-authority: /etc/kubernetes/pki/ca.crt		# full file path
+    certificate-authority: /etc/kubernetes/pki/ca.crt		# certificates full file path is recommended
     server: httos://my-kube-playground:6443
 
 contexts:
@@ -2012,8 +2046,8 @@ contexts:
 users:
 - name:
   user:
-    client-certificate: /etc/kubernetes/pki/users/admin.crt	# full file path
-    client-key: /etc/kubernetes/pki/users/admin.key		# full file path
+    client-certificate: /etc/kubernetes/pki/users/admin.crt	# certificates full file path is recommended
+    client-key: /etc/kubernetes/pki/users/admin.key		# certificates full file path is recommended
 ------------------------------------------------------
 
 
@@ -2047,6 +2081,7 @@ We can decode the certificate with the decode option
 
 
 
+
 =========================================
 Section 7 162. Practice Test - KubeConfig
 =========================================
@@ -2069,7 +2104,14 @@ Print config file
 Print config file
 	terminal --> cat /root/.kube/config
 
-	# in the result:     cluster: kubernetes
+# result:     
+--------------------------------------------------
+clusters:
+- cluster:					# one in the array
+    certificate-authority-data: LS0tL...
+    server: https://controlplane:6443
+  name: kubernetes				# name of the cluster
+--------------------------------------------------
 
 - choose '1' as answer
 
@@ -2085,7 +2127,7 @@ Print config file
 ----------------------------
 ...
 users:
-- name: kubernetes-admin
+- name: kubernetes-admin			# one in the array
   user:
     client-certificate-data:
 ...
@@ -2105,8 +2147,11 @@ Print config file
 ----------------------------
 ...
 contexts:
-- context:
+- context:				# one in the array
     cluster: kubernetes
+    user: kubernetes-admin
+  name: kubernetes-admin@kubernetes
+current-context: kubernetes-admin@kubernetes
 ...
 ----------------------------
 
@@ -2141,7 +2186,11 @@ Print config file
 #result:
 ----------------------------
 ...
-current-context: kubernetes-admin@kubernetes
+clusters:
+- cluster:
+    certificate-authority-data: LS0...
+    server: https://controlplane:6443
+  name: kubernetes				# this is the cluster name
 ...
 ----------------------------
 
@@ -2330,12 +2379,17 @@ Set the my-kube-config file as the default kubeconfig file and make it persisten
 Note: Don't forget to source the configuration file to take effect in the existing session. Example: source ~/.bashrc
 
 Overwrite config file with my-kube-config to /root/.kube/ directory
-	terminal --> mv /root/my-kube-config /root/.kube/config
+	terminal --> cp /root/my-kube-config /root/.kube/config
 
 Verify file movement
 	terminal --> ls /root/.kube/
 
-	# result: config  my-kube-config
+	# result: cache config 
+
+Print the overwritten config
+	terminal --> cat /root/.kube/config
+
+	# the result should be our custom config file
 
 Reload kubectl service
 	terminal --> source ~/.bashrc
@@ -2343,7 +2397,30 @@ Reload kubectl service
 Verify default config used
 	terminal --> kubectl config view
 
+
+For the test check we need to:
+------------------------------
+
+1. Open your shell configuration file:
+	terminal --> vi ~/.bashrc
+
+2. Add the following line to export the variable:
+------------------------------------
+....
+# for examples
+export KUBECONFIG=/root/my-kube-config			# added
+# If not running interactively, don't do anything
+[ -z "$PS1" ] && return
+...
+------------------------------------
+save changes - escape, :wq!, enter
+
+3. Apply the Changes, Reload the shell configuration to apply the changes in the current session:
+	terminal --> source ~/.bashrc
+
+
 - click 'Check' button
+
 
 
 14. With the current-context set to research, we are trying to access the cluster. However something seems to be wrong. Identify and fix the issue.
@@ -2379,6 +2456,8 @@ users:
 
 Edit the config file and set the correct certificate
 	terminal --> vi /root/.kube/config
+	and
+	terminal --> vi /root//my-kube-config
 
 # result:
 -------------------------------------------------------------------------
@@ -2387,7 +2466,7 @@ users:
 ...
 - name: dev-user
   user:
-    client-certificate: /etc/kubernetes/pki/users/dev-user/dev-user.crt		# correct certificate is set
+    client-certificate: /etc/kubernetes/pki/users/dev-user/dev-user.crt		# correct certificate is set - 
     client-key: /etc/kubernetes/pki/users/dev-user/dev-user.key
 ...
 -------------------------------------------------------------------------
@@ -2412,13 +2491,15 @@ We have already seen how to secure the ETCD key/value store using TLS certificat
 Section 7 165. API Groups
 =========================
 
+All interactions with the kubeapi-server are made with kubectl utility or directlly via REST (curl).
+
 We can check api version with crul command
 	terminal --> curl https://kube-master:6443/version
 
 We can list pods with curl command
 	terminal --> curl https://kube-master:6443/api/v1/pods
 
-Kubernetes APIs are 
+Kubernetes APIs are grouped based on their purpose:
 	- /metrics
 	- /healthz		- monitor the health of the cluster
 	- /version		- view the version on the cluster
@@ -2427,13 +2508,17 @@ Kubernetes APIs are
 	- /logs			- integrating with third party logging applications
 
 
+
 We will focus on APIs responsible for the cluster functionality
 ---------------------------------------------------------------
 
-Responsible for cluster functionality are 2 groups - core - /api and named - /apis
+Responsible for cluster functionality are 2 groups 
+	- core group - /api 
+	- named group - /apis
 
-core - /api - manage all core functionalities
-----
+
+core group - /api - manage all core functionalities
+----------
 
 /api
   - /v1
@@ -2451,8 +2536,8 @@ core - /api - manage all core functionalities
 	- services
 
 
-named - /apis - manage all newer features of Kubernetes
------
+named group - /apis - manage all newer features of Kubernetes
+-----------
 
 /apis
 - /apps				# API Group
@@ -2476,6 +2561,7 @@ named - /apis - manage all newer features of Kubernetes
   - /v1
 	- /certifiatesigningrequests	# Group Resource
 
+
 List available APIs
 	terminal --> curl httos://localhost:6443 -k
 
@@ -2490,10 +2576,14 @@ We can also open kubectl proxy and use some of the contexts in the kubectl confi
 List proxyes
 	terminal --> kubectl proxy
 
-	# result: Starting to serv on 127.0.0.1:8001
+	# result: Starting to serv on 127.0.0.1:8001 
+	# uses creadentials and certificates fronm our kube-config file to access the cluster
+	# we don't have to specify creds and certs in the curl command 
 
 List apis with the proxy
 	terminal --> curl http://localhost:8001 -k
+
+	# uses creadentials and certificates fronm our kube-config file to forward the request to kubeapi-server
 
 # result - list all available APIs on root:
 {
@@ -2522,7 +2612,16 @@ Kubectl proxy - http proxy service created by kubectl utility to access the kube
 Section 7 166. Authorization
 ============================
 
-How many Authorization we have in Kubernetes
+Authorization grand permissions to User to execute specific actions in the Cluster like list pods, list nodes, delete node, etc.
+We want specific user to have specific rights for perform tasks on the cluster.
+	- Admins - can list pods and nodes, create and delete nodes, etc.
+	- Developers - can list pods and list nodes but cannot delete nodes
+	- Service Accounts (Bots) - can access specific service only
+
+Also we want to restrict users to work on specific namespaces only.
+
+
+What Authorization mechanisms we have in Kubernetes:
 	- Node
 	- ABAC				- attribute based access controls
 	- RBAC				- role based access controls
@@ -2531,8 +2630,10 @@ How many Authorization we have in Kubernetes
 	- AlwaysDeny			- deny all requests
 
 
+
 Node (access in the cluster)
-----
+============================
+
 Uses Node Authorizer to manage the requests. We know that kubelet are part of the system 'nodes' group and certificate must be named with prefix 'system:node'. So any request comming from user named 'system:node' and part of the system 'nodes' group is authorized by Node Authorizer and granted this previleges. Previleges required for a kubelet.
 
 User 		<-------->    		Kube API		<-------->		kubelet
@@ -2548,8 +2649,10 @@ User 		<-------->    		Kube API		<-------->		kubelet
 												- events
 
 
+
 ABAC - attribute based authrization (external access to the API)
-----
+================================================================
+
 Asociate user or group of user with set of permissions.
 
 Example: 
@@ -2575,17 +2678,21 @@ Example policy file:
 Every time we need to change someting in the security, we need to edit teh file manually and restart the api-server. ABAC methodology is difficult to manage. Not recommended.
 
 
+
+
 RBAC - role based access controls
-----
+=================================
+
 We create a role group with set of permissions. Every user added to specific role group will have group's permissions. This way we can edit the role group permissions and the changes apply to all users immediately.This is the default access control in Kubernetes.
 
 We will focus this methodology more in the next lectures.
 
 
-Webhook
--------
-Kubernetes can use external tools for external access authorization like 'Open Policy Agent'
 
+Webhook
+=======
+
+Kubernetes can use external tools for external access authorization like 'Open Policy Agent'
 
 Authorization modes are passed in the api-server option set. If not specified is set 'AlwaysAllow' as default. Not recommended
 
@@ -2613,18 +2720,20 @@ ExecStart=/usr/local/ kube apiserver \\
 --v=2
 --------------------------------------------------------------------
 
-If we have multiple authorization method configured, the requests are authorized by each one by the oreder they are set in the api-server option. If one authorization module deny the request, then forewards the request to the next module in the chain.
+If we have multiple authorization method configured, the requests are authorized by each one by the oreder they are set in the api-server option. If one authorization module deny the request, then forewards the request to the next module in the chain. As soon as the permissions are granted, no more checks are performed.
 
 --authorization-mode=Node,RBAC,Webhook	
 Node module first. Node Authorizer handle only Node requests, so the request it denied and forewarded to the next one in the chain.
 RBAC module second. Checks are performed and access is given to the user for the requested object.
 
 
+
+
 ===============================================
 Section 7 167. Role Based Access Control (RBAC)
 ===============================================
 
-How we define a role?
+How we create a role?
 
 Create a role object with role-definition file.
 
@@ -2651,13 +2760,12 @@ How to link user to the role?
 
 Create an object called role binding.
 
-
 devuser-developer-binding.yaml
 --------------------------------------------------------------------
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: devuser-developer-binding
+  name: devuser-developer-binding			
 subjects:
 - kind: User
   name: dev-user
@@ -2670,6 +2778,8 @@ roleRef:
 
 Create the role-binding with kubectl
 	terminal --> kubectl create -f devuser-developer-binding.yaml
+
+Roles and RoleBinding falls under the scope of namespaces! If we want to restrict the role to specific namespace we need to specify the namespace in the role and rolebingding in the definition files undes metadata section.
 
 This role is defind and bind to the user in the default namespace. If we want to limit the user into specific namespace, we need to specify the namespace in the role definition file under 'metadata' section.
 
@@ -2694,6 +2804,10 @@ Show details about rolebindings
 
 	# the result will show us info about the role and used namespace
 
+
+
+Check Access
+------------
 
 How to check if I the user I am working with have specific rights?
 
@@ -2720,7 +2834,13 @@ Check rights of the user for specific namespace
 	terminal --> kubectl auth can-i create pods --as dev-user --namespace test	# result: no
 
 
+
+Resource Nmaes
+--------------
+
 We can set rights to users and specify the exact resurces we need them to be able to work with
+
+Lets say we have 5 Pods - blue, orange, green, purple and pink. We can give access only to specific Pods specifing their names.
 
 developer-role.yaml
 --------------------------------------------------------------------
@@ -2731,11 +2851,8 @@ metadata:
 rules:
 - apiGroups: [""]
   resources: ["pods"]						# allow to manage objects
-  verbs: ["list", "get", "create", "update", "delete"]		# allowed actions
-  resourceNames: ["frontend", "backend"]			# specify pods
-- apiGroups: [""]
-  resources: ["ConfigMap"]					# allow to manage objects
-  verbs: ["create"]						# allowed actions
+  verbs: ["list", "get", "create", "update" ]			# allowed actions
+  resourceNames: ["blue", "orange"]				# specify pods
 --------------------------------------------------------------------
 
 
@@ -2795,6 +2912,21 @@ Counts all roles in all namespacec
 List all roles in all namespaces
 	terminal --> k get roles -A
 
+	# result:
+	NAMESPACE     NAME                                             CREATED AT
+	blue          developer                                        2025-03-20T09:58:45Z
+	kube-public   kubeadm:bootstrap-signer-clusterinfo             2025-03-20T09:54:06Z
+	kube-public   system:controller:bootstrap-signer               2025-03-20T09:54:05Z
+	kube-system   extension-apiserver-authentication-reader        2025-03-20T09:54:05Z
+	kube-system   kube-proxy                                       2025-03-20T09:54:07Z	# this is the role
+	kube-system   kubeadm:kubelet-config                           2025-03-20T09:54:06Z
+	kube-system   kubeadm:nodes-kubeadm-config                     2025-03-20T09:54:06Z
+	kube-system   system::leader-locking-kube-controller-manager   2025-03-20T09:54:05Z
+	kube-system   system::leader-locking-kube-scheduler            2025-03-20T09:54:05Z
+	kube-system   system:controller:bootstrap-signer               2025-03-20T09:54:05Z
+	kube-system   system:controller:cloud-provider                 2025-03-20T09:54:05Z
+	kube-system   system:controller:token-cleaner                  2025-03-20T09:54:05Z
+
 Show the details about 'kube-proxy' role
 	terminal --> k describe role kube-proxy -n kube-system
 
@@ -2806,7 +2938,7 @@ Annotations:  <none>
 PolicyRule:
   Resources   Non-Resource URLs  Resource Names  Verbs
   ---------   -----------------  --------------  -----
-  configmaps  []                 [kube-proxy]    [get]
+  configmaps  []                 [kube-proxy]    [get]			# Resources - configmaps 
 ----------------------------------------------------------
 
 - choose 'configmaps' as answer
@@ -2819,6 +2951,21 @@ PolicyRule:
 List all roles in all namespaces
 	terminal --> k get roles -A
 
+	# result:
+	NAMESPACE     NAME                                             CREATED AT
+	blue          developer                                        2025-03-20T09:58:45Z
+	kube-public   kubeadm:bootstrap-signer-clusterinfo             2025-03-20T09:54:06Z
+	kube-public   system:controller:bootstrap-signer               2025-03-20T09:54:05Z
+	kube-system   extension-apiserver-authentication-reader        2025-03-20T09:54:05Z
+	kube-system   kube-proxy                                       2025-03-20T09:54:07Z	# this is the role
+	kube-system   kubeadm:kubelet-config                           2025-03-20T09:54:06Z
+	kube-system   kubeadm:nodes-kubeadm-config                     2025-03-20T09:54:06Z
+	kube-system   system::leader-locking-kube-controller-manager   2025-03-20T09:54:05Z
+	kube-system   system::leader-locking-kube-scheduler            2025-03-20T09:54:05Z
+	kube-system   system:controller:bootstrap-signer               2025-03-20T09:54:05Z
+	kube-system   system:controller:cloud-provider                 2025-03-20T09:54:05Z
+	kube-system   system:controller:token-cleaner                  2025-03-20T09:54:05Z
+
 Show the details about 'kube-proxy' role
 	terminal --> k describe role kube-proxy -n kube-system
 
@@ -2830,7 +2977,7 @@ Annotations:  <none>
 PolicyRule:
   Resources   Non-Resource URLs  Resource Names  Verbs
   ---------   -----------------  --------------  -----
-  configmaps  []                 [kube-proxy]    [get]
+  configmaps  []                 [kube-proxy]    [get]		# Verbs - get
 ----------------------------------------------------------
 
 - choose 'Get' as answer
@@ -2842,6 +2989,21 @@ PolicyRule:
 
 List all roles in all namespaces
 	terminal --> k get roles -A
+
+	# result:
+	NAMESPACE     NAME                                             CREATED AT
+	blue          developer                                        2025-03-20T09:58:45Z
+	kube-public   kubeadm:bootstrap-signer-clusterinfo             2025-03-20T09:54:06Z
+	kube-public   system:controller:bootstrap-signer               2025-03-20T09:54:05Z
+	kube-system   extension-apiserver-authentication-reader        2025-03-20T09:54:05Z
+	kube-system   kube-proxy                                       2025-03-20T09:54:07Z	# this is the role
+	kube-system   kubeadm:kubelet-config                           2025-03-20T09:54:06Z
+	kube-system   kubeadm:nodes-kubeadm-config                     2025-03-20T09:54:06Z
+	kube-system   system::leader-locking-kube-controller-manager   2025-03-20T09:54:05Z
+	kube-system   system::leader-locking-kube-scheduler            2025-03-20T09:54:05Z
+	kube-system   system:controller:bootstrap-signer               2025-03-20T09:54:05Z
+	kube-system   system:controller:cloud-provider                 2025-03-20T09:54:05Z
+	kube-system   system:controller:token-cleaner                  2025-03-20T09:54:05Z
 
 Show the details about 'kube-proxy' role
 	terminal --> k describe role kube-proxy -n kube-system
@@ -2858,7 +3020,7 @@ PolicyRule:
 ----------------------------------------------------------
 
 
-- choose 'kube-proxy role can get details of a objects by the name kube-proxy only' as answer
+- choose 'kube-proxy role can get details of a configmap objects by the name kube-proxy only' as answer
 
 
 
@@ -2867,6 +3029,21 @@ PolicyRule:
 
 List all roles in all namespaces
 	terminal --> k get rolebindings -A
+
+# result:
+NAMESPACE     NAME                                                ROLE                                                  AGE
+blue          dev-user-binding                                    Role/developer                                        5m19s
+kube-public   kubeadm:bootstrap-signer-clusterinfo                Role/kubeadm:bootstrap-signer-clusterinfo             9m58s
+kube-public   system:controller:bootstrap-signer                  Role/system:controller:bootstrap-signer               9m59s
+kube-system   kube-proxy  # this is the rolebinding we  describe  Role/kube-proxy                                       9m57s
+kube-system   kubeadm:kubelet-config                              Role/kubeadm:kubelet-config                           9m58s
+kube-system   kubeadm:nodes-kubeadm-config                        Role/kubeadm:nodes-kubeadm-config                     9m58s
+kube-system   system::extension-apiserver-authentication-reader   Role/extension-apiserver-authentication-reader        9m59s
+kube-system   system::leader-locking-kube-controller-manager      Role/system::leader-locking-kube-controller-manager   9m59s
+kube-system   system::leader-locking-kube-scheduler               Role/system::leader-locking-kube-scheduler            9m59s
+kube-system   system:controller:bootstrap-signer                  Role/system:controller:bootstrap-signer               9m59s
+kube-system   system:controller:cloud-provider                    Role/system:controller:cloud-provider                 9m59s
+kube-system   system:controller:token-cleaner                     Role/system:controller:token-cleaner                  9m59s
 
 Show the details about 'kube-proxy' role
 	terminal --> k describe rolebinding kube-proxy -n kube-system
@@ -3100,7 +3277,7 @@ Verify changes made
 
 
 
-1. Add a new rule in the existing role developer to grant the dev-user permissions to create deployments in the blue namespace.
+11. Add a new rule in the existing role developer to grant the dev-user permissions to create deployments in the blue namespace.
 -------------------------------------------------------------------------------------------------------------------------------
 Remember to add api group "apps".
 
@@ -3178,7 +3355,11 @@ Section 7 170. Cluster Roles and Role Bindings
 
 We know that the role and rolebinding are craeted in the default namespqce if the namespace is not defined and access into this namespace. If we want to view, create or edit role or rolebinding we need to specify the namespace they are in.
 
-Resources are categorized either as namespaced or cluster scoped. Can't be 
+Resources are categorized either as namespaced or cluster scoped. Nodes are cluster scoped and they can't be associated with any particular namespace.
+
+Namespaced resources - pods, replicasets, jobs, deployments, services, secrets, roles, rolebindings, configmaps, PVCs
+
+Cluster Scoped - nodes, PVs, clusterroles, clusterrolebindings, certificatesingingrequests, namespaces
 
 To view namespaced resources try
 	terminal --> kubectl api-resources --namespaced=true
@@ -3187,6 +3368,10 @@ To view cluster scoped resourced try
 	terminal --> kubectl api-resources --namespaced=false
 
 To assign rights to users to cluster scoped resources we use clusterroles and clusterrolebindings
+
+
+Cluster roles
+-------------
 
 To create a cluster role we have to create cluster role definition file.
 
@@ -3208,9 +3393,14 @@ Create the role
 
 We need to link the user to the cluster role.
 
-To link the user to this role we have to create role-binding object and link it to the user
 
-Create role-bindinf definition file
+
+Link the user to this role 
+--------------------------
+
+We have to create role-binding object and link it to the user
+
+Create role-binding definition file
 
 cluster-admin-role-binding.yaml
 ----------------------------------------------------------------
@@ -3298,7 +3488,7 @@ Find cluterrolebinding for the cluster-admin user
 	terminal --> k get clusterrolebindings | grep cluster-admin
 
 # result:
-cluster-admin                                                   ClusterRole/cluster-admin                                            
+cluster-admin                                                   ClusterRole/cluster-admin  	# describe this binding                                          
 helm-kube-system-traefik                                        ClusterRole/cluster-admin                                                   
 helm-kube-system-traefik-crd                                    ClusterRole/cluster-admin                                                   
 
@@ -3320,6 +3510,7 @@ Subjects:
 -----------------------------------------------------------
 
 - choose 'system:masters' as answer
+
 
 
 6. What level of permission does the cluster-admin role grant?
@@ -3353,6 +3544,7 @@ Check if the new user 'michelle' can perform any action with nodes
 	terminal --> k get nodes --as michelle
 
 	# result: Error from server (Forbidden): nodes is forbidden: User "michelle" cannot list resource "nodes" in API group "" at the cluster scope
+
 
 Create role
 -----------
@@ -3417,6 +3609,14 @@ Subjects:
   ----  ----      ---------
   User  michelle  
 ------------------------------------------
+
+Check if the new user 'michelle' can perform any action with nodes
+	terminal --> k get nodes --as michelle
+
+	# result:
+	NAME           STATUS   ROLES                  AGE    VERSION
+	controlplane   Ready    control-plane,master   8m1s   v1.32.0+k3s1
+
 
 - click 'Check' button
 
@@ -4608,6 +4808,9 @@ We have 3 component architecture
 	- DB 				- port 3306
 
 
+User ---->  Web Server ---->  API Server   ---->     DB
+User <----  [port 80]  <----  [port 5000]  <---- [port 3306]
+
 2 Types of traffic
 	- Ingress			- incoming traffic from the client
 	- Egress			- outgoing traffic from the component
@@ -4643,8 +4846,8 @@ spec:
     matchLabels:
       role: db
   policyTypes:		# only ingress traffic is isolated (affected), all egress traffic is unaffected
-  - Ingrees		# if we want to modify egress traffic we need to add it in 'policyTypes' list and set rules
-  ingrees:
+  - Ingress		# if we want to modify egress traffic we need to add it in 'policyTypes' list and set rules
+  ingress:
   - from:
     - podSelector:
         matchLabels:
@@ -4668,7 +4871,7 @@ Note :
 
 - Solutions that DO NOT Support Network Policies
 	- Flannel
-	# we can still create network policies, but they wil not take effect
+	# we can still create network policies, but they will not take effect
 
 
 
@@ -4678,10 +4881,99 @@ Note :
 Section 7 184. Developing Network Policies
 ==========================================
 
+Traffic
+=======
+
+We have 3 component architecture
+	- Web server (front-end - FE) 	- port 80
+	- API server (back-end - BE)	- port 5000
+	- DB 				- port 3306
+
+
+User ---->  Web Server ---->  API Server   ---->     DB
+User <----  [port 80]  <----  [port 5000]  <---- [port 3306]
+
+2 Types of traffic
+	- Ingress			- incoming traffic from the client
+	- Egress			- outgoing traffic from the component
+
+
+	- Ingress			
+		- from users to FE (FE view)		port 80 	(Ingress for the web server)
+		- from FE to BE (BE view)		port 5000	(Ingress for the API server)
+		- from BE to BE (DB view)		port 3306	(Ingress for DB)
+
+	- Egress
+		- from FE to BE (FE view)		port 5000	(Egress for the web server)
+		- from BE to DB (BE view)		port 3306	(Egress for the API server)
+		- from DB to BE (DB view)		port 3306	(Egress for the DB)
+
+
+
+Network Security
+================
+
+All nodes in a cluster are in one virutal network that is in "All Allow" mode to secure communication between all pods in all nodes.
+
+So we want to prevent FE to communicate with the DB. We can set network policy to allow communication with DB only to BE. Network policy is another object in the Kubernetes namespace (like pods, replicasets or services). We link network policy to one or more pods. We define rules in the network policy - in this case we will set "Allow Ingress Traffic From BE Pod on Port 3306". Ones set, the policy block all other traffic except that from the BE Pod.
+
+We link network policy to a pod with labels and selectors.
+
+Example for network policy definition file
+
+policy-definition.yaml
+----------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-policy
+spec:
+  podSelector:
+    matchLabels:
+      role: db
+  policyTypes:		# only ingress traffic is isolated (affected), all egress traffic is unaffected
+  - Ingress		# if we want to modify egress traffic we need to add it in 'policyTypes' list and set rules
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+	  name: api-pod  
+    ports:
+    - protocol: TCP
+      port: 3306  
+----------------------------------------------
+
+Create a network policy
+	terminal --> k create -f policy-definition.yaml
+
+
+Note :
+------
+- Solutions that Support Network Policies
+	- Kube-router
+	- Calico
+	- Romana
+	- Weave-net
+
+- Solutions that DO NOT Support Network Policies
+	- Flannel
+	# we can still create network policies, but they will not take effect
+
+
+
+==========================================
+Section 7 119. Developing Network Policies
+==========================================
+
+
 We have 3 pod architecture in production (prod) environment
 	- Web server (front-end - FE) 	- port 80
 	- API server (back-end - BE)	- port 5000
 	- DB 				- port 3306
+
+User ---->  Web Server ---->  API Server   ---->     DB
+User <----  [port 80]  <----  [port 5000]  <---- [port 3306]
+
 
 We need to set incoming traffic to DB pod to be modified. Only calls from API Server Pod (BE) should be allowed.
 
@@ -4697,11 +4989,11 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      role: db		# select the pods witth this label
+      role: db		# select the pods with this label
 
   policyTypes:		# only ingress traffic is isolated (affected)
-  - Ingrees		# if we want to modify egress traffic we need to add it in 'policyTypes' list and set rules
-  ingrees:
+  - Ingress		# if we want to modify egress traffic we need to add it in 'policyTypes' list and set rules
+  ingress:
   - from:
     - podSelector:		# select other pod 
         matchLabels:
@@ -4712,7 +5004,7 @@ spec:
 ----------------------------------------------
 
 - We plan the rules from the receiving pod's prospective (from DB View)
-- When we allow Ingrees traffic from other pod, the response traffic is allowed by default.
+- When we allow Ingress traffic from other pod, the response traffic is allowed by default.
 - The Egress traffic from DB to BE (API) is restricted (not available).
 
 
@@ -4720,6 +5012,7 @@ How to manage pod with the same name in different namespaces? We have few more p
 	- API pod for Dev environment
 	- API pod for test environment
 
+To restrict pods with the same name from different namespaces to send requests to our DB we have to add another section named 'namespaceSelector'.
 
 db-network-policy.yaml
 ----------------------------------------------
@@ -4733,13 +5026,13 @@ spec:
       role: db		# select the pods witth this label
 
   policyTypes:		# only ingress traffic is isolated (affected)
-  - Ingrees		# if we want to modify egress traffic we need to add it in 'policyTypes' list and set rules
-  ingrees:
+  - Ingress		# if we want to modify egress traffic we need to add it in 'policyTypes' list and set rules
+  ingress:
   - from:
     - podSelector:		# select other pod 
         matchLabels:
 	  name: api-pod 	# API server (BE)
-      namespaceSelector:
+      namespaceSelector:	# set namespace selector to restrict pods from different namespaces
 	matchLabel:
 	  name: prod
     ports:
@@ -4754,7 +5047,7 @@ spec:
 We have Backup Server (with IP 192.168.5.10) that we want to allow to connect with the DB pod in production namepsace. We can set 'ipBlock' configuration section in the network policy.
 
 
-db-network-policy.yaml Ingrees
+db-network-policy.yaml Ingress
 ----------------------------------------------
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -4766,8 +5059,8 @@ spec:
       role: db		# select the pods witth this label
 
   policyTypes:		# only ingress traffic is isolated (affected)
-  - Ingrees		# if we want to modify egress traffic we need to add it in 'policyTypes' list and set rules
-  ingrees:
+  - Ingress		# if we want to modify egress traffic we need to add it in 'policyTypes' list and set rules
+  ingress:
   - from:
     - podSelector:		# select pods
         matchLabels:
@@ -4796,6 +5089,7 @@ spec:
 	matchLabel:
 	  name: prod
     - ipBlock:		  			- Rule 2 - allow traffic from specific IP address (rule 2)
+	cidr: 192.168.5.10/32
 ----------------------------------------
 
 We can specify all configurations under one rule (like in the example above) or separate them each in different rule.
@@ -4832,9 +5126,9 @@ spec:
       role: db		# select the pods witth this label
 
   policyTypes:		# both ingress and egress traffic are affected
-  - Ingrees		
+  - Ingress		
   - Egress
-  ingrees:			# incoming traffic
+  ingress:			# incoming traffic
   - from:
     - podSelector:		# select pods
         matchLabels:
@@ -4853,7 +5147,6 @@ spec:
     - protocol: TCP				
       port: 80  				# what port data will be sent to
 ----------------------------------------------
-
 
 
 
@@ -4927,23 +5220,25 @@ We have deployed few web applications, services and network policies. Inspect th
 
 List pods
 	terminal --> k get pods
-# result:
-NAME       READY   STATUS    RESTARTS   AGE
-external   1/1     Running   0          80s
-internal   1/1     Running   0          80s
-mysql      1/1     Running   0          80s
-payroll    1/1     Running   0          80s
+
+	# result:
+	NAME       READY   STATUS    RESTARTS   AGE
+	external   1/1     Running   0          80s
+	internal   1/1     Running   0          80s
+	mysql      1/1     Running   0          80s
+	payroll    1/1     Running   0          80s
 
 
 List services
 	terminal --> k get svc
-# result:
-NAME               TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
-db-service         ClusterIP   10.100.30.69    <none>        3306/TCP         2m2s
-external-service   NodePort    10.104.66.126   <none>        8080:30080/TCP   2m3s
-internal-service   NodePort    10.99.127.155   <none>        8080:30082/TCP   2m3s
-kubernetes         ClusterIP   10.96.0.1       <none>        443/TCP          44m
-payroll-service    NodePort    10.110.45.31    <none>        8080:30083/TCP   2m2s
+
+	# result:
+	NAME               TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
+	db-service         ClusterIP   10.100.30.69    <none>        3306/TCP         2m2s
+	external-service   NodePort    10.104.66.126   <none>        8080:30080/TCP   2m3s
+	internal-service   NodePort    10.99.127.155   <none>        8080:30082/TCP   2m3s
+	kubernetes         ClusterIP   10.96.0.1       <none>        443/TCP          44m
+	payroll-service    NodePort    10.110.45.31    <none>        8080:30083/TCP   2m2s
 
 Look over the ports that services are set on.
 
@@ -4951,9 +5246,9 @@ Look over the ports that services are set on.
 List network policies
 	terminal --> k get networkpolicies		# netpol - short syntax
 
-# result:
-NAME             POD-SELECTOR   AGE
-payroll-policy   name=payroll   3m35s
+	# result:
+	NAME             POD-SELECTOR   AGE
+	payroll-policy   name=payroll   3m35s
 
 - choose '1' as answer
 
@@ -4965,9 +5260,9 @@ payroll-policy   name=payroll   3m35s
 List network policies
 	terminal --> k get networkpolicies		# netpol - short syntax
 
-# result:
-NAME             POD-SELECTOR   AGE
-payroll-policy   name=payroll   3m35s
+	# result:
+	NAME             POD-SELECTOR   AGE
+	payroll-policy   name=payroll   3m35s
 
 - choose 'payroll-policy' as answer
 
@@ -4979,9 +5274,9 @@ payroll-policy   name=payroll   3m35s
 List network policies
 	terminal --> k get networkpolicies		# netpol - short syntax
 
-# result:
-NAME             POD-SELECTOR   AGE
-payroll-policy   name=payroll   3m35s
+	# result:
+	NAME             POD-SELECTOR   AGE
+	payroll-policy   name=payroll   3m35s
 
 Show details about the network policy
 	terminal --> k describe netpol payroll-policy
@@ -5013,9 +5308,9 @@ Spec:
 List network policies
 	terminal --> k get networkpolicies		# netpol - short syntax
 
-# result:
-NAME             POD-SELECTOR   AGE
-payroll-policy   name=payroll   3m35s
+	# result:
+	NAME             POD-SELECTOR   AGE
+	payroll-policy   name=payroll   3m35s
 
 
 Show details about the network policy
@@ -5048,9 +5343,9 @@ Spec:
 List network policies
 	terminal --> k get networkpolicies		# netpol - short syntax
 
-# result:
-NAME             POD-SELECTOR   AGE
-payroll-policy   name=payroll   3m35s
+	# result:
+	NAME             POD-SELECTOR   AGE
+	payroll-policy   name=payroll   3m35s
 
 
 Show details about the network policy
@@ -5084,9 +5379,9 @@ Spec:
 List network policies
 	terminal --> k get networkpolicies		# netpol - short syntax
 
-# result:
-NAME             POD-SELECTOR   AGE
-payroll-policy   name=payroll   3m35s
+	# result:
+	NAME             POD-SELECTOR   AGE
+	payroll-policy   name=payroll   3m35s
 
 
 Show details about the network policy
@@ -5241,8 +5536,6 @@ Spec:
 
 
 
-
-
 =====================================================
 Section 7 188. 2025 Custom Resource Definitions (CRD)
 =====================================================
@@ -5320,9 +5613,87 @@ Namespace							Namespace
 
 
 
+Resources Recap:
+
+deployment.yaml
+-------------------------------
+apiVErsion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp-deployment
+spec:
+  template:
+    metadata:
+      name: myapp-pod
+      labels:
+	type: front-end
+    spec:
+      containers:
+      - image: nginx
+  replicas: 3
+  selector:
+    matchLabels:
+      type: front-end
+-------------------------------
+
+Create the deployment
+	terminal --> kubectl create -f deployment.yaml
+
+	# result: deployment "myapp-deployment" created
+
+The Deployment information is stored in ETCD datastore
+
+Then we can list the deplyment and see the status
+	terminal --> k get deploy
+	
+	# result:
+	NAME			DESIRED		CIRRENT		UP-TO-DATE	AVAILABLE	AGE
+	myapp-deployment	3		3		3		3		21s
+
+We can delete the deployment
+	terminal --> k delete deploy myapp-deployment
+
+	# result: deployment "myapp-deployment" deleted
+
+When we create a deployment it a controller creates the desired Pods. This controller is the deployment controller. The deployment controller is built in and is already available. The controller is background controller that continuouslly monitors the status of resources that is supose to manage (the deployment in this case). When we modify or delete the deployment it makes the necessary changes on the cluster to match what we have done. In this case when we create a deployment the controller creates a replicaset that which then creates as meany Pods as we have specified in the deployment definition file.
+
+
+Example deplyment controller
+
+deployment_controller.go
+----------------------------------
+package deployment
+
+var controllerKind = 
+apps.SchemeGroupVersion.WithKind("Deployment")
+
+//< Code hidden >
+
+// Run begins watching and syncing
+func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{})
+
+// < Code hidden >
+// App ReplicaSet
+func (dc *DeploymentController) addReplicaSet(obj interface{})
+
+// A lot of code hidden
+----------------------------------
+
+
+
+Resource							Controller
+-----------------------------------------------------------------------------
+ReplicaSet							ReplicaSet		
+Deployment							Deployment
+Job								Job
+Cronjob				ETCD				Cronjob		
+Statefulset							Statefulset
+Namespace							Namespace
+
+
 For us to create a custom resource and expect this kind resources to be managed by controllers, we need to create resourcename-custom-definition.yaml
 
-This is the resource we want to use:
+This is the custom resource we want to use:
 
 flightticket.yaml
 -------------------------------------------------
@@ -5336,6 +5707,53 @@ spec:
   number: 2
 -------------------------------------------------
 
+Create flight tickets
+	terminal --> k create -f flightticket.yaml
+
+	# result: flighticket "my-flight-ticket" created
+
+List flight tickets
+	terminal --> k get flighttickets
+
+	# result:
+	NAME			STATUS
+	My-flight-ticket 	Pending
+
+Delete flightticket
+	terminal --> k delete -f flightticket.yaml
+
+	# result: flighticket "my-flight-ticket" deleted
+
+This command are going to craete or delete the flightticket object in the ETCD datastore. But is not actually going to book a ticket.
+
+We have API https://book-flight.com/api that we want to call when we want to book a ticket. How do we call it?
+
+To book a ticket we will need a controller. So we will create a controller that will monitor the ETCD for created flightticket object and it will connect to the booking API and purchase the tickets and when we delete this flightticket object it will connect to the API and cancel the tickets.
+
+
+Example custom controller:
+
+flightticket_controller.go
+-------------------------------------------------
+package flightticket
+
+var controllerKind =
+apps.SchemeGroupVersion.WithKind("Flightticket")
+
+//< Code hidden >
+
+// Run begins watching and syncing
+func (dc *FlightticketController) Run(workers int, stopCh <-chan struct{})
+
+// < Code hidden >
+// App ReplicaSet
+func (dc *FlightticketController) callBookFlightAPI(obj interface{})
+
+// A lot of code hidden
+-------------------------------------------------
+
+
+We cannot create a custom resource without configuting it in the Kubernetes API. For that purpose we need a Custom Resource Definition - CRD
 
 flightticket-custom-definition.yaml
 -------------------------------------------------
@@ -5359,7 +5777,7 @@ spec:
   schema:					# all the parameters specified under 'spec:' section when creating an object
     openAPIV3Schema:				# fields and kind of data that that fields require
         type: object
-	properties:
+	properties:				# define the schema that the object will require to be created
 	  spec:
 	    type: object
 	    properties:
@@ -5372,16 +5790,6 @@ spec:
 		minimum: 1
 		maximum: 10
 -------------------------------------------------
-
-Namespaced objects:
-	- pods
-	- replicasets
-	- deployments
-
-No namepsaced object:
-	- Persistent Volumes (PVs)
-	- Nodes
-	- Namespaces
 
 List api resources
 	terminal --> kubectl api-resources
