@@ -23,7 +23,7 @@ Helm is package manager for Kubernetes
 Example for useing Helm
 	terminal --> helm install wordpress
 
-# result: alues.yaml file is created with all settings of wordpress application.
+# result: values.yaml file is created with all settings of wordpress application.
 
 We can the edit the values.yaml file and upgrade the wordpress application
 	terminal --> helm upgrade wprdpress
@@ -34,7 +34,7 @@ If we make a mistake we can rollback versions
 We can uninstall app with one command
 	terminal --> helm uninstall wordpress
 
-# heml keep track of all files used by each app so it knows what to remove
+	# helm keep track of all files used by each app so it knows what to remove
 
 HELM allows us to treat kubernetes apps as apps and not as set of objects that we need to manage manually one by one. This is great ease!
 
@@ -48,21 +48,31 @@ Section 12 259. Installation and Configuration
 
 For installing HELM we need
 	- Working Kubernetes Cluster
-	- Installed and configured kubectl util
+	- Installed and configured kubectl utilily with the kubeconfig file and credentials
+	INFO: https://helm.sh/docs/intro/install/
+
+
+INstall HELM on Linux
+=====================
 
 Isntall HELM on Linux system
-	terminal --> sudo snap install helm --classic
+	terminal --> sudo snap install helm --classic		
 
-For apt based systems
+# --classic version give more access to the host system, rather strictly isolating it to its separate environment
+This sway HELM can easilly access the kubeconfig file in our home directory - knows how to connect to our kubernetes cluster
+
+For apt based systems (Debian or Ubuntu)
+----------------------------------------
 	terminal --> curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
 sudo apt-get install apt-transport-https --yes
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
 sudo apt-get update
 sudo apt-get install helm
 
-For pkg systems
+For package based systems (Windows)
 	terminal --> pkg install helm
 
+Always refer to latest instructions in the documentation pages - https://helm.sh/docs/intro/install/
 
 
 
