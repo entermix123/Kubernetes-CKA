@@ -209,9 +209,9 @@ Show pod's state
 Section 3 56. Labels and Selectors
 ==================================
 
-Labels and Selectors give us the possibility to group and filter object by different criteria.
+Labels and Selectors give us the possibility to filter object by different criteria.
 
-Labels are properties of every object.
+Labels are properties of every objects.
 Selectors are the criteria we are filtering on.
 
 example for pod-definition.yaml file
@@ -303,8 +303,7 @@ metadata:
   labels:
     app: App1
     funtion: Front-End
-  annotations: 
-      buildversion: 1.34	# annotation information
+  annotation: 1.34	# annotation information
 
 spec:
   replicas: 3
@@ -345,35 +344,16 @@ Show all object (pods) in dev environment
 	# --no-headers				- exclude headers of the result table
 
 Show count of all filtered objects
-	terminal --> kubectl get all --selector env=dev --no-headers | wc -l
+	terminal --> kubectl get all --selector env=prod --no-headers | wc -l
 
 	# kubectl				- common kubernetes command
 	# get					- used action
 	# all					- object kind
-	# --selector env=dev			- set selector for environment
+	# --selector env=prod			- set selector for environment
 	# --no-headers				- exclude headers of the result table
 	# | wc -l				- show count of lines in the result
 
-Show all pods in 'dev' environment
-	terminal --> k get pods --selector env=dev
-
-	# result:
-	NAME          READY   STATUS    RESTARTS   AGE
-	app-1-525l2   1/1     Running   0          7m5s
-	app-1-9nt54   1/1     Running   0          7m5s
-	app-1-mf5wv   1/1     Running   0          7m5s
-	db-1-72vr5    1/1     Running   0          7m5s
-	db-1-hxjjj    1/1     Running   0          7m5s
-	db-1-njc7d    1/1     Running   0          7m5s
-	db-1-wjfzv    1/1     Running   0          7m5s
-
-Show count of the pods in 'dev' environment
-	terminal --> k get pods --selector env=dev --no-headers | wc -l
-
-	# result: 7
-
 - choose '7' as answer
-
 
 
 
@@ -441,69 +421,110 @@ Show the pod in prod environment, finance bu and frontend tier
 ------------------------------------------------
 Once you fix the issue, create the replicaset from the definition file.
 
-Trye to create the replicaset
-	ternubal --> k create -f replicaset-definition-1.yaml
 
-# result:
-The ReplicaSet "replicaset-1" is invalid: spec.template.metadata.labels: Invalid value: map[string]string{"tier":"nginx"}: `selector` does not match template `labels`
+Task approach
+	option 1 - edit the pod
+		- creates temporary file with the edited pod definition
+		- replace the existing pod with the new using the temporary definition file
+	option 2 - craete new definition file from existing pod
+		- edit the definition file
+		- apply changes
 
+Option 1
+--------
+Edit the pod configuration and change the memory limit to 20Mi
+	terminal --> kubectl edit pod elephant
 
-Print the replicaset definition file
-	terminal --> cat replicaset-definition-1.yaml
-
-replicaset-definition-1.yaml
------------------------------
-apiVersion: apps/v1
-kind: ReplicaSet
-metadata:
-   name: replicaset-1
+-----------------------------------------
+...
 spec:
-   replicas: 2
-   selector:
-      matchLabels:
-        tier: front-end			# this is different from template labels
-   template:
-     metadata:
-       labels:
-        tier: nginx			# this is different from replicaset selector
-     spec:
-       containers:
-       - name: nginx
-         image: nginx
------------------------------
+  containers:
+  - args:
+    - --vm
+    - "1"
+    - --vm-bytes
+    - 15M
+    - --vm-hang
+    - "1"
+    command:
+    - stress
+    image: polinux/stress
+    imagePullPolicy: Always
+    name: mem-stress
+    resources:
+      limits:
+        memory: 20Mi			# change from 10Mi to 20Mi
+      requests:
+        memory: 5Mi
+...
+-----------------------------------------
+save changes - escape, :wq!, enter
+exit the error screen - escape, :q!, enter
+
+We receive message:
+error: pods "elephant" is invalid
+A copy of your changes has been stored to "/tmp/kubectl-edit-808191089.yaml"
+error: Edit cancelled, no valid changes were saved.
+
+Recreate 'elephant' pod
+	terminal --> kubectl replace --force -f /tmp/kubectl-edit-808191089.yaml
+
+	# kubectl 				- common kubernetes command
+	# replace				- recreate object
+	# --force				- delete object and create new one
+	# -f /tmp/kubectl-edit-1577548652.yaml	- used definition file
+
+	# result:
+	pod "elephant" deleted
+	pod/elephant replaced
 
 
+Option 2
+--------
 
-Edit the replicaset definition file
-	terminal --> vi replicaset-definition-1.yaml
+Create definition file from existing pod
+	terminal --> k get pod elephant -o yaml > elephant.yaml
 
-replicaset-definition-1.yaml
------------------------------
-apiVersion: apps/v1
-kind: ReplicaSet
-metadata:
-   name: replicaset-1
+Edit the definition file
+	terminal --> vi elephant.yaml
+
+elephant.yaml
+-----------------------------------------
+...
 spec:
-   replicas: 2
-   selector:
-      matchLabels:
-        tier: nginx
-   template:
-     metadata:
-       labels:
-        tier: nginx
-     spec:
-       containers:
-       - name: nginx
-         image: nginx
------------------------------
+  containers:
+  - args:
+    - --vm
+    - "1"
+    - --vm-bytes
+    - 15M
+    - --vm-hang
+    - "1"
+    command:
+    - stress
+    image: polinux/stress
+    imagePullPolicy: Always
+    name: mem-stress
+    resources:
+      limits:
+        memory: 20Mi			# change from 10Mi to 20Mi
+      requests:
+        memory: 5Mi
+...
+-----------------------------------------
 save changes - escape, :wq!, enter
 
+Delete the existing pod
+	terminal --> k delete pod elephant
 
-Try to create the replicaset again
-	ternubal --> k create -f replicaset-definition-1.yaml
+Create new pod with the craeted pod definition file
+	terminal --> k apply -f elephant.yaml
 
-	# result: replicaset.apps/replicaset-1 created
+Verify pod creation 
+	terminal --> kubectl get pods -o wide
+
+Verify memory limit in elephant pod details
+	terminal --> kubectl describe pod elephant
 
 
 - cklick 'Check' button
@@ -2912,19 +2933,61 @@ Section 3 82. 2025 Admission Controller
 =======================================
 
 
+Recap of the request path. When we want to craete a Pod, we send a request to the kubeapi-server. The server authenticate us, then check if we are authorized to perform this action with RBAC and then executes the action.
+
+ User
+kubectl <---> Authentication <---> Authorization <---> Create Pod
+
+Given role with allowed actions.
+
+developer-role.yaml
+---------------------------------------
+apiVErsion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: developer
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["list", "get", "create", "update", "delete"]
+---------------------------------------
+
+
 With RBAC (role based access control) we can give access for specific actions to specific roles. Developers can create, edit, list and delete pods. Admins can manage servers, schedulers, etc. 
 
 We want to set more specific permissions like or requirements not connected with cpecific role:
 	- Only permit images from certain registry
-	- Do not permit to use images with 'latest' tag
+	- Do not permit to use images with 'latest' tag or specific repository
 	- Do not allow requests to containers runned as root user
-	- only permit certain capabilities
-	- Pod always has labels
+	- Only permit certain capabilities
+	- Pod always contains labels
 
 
-This is where admission controller comes in:
+Example with Pod definition file and restrictions:
 
-kubectl	-> Authentication -> Authorization -> Admission Controller -> Create Pod
+web-pod.yaml
+-----------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web-pod				# Pod always contains labels
+spec:
+  containers:
+    - name: ubuntu
+      image: ubunru:latest		# Do not permit to use images with 'latest' tag or specific repository
+      command: ["sleep", "3600"]
+      securityContext:
+	ruAsUser: 0			# Do not allow requests to containers runned as root user
+	cpabilities:
+	  add: ["MAC_ADMIN"]		# Only permit certain capabilities
+-----------------------------------------
+
+We cannot acheave this restrictions with RBAC.
+
+This is where admission controller comes in.
+
+ User
+kubectl	<---> Authentication <---> Authorization <---> Admission Controller <---> Create Pod
 
 Admission Controller help us implement better security measures to enforce how a cluster is used. There are prebuild admission controllers that comes with kubernetes.
 	- AlwaysPullImages			# every time a pod is created, the images are always pulled
@@ -2989,7 +3052,6 @@ Now as we enabled NamespaceAutoProvision admission controller if we try to run a
 NamespaceAutoProvision and NamespaceExists provission controllers are depricated and replaced by NamespaceLifecycle admission controller.
 
 NamespaceLifecycle ensure to reject requests to not existing namespaces and that the default namespaces such as default, kube-system and kube-public cannot be deleted.
-
 
 
 
@@ -3200,17 +3262,19 @@ List admission plugins
 Section 3 84. 2025 Validating and Mutating Admission Controllers
 ================================================================
 
+We will take a closer look over the different types of admission controllers and how to configure our own admission controller.
+
 kubectl	-> Authentication -> Authorization -> Admission Controller -> Create Object
 
 Type of admission controller
-	- NamespaceExists 	- Validating admission controller - validate the request and allow or deny it
-	- DefaultStorageClass	- Mutating admission controller - enabled by default - can change the request (change object before creation - adding default storage class to i)
+	- Validating admission controller - NamespaceExists - validate the request and allow or deny it
+	- Mutating admission controller   - DefaultStorageClass - enabled by default - can change the request (change object before creation - adding default storage class)
 
 Admission controllers are executed in order - mutating, validating - so if any mutation is not permitted or mutation is required, the request will be rejected.
 
 
 
-How we can create adn add custom admission contrllers?
+How we can create and add custom admission contrllers?
 ------------------------------------------------------
 
 There are special admission controllers that allow external admission controllers
@@ -3227,6 +3291,8 @@ How to set up a admission webhook configuration?
 
 
 1. Deploy Webhook Server
+	- Requirements: it can accept, mutate and validate APIs and respond with a JSON obkect that the web server expects
+	- There is a Python example of server in the video.
 	- set source code - https://github.com/kubernetes/kubernetes/blob/v1.13.0/test/images/webhook/main.go
 	- set deployment and service on kubernetes cluster for the admission webhook server
 
@@ -3242,7 +3308,7 @@ webhooks:
 - name: "pod-policy.example.com"
   clientConfig:						# config the location of admission webhook server
       # url: "https://external-server.example.com"	# for external server that is not part of our Kubernetes cluster
-      service:						# specify the service if the server is part of our kub cluster
+      service:						# specify the service if the server is part of our kube cluster
 	namespace: "webhook-namespace"			# specify the namespace
 	name: "webhook-service"				# name of the taget service
       caBundle: "Ci0tLS0tQk.....tLS0K"			# certificate bundel for secure communication
@@ -3255,7 +3321,7 @@ webhooks:
       scope: "Namespaced"
 -----------------------------------------------
 
-
+Once this obkect is created , every time we create a Pod a call to the Webhook service is made and depending on the response it will be allowed or rejected.
 
 
 
