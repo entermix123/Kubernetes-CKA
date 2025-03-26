@@ -31,6 +31,10 @@ Section 13 269. Kustomize Problem Statement and Ideology
 ========================================================
 
 
+Looking over the problem and how Kustomize solve it.
+
+We have example deployment:
+
 nginx-depl.yml
 ---------------------------------------
 apiVersion: apps/v1
@@ -54,17 +58,22 @@ spec:
 
 
 We have 3 environments and we have to deploy different count of replicas on every environment. How to do it?
-	- dev		- deploy 1 replica
-	- staging	- deploy 2-3 replicas
-	- prod		- deploy 5-10 replicas
+	- dev				
+		nginx-depl.yaml		# deploy 1 replica
+	- staging			
+		nginx-depl.yaml		# deploy 2-3 replicas
+	- prod				
+		nginx-depl.yaml		# deploy 5-10 replicas
 
 
 Option 1
 --------
 
-Simplest way is to create files for different envs
+We create 3 directories with the same deployment definition file and just modify the parameters in the deployemnt configuration for each different environmant.
+
 	- dev folder
 		nginx-depl.yaml
+
 nginx-depl.yml
 ---------------------------------------
 ...
@@ -101,8 +110,13 @@ Deploy Staging
 Deploy Prod
 	terminal --> kubectl apply -f prod/nginx-depl.yaml
 
-This solution is OK but not well scalable. For example if we want to create service.yml file we need to copy the created file to all folders. That brings human error chance that we or our colleagues can forget to copy the file in the one of the directories.
+This solution is OK but not well scalable. For example if we want to create service.yml file we need to copy the created file to all folders. That brings human error chance that we or our colleagues can forget to copy the file in the one of the directories. It works for small deployments. 
 
+When we scale our deployments with more and different resources, we need different solution. We want to treat the setup as simple application itself and thats where Kustomize directory and file topology comes in place.
+
+We 
+	
+	
 
 
 Option 2
@@ -110,15 +124,24 @@ Option 2
 
 Using Kustomize tool/util
 
-Kustomize have 2 types of configurations
-	- base 					- used accros all environments
-	- Overlays 				- used in specific environment
+Kustomize have 2 main Kustomize components
+	- Base config				- resources used accros all environments
+	- Overlays				- resources used in specific environment
 
 
+We will look over the example from before:
+
+We have 3 environments and we have to deploy different count of replicas on every environment.
+	- dev				
+		nginx-depl.yaml		# deploy 1 replica
+	- staging			
+		nginx-depl.yaml		# deploy 2-3 replicas
+	- prod				
+		nginx-depl.yaml		# deploy 5-10 replicas
 
 
 base (default) config					overlays
----------------------					--------
+=====================					========
 
 nginx-depl.yml						overlay/dev
 ---------------------------------------			---------------------------------------	
@@ -144,7 +167,8 @@ spec:							overlay/stg
 
 
 Folder Structure
-----------------
+================
+
 k8s/
 	base/					# common definition files for all envs
 		kustomization.yaml
@@ -162,9 +186,15 @@ k8s/
 			kustomization.yaml
 			config-map.yaml		
 
+
+How Kustomize works:
+
+Kustomize takes the Base resources combines them with the Overlays configurations and produce the Final Manifests file that are deployed on Kubernetes.
+
+
 RPOS:
 - Kustomize comes build-in with kubectl so no other packages need to be installed.
-	- We may want to install latest kustomize ctl
+	- We may want to install latest kustomize ctl (comes not aloways with the latest version)
 
 - No need to learn complex & hard to read templating systems (like helm)
 
@@ -173,17 +203,13 @@ RPOS:
 
 
 
-
 =================================
 Section 13 270. Kustomize vs Helm
 =================================
 
-Helm is package manager for kubernetes. 
-	- Helm provides little bit more functionalities from Lustomize like conditionals, loops, functions and hooks.
-	- Helm templates are NOT valid YAML as they use go templating syntax
-		- Complex templates become hard to read
+Helm makes use of Go templates to allow assigning varibles to properties.
 
-Helm deployment example with deployment.yaml and values.yaml files:
+Helm deployment example with deployment.yaml and values.yaml files as Go templateing:
 
 Deployment.yaml
 ---------------------------------------
@@ -216,20 +242,27 @@ image:
 ---------------------------------------
 
 
-Project structure
------------------
+Project structure using Helm
+----------------------------
 
 k8s/
-	environments/
+	environments/				# directory with values for each environemnt
 		values.dev.yaml
 		values.stg.yaml
 		values.prod.yaml
-	templates/
+	templates/				# Go templates directory
 		nginx-deployment.yaml
 		nginx-service.yaml
 		db-deployment.yaml
 		db-service.yaml
 
+
+Helm is package manager for Kubernetes. 
+	- provides little bit more functionalities from Kustomize like conditionals, loops, functions and hooks.
+	- templates are NOT valid YAML as they use Go templating syntax
+		- Complex templates become hard to read
+
+We must decide if we are going to use Helm or Kustomize over the spcifity of the project we will deploy.
 
 
 
@@ -242,7 +275,7 @@ Requirements
 	- Up and running Kubernetes cluster
 	- Installed kubectl util
 
-Install KUstomize
+Install Kustomize
 	terminal --> curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
 
 Verify Kustomize installation
@@ -250,7 +283,7 @@ Verify Kustomize installation
 	
 	# expected result: {kustomize/v4.4.1 2012-11-11T23:36:27Z }
 
-
+If the verification result is not as above, we need to close the current terminal sesion and open a new one and install Kustomize again.
 
 
 
@@ -258,7 +291,27 @@ Verify Kustomize installation
 Section 13 272. kustomization.yaml file
 =======================================
 
-Example kubernetes project folder structure
+Requirements
+	- Up and running Kubernetes cluster
+	- Installed kubectl util
+
+Install Kustomize
+	terminal --> curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+
+Verify Kustomize installation
+	terminal --> kustomize version --short
+	
+	# expected result: {kustomize/v4.4.1 2012-11-11T23:36:27Z }
+
+If the verification result is not as above, we need to close the current terminal sesion and open a new one and install Kustomize again.
+
+
+
+=======================================
+Section 11 174. kustomization.yaml file
+=======================================
+
+Example Kubernetes project folder structure
 
 k8s/
 	nginx-depl.yaml
@@ -280,10 +333,12 @@ commonLabels:						# simple example for adding label with key-value pair
 --------------------------------------------------
 
 
-Build the kubernetes structure
+Build the Kubernetes structure
 	terminal --> kustomize build k8s/
 
-# result is the configurations applied:
+
+Kustomize combine all files and produce one final file with all configurations in it:
+
 
 --------------------------------------
 kustomize build k8s/
@@ -338,10 +393,8 @@ Conclusion
 - The 'kustomize build' command combines all the manifests and applies the defined tranformations
 - The 'kustomize build' command DOES NOT apply/deploy the Kubernetes resources to a cluster
 	- It just result in the final configuration that will be used for the deploy
+
 - If we want to aplly the kustomize output configurations, we need to apply them with kubectl util
-
-
-
 
 
 
@@ -350,10 +403,15 @@ Section 13 273. Kustomize Output
 ================================
 
 
+Kustomize DO NOT apply or deploy configs by itself. We have to conbine the commands with kubectl to apply them.
+
+Project structure
+-----------------
 k8s/
 	nginx-depl.yaml
 	nginx-service.yaml
 	kustomization.yaml		# kustomize config file
+
 
 BUILD AND APPLY RESOURCES WITH KUSTOMIZE
 ----------------------------------------
@@ -364,13 +422,13 @@ Build Kubernetes configuration
 	# This command result is the configuration that have to be applied with kubectl util to deploy to Kubernetes Cluster
 
 
-Build Kubernetes configs and with Kustomize and apply them with kubectl
+Build Kubernetes configs with Kustomize and apply them with kubectl
 	terminal --> kustomize build k8s/ | kubectl apply -f -
 
 	# kustomize					- common kustomize command
 	# build						- action	
 	# k8s/						- from folder
-	# |						- execute next command if previous command is successful
+	# |						- 'Redirect' - execute next command if previous command is successful
 	# kubect					- kubernetes common CLI command
 	# apply -f -					- apply the result of the previous command
 
@@ -379,7 +437,7 @@ Build Kubernetes configs and with Kustomize and apply them with kubectl
 	deployment.apps/nginx-deployment created
 	
 
-If the config of the resources are build by kustomize we can apply them with kubectl
+If the config of the resources are build with Kustomize we can apply them with kubectl
 	terminal --> kubectl apply -k k8s/
 
 	# kubectl				- common kubernetes kubectl util command
@@ -395,7 +453,7 @@ If the config of the resources are build by kustomize we can apply them with kub
 DELETE RESOURCES WITH KUSTOMIZE
 -------------------------------
 
-Delete resources with kustomize
+Delete resources with Kustomize
 	terminal --> kustomize build k8s/ | kubectl delete -f -
 
 	# expected result:
@@ -409,7 +467,6 @@ If the resources are build, we can delete them with kubectl util
 	# kubectl				- common kubernetes kubectl util command
 	# delete 				- action
 	# -k k8s/				- use files from directory
-
 
 
 
@@ -445,7 +502,7 @@ Section 13 275. Managing Directories
 Example for changing directory structure
 
 Current direcory structure:
-
+---------------------------
 k8s/
 	api-depl.yaml
 	api-service.yaml
@@ -453,8 +510,10 @@ k8s/
 	db-service.yaml
 
 
-We reconfigure the folder structure to:
+We add more resources and we decide to separate the files in different directories:
 
+We reconfigure the folder structure to:
+---------------------------------------
 k8s/
 	api/
 		api-depl.yaml
@@ -468,8 +527,7 @@ If we want to apply with kubectl we need to specify the directories
 	terminal --> kubectl apply -f k8s/db/
 
 
-When we add more directories or files in the directories, we need to apply every directory again. The solution for this iisue is to add a kustomize.yaml file in the main directory
-
+When we add more directories or files in the directories, we need to apply every directory again. The solution for this issue is to add a kustomize.yaml file in the main directory:
 
 k8s/
 	kustomize.yaml			# added
@@ -494,7 +552,7 @@ resources:
 ---------------------------------------
 
 
-Build and apply the kubernetes files
+Build and apply all Kubernetes resources
 	terminal --> kustomize build k8s/ | kubectl apply -f -
 
 	# expected result:
@@ -505,7 +563,7 @@ Build and apply the kubernetes files
 
 
 
-If kubernetes configuration is already made by kustomize, we can apply it woth kubectl
+If kubernetes configuration is already made with Kustomize, we can apply it woth kubectl
 	terminal --> kubectl apply -k k8s/
 
 	# expected result:
@@ -516,7 +574,7 @@ If kubernetes configuration is already made by kustomize, we can apply it woth k
 
 
 
-We build more and our directories increases. We can create kustomization.yaml file in every subfolder. In the main kustomization.yaml file we provide only routes for every subdirectory so kustomize can search in all of them.
+We build more and our directories increases. We can create kustomization.yaml file in every subfolder. In the main kustomization.yaml file we provide only routes for every subdirectory so kustomize can search in all of them. In the kustomization.yaml files in the subdirectories we list all resources for the specific diretory.
 
 k8s/
 	kustomization.yaml
@@ -571,7 +629,7 @@ Apply these resources
 	# apply -f -					- apply the result of the previous command
 
 
-If the configurations are already build, just apply them with kubectl
+If the configurations are already build with Kustomize, just apply them with kubectl
 	terminal --> kubectl apply -k k8s/
 
 
@@ -618,6 +676,8 @@ We can delete the resources with
 OPTION 2 - Deploy resources with kustomization.yaml file
 --------------------------------------------------------
 
+Add kustomization.yaml file in the root directory. 
+
 kustomization.yaml
 ---------------------------------------
 apiVersion: kustomize.config.k8s.io/v1beta1
@@ -638,14 +698,13 @@ resources:
 Build the resources with ustomize
 	terminal --> kustomize build k8s/
 
-	# the result is one file with all configs
+	# the result is one file with all resources and configs
 
 Apply the resources with kubectl
 	terminal --> kubectl apply -k k8s/
 
 Build and deploy resources with one line command
 	terminal --> kustomize build k8s/ | kubectl apply -f -
-
 
 
 OPTION 3 - Deploy resources with kustomization.yaml file in every subdirectory
@@ -766,6 +825,16 @@ resources:
 Build and apply the resources
 	terminal --> kustomize build k8s/ | kubectl apply -f -
 
+	# result:
+	configmap/db-credentials created
+	configmap/redis-credentials created
+	service/db-service created
+	service/nginx-service created
+	service/rabbit-cluster-ip-service created
+	deployment.apps/db-deployment created
+	deployment.apps/nginx-deployment created
+	deployment.apps/rabbitmq-deployment created
+
 
 - click 'Check' button
 
@@ -778,6 +847,14 @@ In the current(default) namespace.
 List pods
 	terminal --> kubectl get pods
 
+	# result:
+	NAME                                   READY   STATUS    RESTARTS   AGE
+	db-deployment-856558f969-2m2kb         1/1     Running   0          55s
+	nginx-deployment-6fd6985867-56b96      1/1     Running   0          55s
+	nginx-deployment-6fd6985867-9lxr5      1/1     Running   0          55s
+	nginx-deployment-6fd6985867-bk8j9      1/1     Running   0          55s
+	rabbitmq-deployment-56cbdbfd4c-9xw6h   1/1     Running   0          55s
+
 - cjoose '5' as answer
 
 
@@ -788,18 +865,19 @@ List pods
 List services
 	terminal --> kubectl get svc
 
-# result:
-NAME                        TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)           AGE
-db-service                  NodePort    10.43.229.158   <none>        27017:31451/TCP   2m11s
-kubernetes                  ClusterIP   10.43.0.1       <none>        443/TCP           23m
-nginx-service               NodePort    10.43.2.209     <none>        80:30904/TCP      2m11s
-rabbit-cluster-ip-service   ClusterIP   10.43.213.188   <none>        5672/TCP          2m10s
+	# result:
+	NAME                        TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)           AGE
+	db-service                  NodePort    10.43.229.158   <none>        27017:31451/TCP   2m11s
+	kubernetes                  ClusterIP   10.43.0.1       <none>        443/TCP           23m
+	nginx-service               NodePort    10.43.2.209     <none>        80:30904/TCP      2m11s
+	rabbit-cluster-ip-service   ClusterIP   10.43.213.188   <none>        5672/TCP          2m10s
 
 
 Show information about rabbit-cluster-ip-service service
 	terminal --> kubectl describe svc rabbit-cluster-ip-service
 
-# result: Type: ClusterIP
+	# result: Type: ClusterIP
+
 
 - choose 'ClusterIP' as answer
 
@@ -862,6 +940,15 @@ resources:
 Build and apply resources
 	terminal --> kustomize build k8s/ | kubectl apply -f -
 
+	# result:
+	configmap/db-credentials created
+	configmap/redis-credentials created
+	service/db-service created
+	service/nginx-service created
+	service/rabbit-cluster-ip-service created
+	deployment.apps/db-deployment created
+	deployment.apps/nginx-deployment created
+	deployment.apps/rabbitmq-deployment created
 
 - click 'Check' button
 
@@ -873,8 +960,8 @@ Build and apply resources
 List pods
 	terminal --> kubectl get pods
 
-- choose '6' as answer
 
+- choose '6' as answer
 
 
 
@@ -883,7 +970,13 @@ List pods
 Section 13 278. Common Tranformers
 ==================================
 
-Tranformers are tools to manage resources in Kubernetes
+We will look how we can use Kustomize to modify our Kubernetes configs. We use Kustomize transformers. Kustomize has several builtin tranformers. We can build our custom tranformers.
+
+We will look ovet specific group of tranforers called Common Tranformers.
+
+What is the issue and how tranformers are solving it.
+
+We ahve deployment and service definition files as follow:
 
 db-depl.yaml
 ---------------------------------------------
@@ -923,15 +1016,15 @@ spec:
   type: LoadBalancer
 ---------------------------------------------
 
+We can go true all Kubernetes resources and set the sepcific changes, but in production environment we may have many and different resources and this task can be very risky and difficult.
 
-How we can make changes on names or add label on all files in scalable way? Tranforators come in place in this scenario.
+How we can make changes all files in scalable way? Tranforators come in place in this scenario.
 
-What Common Tranformations can do
-	- commonLabels - adds a label to all Kubernetes resources
-	- namePrefix/Suffix - adds a common prefix-suffix to all resources
-	- Namespace - adds a common namespace to all resources
-	- commonAnnotations - adds an annotation to all resources
-
+Lets look over a scenarion that we want to add labels, set namespace, set prefix or suffix or set annotations. There are different tranformars for different changes we want to make:
+	- CommonLabel Tranformer 		- adds a label to all Kubernetes resources
+	- Namespace Tranformer 			- adds a common namespace to all resources
+	- Name Prefix/Suffix Tranformer 	- adds a common prefix-suffix to all resources
+	- CommonAnnotations Tranformer 		- adds an annotation to all resources
 
 Kustomization.yaml
 ---------------------------------------------
@@ -985,6 +1078,11 @@ Section 13 279. Image Tranformers
 =================================
 
 
+Image Tranformer allow us to change an Image of specific Deployment or Container is going to use true Kustomize.
+
+
+We have example deployment:
+
 web-depl.yaml
 ---------------------------------------------
 apiVersion: apps/v1
@@ -1003,9 +1101,8 @@ spec:
     spec:
       containers:
         - name: web
-	  image: nginx
+	  image: nginx				# this is the current Image
 ---------------------------------------------
-
 
 We can change the image with kustomize.yaml file
 
@@ -1019,11 +1116,11 @@ images:
     newName: haproxy				# image to replace with
 ---------------------------------------------
 
-This will go true all our configuration files and find all containers that use image nginx and replace it with haproxy
+This will go true all our configuration files and find all containers that use image nginx and replace it with haproxy.
 
 
 
-We can change the tag of the image with kustomize.yaml file
+We can change the tag of the image with kustomize.yaml file as well.
 
 Kustomization.yaml
 ---------------------------------------------
@@ -1040,7 +1137,7 @@ This will go true all our configuration files and find all containers that use i
 
 
 
-We can combine the image na d tag tranforation with one kustomize file
+We can combine the image and tag tranforation with one kustomize file
 
 Kustomization.yaml
 ---------------------------------------------
@@ -1049,13 +1146,11 @@ kind: Kustomization
 
 images:
   - name: nginx					# target image
-    newName: haproxy
+    newName: haproxy				# set new image
     newTag: 2.4					# set tag
 ---------------------------------------------
 
 This will go true all our configuration files and find all containers that use image nginx, replace the image with haproxy and set tag 2.4 - haproxy:2.4
-
-
 
 
 
@@ -1065,6 +1160,7 @@ Section 13 280. Image Tranformers Demo
 ======================================
 
 We have folder structure
+------------------------
 
 k8s/
   kustomization.yaml
@@ -1158,7 +1254,7 @@ commonLabels:
 Build the configs
 	terminal --> kustomize build k8s/ 
 
-	# the result will print all resources, but only api resources will have "feature: api" key-value pair
+	# the result will print all resources, but only /api resources will have "feature: api" key-value pair
 
 
 
@@ -1184,7 +1280,7 @@ commonLabels:
 Build the configs
 	terminal --> kustomize build k8s/ 
 
-	# the result will print all resources, but only db resources will have "feature: db" key-value pair
+	# the result will print all resources, but only /db resources will have "feature: db" key-value pair
 
 
 
@@ -1292,8 +1388,8 @@ Build the configs
 
 	# result:
 	# all resources will have prefix "KodeKloud-"
-	# api resources will have suffix "-web"
-	# db resources will have suffix "-sorage"
+	# /api resources will have suffix "-web"
+	# /db resources will have suffix "-sorage"
 
 
 
@@ -1334,7 +1430,7 @@ Set image and tag tranformer to db resources
 
 - Our db uses mongo db and we want to change the image to postgres
 - if we want to make changes to all resources we need to set the image and tag tranformer to k8s/kustomization.yaml 
-- if we want to make changes to db subfolder resources only we need to set the image adn tag tranformer to k8s/db/kustomization.yaml
+- if we want to make changes to db subfolder resources only we need to set the image and tag tranformer to k8s/db/kustomization.yaml
 
 
 k8s/db/kustomization.yaml
@@ -1465,10 +1561,10 @@ resources:
   - nginx-depl.yaml
   - nginx-service.yaml
 
-commonAnnotations:
-  owner: bob@gmail.com
+commonAnnotations:		# added
+  owner: bob@gmail.com		# added
 ----------------------------------------------------
-
+save changes: ctrl + s
 
 in /root/code/k8s/monitoring/kustomization.yaml file add
 ----------------------------------------------------
@@ -1481,9 +1577,10 @@ resources:
 
 namespace: logging
 
-commonAnnotations:
-  owner: bob@gmail.com
+commonAnnotations:		# added
+  owner: bob@gmail.com		# added
 ----------------------------------------------------
+save changes: ctrl + s
 
 Build the configs
 	terminal --> kustomize build k8s/ 
@@ -1515,7 +1612,7 @@ images:					# added
   - name: postgres			# added
     newName: mysql			# added
 ----------------------------------------------------
-
+save changes: ctrl + s
 
 Build the configs
 	terminal --> kustomize build k8s/ 
@@ -1543,10 +1640,11 @@ resources:
 commonAnnotations:
   owner: bob@gmail.com
 
-images:
-  - name: nginx
-    newTag: "1.23"
+images:				# added
+  - name: nginx			# added
+    newTag: "1.23"		# added
 ----------------------------------------------------
+save changes: ctrl + s
 
 Build the configs
 	terminal --> kustomize build k8s/ 
@@ -1558,10 +1656,12 @@ Build the configs
 
 
 
-
 =============================
 Section 13 282. Patches Intro
 =============================
+
+Patches info
+------------
 
 - Kustomize patches provide another method to modify Kubernetes configs
 
@@ -1724,14 +1824,32 @@ spec:
 
 
 
+PATCHES TYPES
+=============
+
 We can define patches in 2 ways
 	- JSON 6902 Patch		# https://datatracker.ietf.org/doc/html/rfc6902
 	- strategic merge patch		# prefered for more readable and kubernetes config similarity
 
 
+JSON 6902 Patch example
+-----------------------
 
-Strategic merge patch
----------------------
+kustomization.yaml
+------------------------------------------
+patches:
+  - target:
+      kind: Deployment				# target object type
+      name: api-deployment			# target object name
+    patch: |-					# '|-' - patch type - inline patch in this example 
+      - op: replace				# operation
+        path: /spec/replicas			# location of the property we want to do operaton on
+	value: 5				# value we want to set
+------------------------------------------
+
+
+Strategic merge patch example
+-----------------------------
 
 - this type patch is very similar to kubernetes config object
 - is replacing the configuration we want to change only
@@ -1749,6 +1867,7 @@ patches:
 ------------------------------------------
 
 
+We can use both types. Strategic type is a bit more readable.
 
 
 
@@ -1756,6 +1875,9 @@ patches:
 =========================================
 Section 13 283. Different Type of Patches
 =========================================
+
+PATCH TYPES
+===========
 
 We have two ways to define a patch
 	- JSON 6902 Patch		# https://datatracker.ietf.org/doc/html/rfc6902
@@ -3122,6 +3244,8 @@ Build and apply kustomization configurations
 Section 13 287. Overlays
 ========================
 
+Overlays are used to use the base resources and make changes and configurations for specifuc environment. Overlays are pathes used for the sepcific environment.
+
 We have 3 environments
 	- dev
 	- stg
@@ -3172,7 +3296,7 @@ resources:				# specified only shared resources
 
 dev/kustomization.yaml
 -----------------------------------
-bases:
+bases:					# base resources
   - ../../base				# set path - go up 2 directories (to k8s/) and enter base/ directory.
 					# look for kustomization.yaml file in base/ dir
 
@@ -3186,7 +3310,7 @@ patch: |-				# inline patch type
 
 prod/kustomization.yaml
 -----------------------------------
-bases:
+bases:					# base resources
   - ../../base				# set path - go up 2 directories (to k8s/) and enter base/ directory.
 					# look for kustomization.yaml file in base/ dir
 
@@ -3195,6 +3319,10 @@ patch: |-				# inline patch type
 	path: /spec/replicas		# specify path to replicas field
 	value: 3			# set replicas to 3
 -----------------------------------
+
+
+
+We can add resources in specific environments without adding them into base folder resources.
 
 
 
@@ -3223,13 +3351,13 @@ k8s/
 	grafana-depl.yaml	# added
 
 
-We add resources filed in prod kustomization file
+We add resources field in prod kustomization file
 
 prod/kustomization.yaml
 -----------------------------------
 bases:
   - ../../base				# set path - go up 2 directories (to k8s/) and enter base/ directory.
-					# look for kustomization.yaml file in base/ dir
+					
 resources:				# added
   - grafana-depl.yaml			# added
 
@@ -3635,6 +3763,7 @@ patches:				# added
         path: /spec/template/spec/containers/0/image
         value: caddy		
 ------------------------------------------------
+save changes: ctrl + s
 
 Build the configs
 	terminal --> kubectl apply -k /root/code/k8s/overlays/QA
@@ -3681,7 +3810,7 @@ spec:
             - name: MYSQL_ROOT_PASSWORD
               value: mypassword
 ------------------------------------------------
-
+save changes: ctrl + s
 
 edit overlays/staging/kustomization.yaml
 ------------------------------------------------
@@ -3694,6 +3823,7 @@ commonLabels:
 resources:				# add the resource locally in staging env
   - mysql-depl.yaml
 ------------------------------------------------
+save changes: ctrl + s
 
 Apply changes
 	terminal --> kubectl apply -k /root/code/k8s/overlays/staging
@@ -3709,15 +3839,27 @@ Apply changes
 Section 13 289. Components
 ==========================
 
-Components are scalable solution to add features in specific (multiple) overlays without editing all kustomizations in the overlays!
+We will look over Kustomize feature called Components. Components are reusable black of Kubernetes configs.
+
+Components are reusable block of Kubernetes configs - All resources for specific feature: Patches, ConfigMaps, Secrets adn any other Kubernetes related configs associated with the feature are going onto a Component and we can enable it in multiple overlays. Components are scalable solution to add features in specific (multiple) overlays without editing all kustomizations in the overlays!
 
 - Component provide the ability to define reusable pieces of configuration logic (resources + patches) that can be included in multiple ovelays
+
 - Components are useful in situations where applications support multiple optional features that need to be enabled only in a subset of overlays
 
 
 
 Example
 =======
+
+							/		# base directory
+							|
+		----------------------------------------|
+		|					|
+	       base			---------------------------------
+					|		|		|
+				       dev	     Premiun	   Self hosted
+
 
 We need 'caching' feature to be implemented in
 	- Premium
@@ -3727,6 +3869,7 @@ We need to implement 'External DB' feature in
 	- dev
 	- Premium
 
+We can add caching efatures in both directories (Premium and Self hosted) and they will work just fine, but if we want to change something we need NOT to forget to change file configs in both directories. To solve that issue we create 'caching' component and deploy it in the invironment we want to use it.
 
 folder structure
 ----------------
@@ -3740,7 +3883,7 @@ k8s/
 		kustomization.yaml
 		deployment-patch.yaml	
 		redis-depl.yaml
-	db/			# external db feature
+	db/							# external db feature
 		kustomization.yaml
 		deployment-patch.yaml	
 		postgres-depl.yaml
@@ -3753,6 +3896,10 @@ k8s/
 		kustomization.yaml
 
 
+
+
+Files in Components/db/ folder
+==============================
 
 k8s/components/db/postgres-depl.yaml			# standard deployment definition file
 ----------------------------------------------
@@ -3778,8 +3925,8 @@ spec:
 
 k8s/components/db/kustomization.yaml			# component definition file
 ----------------------------------------------
-apiVErsion: kustomize.config.k8s.io/v1alpha1		
-kind: Component
+apiVErsion: kustomize.config.k8s.io/v1alpha1		# specific apiVersion
+kind: Component						# specific kind
 
 resources:
   - postgres-depl.yaml
@@ -3794,7 +3941,7 @@ patches:
 ----------------------------------------------
 
 
-k8s/components/db/deployemnt-patch.yaml			# strategic merge patch
+k8s/components/db/deployemnt-patch.yaml		# strategic merge patch to set specific aparameters for the specific env
 ----------------------------------------------
 apiVersion: apps/v1
 kind: Deployment
@@ -3814,7 +3961,6 @@ spec:
 ----------------------------------------------
 
 
-
 Import external db feature
 --------------------------
 
@@ -3826,9 +3972,6 @@ bases:							# set path to shared resources
 components:						# set path to components folder
   - ../../components/db				
 ----------------------------------------------
-
-
-
 
 
 
@@ -3960,6 +4103,7 @@ components:
   - ../../components/auth
   - ../../components/logging		# added
 --------------------------------
+save changes: ctrl + s
 
 - click 'Check' button
 
@@ -3973,7 +4117,7 @@ There is a directory in the components directory called caching that has a deplo
 Finish creating the component, by creating the kustomization.yaml file and importing the redis configurations.
 
 
-create  code/project_mercury/components/cache/kustomization.yaml
+create  code/project_mercury/components/caching/kustomization.yaml
 -------------------------------------
 apiVersion: kustomize.config.k8s.io/v1alpha1
 kind: Component
@@ -3982,6 +4126,7 @@ resources:
   - redis-depl.yaml
   - redis-service.yaml
 -------------------------------------
+save changes: ctrl + s
 
 - click 'Check' button
 
@@ -3999,7 +4144,7 @@ NOTE: This patch should be defined in the caching directory as it is part of the
 
 
 
-create code/project_mercury/components/cache/api-patch.yaml
+create code/project_mercury/components/caching/api-patch.yaml
 -------------------------------------
 apiVersion: apps/v1
 kind: Deployment
@@ -4014,9 +4159,9 @@ spec:
             - name: REDIS_CONNECTION
               value: redis-service
 -------------------------------------
+save changes: ctrl + s
 
-
-edit code/project_mercury/components/cache/kustomization.yaml
+edit code/project_mercury/components/caching/kustomization.yaml
 -------------------------------------
 apiVersion: kustomize.config.k8s.io/v1alpha1
 kind: Component
@@ -4026,8 +4171,9 @@ resources:
   - redis-service.yaml
 
 patches:				# added
-  - api-patch.yaml
+  - path: api-patch.yaml
 -------------------------------------
+save changes: ctrl + s
 
 - click 'Check' button
 
@@ -4047,11 +4193,11 @@ bases:
 components:
   - ../../components/auth
   - ../../components/db
-  - ../../components/caching
+  - ../../components/caching		# added
 --------------------------------------
+save changes: ctrl + s
 
 - click 'Check' button
-
 
 
 
