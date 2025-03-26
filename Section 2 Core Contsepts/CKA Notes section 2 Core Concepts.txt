@@ -1693,8 +1693,26 @@ Show deployment
 section 2 - 36. Services
 ========================
 
+Services Types
+==============
+
+1. NodePort - the service makes an internal port accessable on a port on the Node.
+2. ClusterIP - the service creates a virtual IP inside the cluster to enable communication between different services such as a set of frontend servers with a set of backend servers.
+3. Load Balabancer - provisions a Load Balabancer for aour application in supported cloud providers. Example of that is to distribute load across different web servers in our frontend tier.
+
+
 NodePort Service
 ================
+
+Mapping a port on the Node to port on the Pod.
+
+
+Visual
+------
+				NODE
+---------------------------------------------------------------------------
+| NodePort [Port 30008] <---> Service [Port 80] <---> [TargetPort 80] POD |
+---------------------------------------------------------------------------
 
 Port - the port of the service (80)
 Target Port - the port of the POD (80)
@@ -1705,7 +1723,6 @@ Node Port - the port of the Node (30008), fixed range - 30000 - 32767
 Create a service
 ================
 
-
 service-definition.yml
 --------------------------------
 apiVersion: v1
@@ -1714,10 +1731,10 @@ metadata:
   name: myapp-service
 spec:
     type: NodePort
-    ports:
+    ports:			# array
      - targetPort: 80		# not mandatory, if not provided, takes 'port' as default
        port: 80			# mandatory
-       nodePort: 30008		# not mandatory, if not procided, takes random free port in the fixed range: 30000 - 32767
+       nodePort: 30008		# not mandatory, if not provided, takes random free port in the fixed range: 30000 - 32767
     selector:			# specify the target PODs 
        app: myapp
        type: front-end
@@ -1727,35 +1744,149 @@ spec:
 Create service
 --------------
 	terminal --> kubectl create -f service-definition.yml
-	# service "myapp-service" created
+	# result: service "myapp-service" created
+
 
 List services
 -------------
 	terminal --> kubectl get services
 
-	# NAME		TYPE		CLUSTER-IP		EXTERNAL-IP		AGE
-	  kubernetes	ClusterIP	10.96.0.1		<none>			16d
-	  myapp-service NodePort	10.106.127.123		<none>			5m
+	# result:
+	NAME		TYPE		CLUSTER-IP		EXTERNAL-IP	PORT(S)		AGE
+	kubernetes	ClusterIP	10.96.0.1		<none>		443/TCP		16d
+	myapp-service   NodePort	10.106.127.123		<none>		80:30008/TCP	5m
+
 
 Access the service
 ------------------
 	terminal --> curl https://192.168.1.2:30008
 
 	# 192.168.1.2 - IP of the Node
-	# 30008 - port of the Node
+	# 30008 - port to access the web server
 
 
+
+Scenario with multiple PODs
+===========================
+
+All 3 PODs have 'labels: app: myapp' and the service have 'selector: app: myapp'.
+
+
+
+When the service is created it looks for a matching Pod with the label and finds 3 of them. Then the service automatically selects all 3 Pods as endpoints to foreward the external requests coming from the user. The service automatically ballance the load between the 3 Pods with 'Algorithm: Random' and property 'SessionAffinity: Yes'. The service acts like a built in load ballancer to distribute load between different Pods.
+
+					NODE
+---------------------------------------------------------------------------------------
+| NodePort [Port 30008] <---> Service [Port 80] <---|				      |
+| IP 192.168.1.2				    |				      |
+| 			-------------------------------------------------             |
+|			|			|			|             |
+|		[TargetPort 80] POD 1   [TargetPort 80] POD 2   [TargetPort 80] POD 3 |
+|		IP 10.244.0.3		IP 10.244.0.2		IP 10.244.0.4	      |
+---------------------------------------------------------------------------------------
+
+
+
+When the Pods are distributed across different nodes
+----------------------------------------------------
+
+When we create a service without any additional configuration, Kubernetes automatically craetes our service that spans across all the Nodes in the cluster and maps the target port to the same NodePort on all the Nodes in the cluster. This way we can access our application using the IP of any Node in the cluster and using the same Port number - in this case is 30008.
+
+
+					       USER
+						|
+		-----------------------------------------------------------------
+		|				|				|
+		|				|				|
+IP 192.168.1.2	| Node 1	IP 192.168.1.3	| Node 2	IP 192.168.1.4	|  Node 3
+-------------------------	-------------------------	-------------------------
+|	NodePort 30008	|	|	NodePort 30008	|	|	NodePort 30008	|
+|		  |	|	|		  |	|	|	   |		|
+|		  v	|	|		  v	|	|	   v		|
+|	------------------------------------------------------------------------	|
+|	|				Service		selector: app: myapp	|	|
+|	------------------------------------------------------------------------	|
+|			|	|		|	|	|			|
+|			|	|		v	|	|			|	
+|	      	---------------------------------------------------------------		|
+|		|	|	|		|	|	|	      |		|
+|		v	|	|		v	|	|	      v		|
+|	--------------	|	|	--------------	|	|	--------------	|
+|	|    POD 1   |	|	|	|     POD 2  |	|	|	|     POD 3  |	|
+|	| 10.244.0.3 |	|	|	| 10.244.0.2 |  |	|	| 10.244.0.4 |	|
+|	|	     |	|	|	|	     |	|	|	|	     |	|
+|	| labels:    |	|	|	| labels:    |	|	|	| labels:    |	|
+|	|  app: myapp|	| 	|	|  app: myapp|	|	|	|  app: myapp|	|
+|	--------------	|	|	--------------	|	|	--------------	|
+|			|	|			|	|			|
+-------------------------	-------------------------	-------------------------
+
+
+We can acess the application usign the same port
+	terminal --> curl http://192.168.1.2:30008
+	terminal --> curl http://192.168.1.3:30008
+	terminal --> curl http://192.168.1.4:30008
+
+
+
+SUMMARIZE
+---------
+
+In any case whether there it would be a sigle Pod on a sigle Node, mutiple Pods on a single Node or multiple Pods on a mutiple Nodes, the service is created exactly the same without we having to any additional steps during the service creation. When Pods are removed or added the service is automatically updated, making it higly flexible and addaptive. One service is created we don't have to do any additional configuration changes.
 
 
 =====================================
 section 2 - 37. Services - Cluster IP
 =====================================
 
+A full stack web application tipically has different Pods hosting different parts of the application. A set of Pods runnign the frontend, a set of Pods runnign the backend, aset of Pods running cache like Redis, and set of Pods running persistent DBs like MySQL.
+
+A Kubernetes service help us group the Pods together and provide a single interface to access the Pods in the group. For example a service created for the backend Pods will help group all the backend Pods together and provide a single interface for other Pods to access the service. The requests are forwarded to one of the Pods randomly. This enables us easily and effectively to deploy microservices based application on Kubernetes cluster. Each layer can now scale or move as required without impacting communication between the various services. Each service gets and IP and name assigned to it inside of the cluster and that is the name that should be used by other Pods to access the service.
+
+
+		---------------------------------------------------
+		|		Forntend Service		  |		Services are used to access groups of Pods
+		---------------------------------------------------
+					|
+	-------------------------------------------------
+	|			|			|
+-------------------	-----------------	-----------------
+|	Pod 1	  |     |	Pod2	|	|	Pod3	|
+|  IP 10.244.0.3  |	| IP 10.244.0.2	|	| IP 10.244.0.4	|		Dynamic IPs - cannot relay on them
+------------------- 	-----------------	-----------------
+	|			|			|
+	-------------------------------------------------
+				      |	
+		---------------------------------------------------
+		|		Backend Service			  |		Services are used to access groups of Pods
+		---------------------------------------------------
+					|
+	-------------------------------------------------
+	|			|			|
+-------------------	-----------------	-----------------
+|	Pod 1	  |     |	Pod2	|	|	Pod3	|
+| IP 10.244.0.5	  |	| IP 10.244.0.6	|	| IP 10.244.0.7	|		Dynamic IPs - cannot relay on them
+------------------- 	-----------------	-----------------
+	|			|			|
+	-------------------------------------------------
+				     |	
+		---------------------------------------------------
+		|		DBs Service			  |		Services are used to access groups of Pods
+		---------------------------------------------------
+				      |
+	-------------------------------------------------
+	|			|			|
+-------------------	-----------------	-----------------
+|	Pod 1	  |     |	Pod2	|	|	Pod3	|
+| IP 10.244.0.8	  |	| IP 10.244.0.9	|	| IP 10.244.0.10|		Dynamic IPs - cannot relay on them
+------------------- 	-----------------	-----------------
+
+
+This type of Service is known as ClusterIP.
+
+
 ClusterIP
 =========
-
-Create common interface for the different types of applications in the cluster (example: front-end, back-end, redis)
-
 
 service-definition.yml
 --------------------------------
@@ -1764,9 +1895,9 @@ kind: Service
 metadata:
   name: back-end
 spec:
-    type: ClusterIP		# not mandatory, default value: ClusterIP
+    type: ClusterIP		# not mandatory, default type
     ports:
-     - targetPort: 80		# expose app port
+     - targetPort: 80		# expose app (backend) port
        port: 80			# expose servce port	
     selector:			 
        app: myapp		# set app name
@@ -1778,13 +1909,16 @@ Create service
 --------------
 	terminal --> kubectl create -f service-definition.yml
 
-	# service "back-end" created
+	# result: service "back-end" created
 
 List services
 -------------
 	terminal --> kubectl get services
 
-
+	# result:
+	NAME		TYPE		CLUSTER-IP	EXTERNAL-IP	PORT(S)		AGE
+	kubernetes	ClusterIP	10.96.0.1	<none>		443/TCP		16d
+	back-end	ClusterIP	10.106.127.123	<none>		80/TCP		2m
 
 
 
@@ -1823,12 +1957,17 @@ section 2 - 40. Practice Test - Services
 -----------------------------------------
 In the current(default) namespace
 
-
-Show services
+List services
 	terminal --> kubectl get services
-	terminal --> kubectl get svc		# shor syntax
+	terminal --> kubectl get svc		# short syntax
+
+	# result:
+	NAME         TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+	kubernetes   ClusterIP   10.43.0.1    <none>        443/TCP   7m13s
+
 
 - choose '1' as answer
+
 
 
 2. That is a default service created by Kubernetes at launch.
@@ -1838,10 +1977,19 @@ Show services
 
 
 
+
 3. What is the type of the default kubernetes service?
 ------------------------------------------------------
 
+List services
+	terminal --> kubectl get svc		
+
+	# result:
+	NAME         TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+	kubernetes   ClusterIP   10.43.0.1    <none>        443/TCP   7m13s	# we cansee in TYPE column
+
 - choose 'ClusterIP' as answer
+
 
 
 
@@ -1851,7 +1999,7 @@ Show services
 Show service details
 	terminal --> kubectl describe svc kubernetes
 
-We can see targetPort:  6443/TCP
+We can see 'targetPort:  6443/TCP'
 
 - choose '6443' as answer
 
@@ -1887,6 +2035,10 @@ In the current(default) namespace
 List deployments
 	terminal --> kubectl get deployments
 
+	# result:
+	NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
+	simple-webapp-deployment   4/4     4            4           39s
+
 - choose '1' as answer
 
 
@@ -1904,7 +2056,26 @@ Show info about pod
 
 	# We can see Image: kodekloud/simple-webapp:red
 
+Or describe the deployment
+
+Show deployment details
+	terminal --> k describe deploy simple-webapp-deployment
+
+# result:
+----------------------------------------
+...
+Pod Template:
+  Labels:  name=simple-webapp
+  Containers:
+   simple-webapp:
+    Image:         kodekloud/simple-webapp:red		# this is the used image
+    Port:          8080/TCP
+...
+----------------------------------------
+
 - choose 'kodekloud/simple-webapp:red' as answer
+
+
 
 
 9. Are you able to accesss the Web App UI?
@@ -1963,7 +2134,7 @@ print service-definition.yml file to ensure changes are made successfully
 Create service
 	terminal --> kubectl create -f service-definition-1.yaml
 
-	# service/webapp-service created
+	# result: service/webapp-service created
 
 - click 'Check' button
 
@@ -1976,7 +2147,6 @@ open simple-webapp-ui in top right corner of the console
 # we should see text 'Hello from simple-webapp-deployment-646b7d6cd4-6bkfn!'
 
 - click 'Ok' button
-
 
 
 
