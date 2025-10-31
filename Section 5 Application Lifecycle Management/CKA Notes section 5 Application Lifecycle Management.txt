@@ -2673,10 +2673,164 @@ Section 5 119. Multi-Container Pods Design Patterns
 ===================================================
 
 Multi-container Pods Design Patterns
-There are 3 common patterns, when it comes to designing multi-container PODs. The first and what we just saw with the logging service example is known as a side car pattern. The others are the adapter and the ambassador pattern.
+There are 3 common patterns, when it comes to designing multi-container PODs. 
 
-But these fall under the CKAD curriculum and are not required for the CKA exam. So we will be discuss these in more detail in the CKAD course.
+- The first type is Co-located Containers. Both containers are working true the entire lifecycle of the pod. This are services that are usually dependent on each other.
 
+
+	Co-located Containers
+
+	---------
+	|  App	|		- start at the same time with App 2
+	|   1	|		- continue working
+	---------
+	    |
+	    |
+	---------
+	|  App	|		- start at the same time with App 1
+	|   2	|		- continue working
+	---------
+
+pod-definition.yaml
+---------------------------------------------
+apiVErsion: v1
+kind: Pod
+metadata:
+  name: simple-webapp
+  labels:
+    name: simple-webapp
+spec:
+  containers:
+  - name: web-app
+    image: web-app
+    ports:
+      - containerPort: 8080
+  - name: main-app
+    image: main-app
+---------------------------------------------
+
+
+- The second type is Init containers or Regular Init Containers. This is used when there are intialization steps sto be performed when a pod starts before the main application itself. This can be a container that waits until the database to be ready before starting the main application. The init container does its job and end and then the main application starts.
+
+
+	Regular Init Containers
+
+	---------
+	|  Init	|		- starts first 
+	|  App	|		- ends / stop working
+	---------		- do not work further
+	    |
+	    |
+	---------
+	|  Main	|		- start second
+	|  App	|		- continue working
+	---------
+
+
+We can have more than one init container specified in the list of 'initContainer:' field:
+
+
+	Regular Init Containers
+
+	---------
+	|  Init	|		- starts first 
+	|  App 1|		- ends / stop working
+	---------		- do not work further
+	    |
+	    |
+	---------
+	|  Init	|		- start second
+	|  App 2|		- ends / stop working
+	---------		- do not work further
+	    |
+	    |
+	---------
+	|  Main	|		- start third
+	|  App	|		- continue working
+	---------
+
+
+
+pod-definition.yaml
+---------------------------------------------
+apiVErsion: v1
+kind: Pod
+metadata:
+  name: simple-webapp
+  labels:
+    name: simple-webapp
+spec:
+  containers:
+  - name: web-app
+    image: web-app
+    ports:
+      - containerPort: 8080
+
+  initContainers:				# init containers fields
+  - name: db-checker				# first init container wait for db
+    image: busybox
+    command: 'wait-for-db-to-start.sh'
+
+  - name: api checker				# second init container wait for another api to start
+    image: busybox
+    command: 'wait-for-another-api.sh'
+---------------------------------------------
+
+
+- The thirtd type is Sidecar containers. Start first and then the main application start. The side container continue to run with the main application true the entire pod lifecycle. Used for Loggs shipper container.
+
+
+	Sidecar Containers
+
+	---------
+	|  Init	|		- start first	
+	|  App	|		- continue working
+	---------
+	    |
+	    |
+	---------
+	|  Main	|		- start second
+	|  App	|		- continue working
+	---------
+
+
+pod-definition.yaml
+---------------------------------------------
+apiVErsion: v1
+kind: Pod
+metadata:
+  name: simple-webapp
+  labels:
+    name: simple-webapp
+spec:
+  containers:
+  - name: web-app
+    image: web-app
+    ports:
+      - containerPort: 8080
+
+  initContainers:				# init containers fields
+  - name: log-shipper				
+    image: busybox
+    command: 'setup-log-shipper.sh'
+    restartPolicy: Always			# start first and continue running
+---------------------------------------------
+
+The difference between first type is Co-located Containers and third type Sidecar containers is that in the first type there is no sequence when the first tand second container start. In the Sidecar Containers the containers starts one after another.
+
+
+Example
+=======
+						  		   User
+								    ^
+       -----------------------			    	            |	
+       |---------  ----------|			---------	---------
+       ||  Main	|  |Sidecar ||			|Elastic|	|	|	
+       ||  App	|  |Filebeat||	------------>	|Search	|------>|Kibana	|
+       ||  	|  ----------|			|	|	|	|
+       |---------  POD	     |			---------	---------
+       -----------------------
+	   	 
 
 
 =============================
