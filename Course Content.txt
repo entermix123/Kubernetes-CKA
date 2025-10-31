@@ -29,6 +29,7 @@ section 2 - 43. Practice Test - Namespaces
 section 2 - 44. Imperative vs. Declarative
 section 2 - 45. Certification Tips - Imperative Commands with Kubectl
 section 2 - 47. Practice Test - Imperative commands
+section 2 - 47.1 Kubectl Explain Command
 section 2 - 48. Kubectl Apply Command
 
 
@@ -52,6 +53,8 @@ Section 3 71. DaemonSets
 Section 3 73. Practice Test - DaemonSets
 Section 3 74. Static Pods
 Section 3 76. Practice Test - Static Pods
+Section 3 76.1 Priority Classes
+Section 3 76.2 Lab - Priority Classes
 Section 3 77. Multiple Schedulers
 Section 3 79. Practice Test - Multiple Schedulers
 Section 3 80. Scheduler Profile
@@ -159,6 +162,7 @@ Section 7 184. Developing Network Policies
 Section 7 186. Kubectx and Kubens – Command line Utilities
 Section 7 187. Practice Test - Network Policies
 Section 7 188. 2025 Custom Resource Definitions (CRD)
+Section 7 188.1 (2025 Updates) Lab - Custom Resource Definition
 Section 7 189. 2025 Custom Controllers
 Section 7 190. 2025 Operator Framework
 
@@ -210,6 +214,7 @@ Section 9 241. Ingress - Annotations and rewrite-target
 Section 9 243. Ingress - Practice Test - Ingrees-1
 Section 9 245. Ingress - Practice Test - Ingrees-2
 Section 9 252. Introduction to Gateway API
+Section 9 252.1. Practical Guide to Gateway API (2025 Update)
 Section 9 253. Practice Test - Gateway API
 
 
@@ -319,6 +324,7 @@ section 19 - Course Conclusion
 Section 18 317. Frequently Asked Questions
 Section 18 318. More Certification Tips
 Section 18 319. Bonus Lecture Conclusion
+Section 18 319.1. What's Next
 Section 18 320. Kubernetes Update and Project Videos - Your Essential Guide
 
 
