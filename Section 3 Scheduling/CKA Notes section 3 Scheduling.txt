@@ -17,6 +17,8 @@ Section 3 71. DaemonSets
 Section 3 73. Practice Test - DaemonSets
 Section 3 74. Static Pods
 Section 3 76. Practice Test - Static Pods
+Section 3 76.1 Priority Classes
+Section 3 76.2 Lab - Priority Classes
 Section 3 77. Multiple Schedulers
 Section 3 79. Practice Test - Multiple Schedulers
 Section 3 80. Scheduler Profile
@@ -2170,6 +2172,492 @@ Check when the pod is deleted
 	terminal --> kubectl get pods --watch
 
 - click 'Check' button
+
+
+
+
+===============================
+Section 3 76.1 Priority Classes
+===============================
+
+We have different object workloads in the cluster
+	- Kubernetes Components
+	- Databases
+	- Critical Apps
+	- Jobs
+
+We need to be sure that more important object's workloads is not interupted by secondary object's workloads. If higher priority pod can't be scheduled, the scheduller will try terminate low priority workload (pod) to make that happen.
+
+Priority classes are non namespaced objects - meaning they are not created or attached to a specific namespace.
+
+How we define a priority? We use a range of numbers. The bigger the number - the higher the priority.
+	System objects and workloads:			  2 000 000 000  <---->  1 000 000 000
+	Application or workload deployed on the cluster:  1 000 000 000  <---->  -2 147 483 684
+	
+
+List priority classes
+	terminal --> kubectl get priorityclass
+result:
+----------------------------------------------------------
+NAME				VALUE			GLOBAL-DEFAULT		AGE		PREEMPTIONPOLICY
+system-cluster-critical		2000000000		false			7m33s		PreemptLowerPriority
+system-node-critical		2000001000		false			7m33s		PreemptLowerPriority
+----------------------------------------------------------
+
+
+
+Create Priority Class
+=====================
+
+Create object file
+	terminal --> vi priority-class.yml
+
+priority-class.yml
+------------------------------------------------
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: high-priority						# name of the class
+value: 1000000000
+description: "Priority class for mission critical pods"
+globalDefault: true						# optional - set default priority class value to 0
+------------------------------------------------
+
+Deafult field can be defined in a single priority class, because we don't have multiple default values.
+
+
+
+Tranfer the priority class in a specific pod
+
+In the pod definition file we add 'priorityClassName' field
+
+pod-definition.yml
+------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+  labels:
+    name: nginx
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+    ports:
+      - containerPort: 8080
+  priorityClassName: high-priority				# added priorityClassName field
+------------------------------------------------
+
+If we DO NOT assign priority class name in a pod, the default priority value is 0.
+
+
+
+Example:
+========
+
+We have 3 clusters, Critical Apps and Jobs and the cluster resources are 100% used.
+
+name 			priority		cluster	1		cluster 2		cluster 3
+						-----------------	-----------------	-----------------
+Critical Apps 		7			| 	V	|	|	V	|	|	V	|
+						|		|	|		|	|		|
+Jobs			5			|	V	|	|	V	| 	|	V	|
+						|		|	|		|	|		|
+						|	100%	|	|	100%	|	| 	100%	|
+						-----------------	-----------------	-----------------
+
+If new job with higer priority (6) is scheduled what will happend?
+name 			priority
+High Priority Job	6
+
+
+Scenario 1 
+----------
+If the property 'preemptionPolicy: PreemptLowerPriority' is configured in the priority class definition file, the lower priority jobs will be terminated (kill) or evated
+
+priority-class.yml
+------------------------------------------------
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: high-priority
+value: 1000000000
+description: "Priority class for mission critical pods"
+preemptionPolicy: PreemptLowerPriority				# This field defines the behavior of the higher priority job
+------------------------------------------------
+
+name 			priority		cluster	1		cluster 2		cluster 3
+						-----------------	-----------------	-----------------
+Critical Apps 		7			| 	V	|	|	V	|	|	V	|
+						|		|	|		|	|		|
+High Priority Job	6			|	V	|	|	V	| 	|	V	|
+						|		|	|		|	|		|
+						|	100%	|	|	100%	|	| 	100%	|
+						-----------------	-----------------	-----------------
+
+Jobs			5 - evated or terminated (killed)
+
+
+
+Scenario 2
+----------
+
+If the configuration of the priotiry class is 'preemptionPolicy: never' field, the newest job will wait until cluster resourcess are freed without terminate lower priority jobs.
+
+priority-class.yml
+------------------------------------------------
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: high-priority
+value: 1000000000
+description: "Priority class for mission critical pods"
+preemptionPolicy: never					# This field defines the behavior of the higher priority job - wait
+------------------------------------------------
+
+
+
+=====================================
+Section 3 76.2 Lab - Priority Classes
+=====================================
+
+1. In this lab, we will learn about PriorityClasses in Kubernetes.
+------------------------------------------------------------------
+Which of the following PriorityClasses are part of a default Kubernetes setup?
+
+List priority classes
+	terminal --> kubectl get priorityclass
+
+result:
+
+controlplane ~ ➜  kubectl get priorityclasses
+NAME                      VALUE        GLOBAL-DEFAULT   AGE     PREEMPTIONPOLICY
+system-cluster-critical   2000000000   false            3m54s   PreemptLowerPriority
+system-node-critical      2000001000   false            3m54s   PreemptLowerPriority
+
+
+Choose 'system-cluster-critical' as answer
+
+
+2. What is the priority value assigned to system-node-critical?
+---------------------------------------------------------------
+
+Show the priority
+	terminal --> kubectl describe priorityclass system-node-critical
+
+result:
+
+Name:              system-node-critical
+Value:             2000001000
+GlobalDefault:     false
+PreemptionPolicy:  PreemptLowerPriority
+Description:       Used for system critical pods that must not be moved from their current node.
+Annotations:       <none>
+Events:            <none>
+
+Choose '2000001000' as answer
+
+
+
+3. What is the value of preemptionPolicy in system-node-critical?
+-----------------------------------------------------------------
+
+Show the priority policy of the system-node-critical
+	terminal --> kubectl get priorityclass system-node-critical -o yaml
+
+result:
+
+apiVersion: scheduling.k8s.io/v1
+description: Used for system critical pods that must not be moved from their current
+  node.
+kind: PriorityClass
+metadata:
+  creationTimestamp: "2025-10-31T10:09:23Z"
+  generation: 1
+  name: system-node-critical
+  resourceVersion: "71"
+  uid: bea17dcc-04ad-4c81-b7d4-a80fd6041f3d
+preemptionPolicy: PreemptLowerPriority			# this is the policy value
+value: 2000001000
+
+Choose 'PreemptLowerPriority' as answer
+
+
+4. Create a PriorityClass named high-priority, a value of 100000, and a preemption policy of PreemptLowerPriority. Do not set this class as a global default.
+------------------------------------------------------------------------------------
+
+- Create priority class definition file
+	terminal --> vi high-priority.yaml
+
+high-priority.yaml
+------------------------------------------------
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: high-priority
+value: 100000
+globalDefault: false
+description: "This priority class is used for high-priority pods."
+preemptionPolicy: PreemptLowerPriority
+------------------------------------------------
+save changes: escape, :wq!, enter
+
+
+- Create the resource
+	terminal --> kubectl apply -f high-priority.yaml
+
+	result:
+	priorityclass.scheduling.k8s.io/high-priority created
+
+
+- list the resources to confirm creation
+	terminal --> kubectl get priorityclasses
+
+	result:
+	NAME                      VALUE        GLOBAL-DEFAULT   AGE   PREEMPTIONPOLICY
+	high-priority             100000       false            14s   PreemptLowerPriority		# created resource
+	system-cluster-critical   2000000000   false            31m   PreemptLowerPriority
+	system-node-critical      2000001000   false            31m   PreemptLowerPriority
+
+	
+	terminal --> kubectl get priorityclass high-priority
+
+	result:
+	NAME            VALUE    GLOBAL-DEFAULT   AGE   PREEMPTIONPOLICY
+	high-priority   100000   false            55s   PreemptLowerPriority
+
+
+Click 'Check' button
+
+
+
+5. Create another PriorityClass named low-priority with a value of 1000. Do not set this class as a global default.
+-------------------------------------------------------------------------------------------------------------------
+
+
+- Create the class definfition file
+	terminal --> vi low-priority.yaml
+
+low-priority.yaml
+------------------------------------------------
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: low-priority
+value: 1000
+globalDefault: false
+description: "This priority class is used for low-priority pods."
+------------------------------------------------
+save changes: escape, :wq!, enter
+
+
+- Create the resource with the created definition file
+	terminal --> kubectl apply -f low-priority.yaml
+
+	result: priorityclass.scheduling.k8s.io/low-priority created
+
+
+- Confirm resource creation 	
+	terminal --> kubectl get priorityclasses
+
+	result:
+	NAME                      VALUE        GLOBAL-DEFAULT   AGE     PREEMPTIONPOLICY
+	high-priority             100000       false            4m52s   PreemptLowerPriority
+	low-priority              1000         false            15s     PreemptLowerPriority		# created
+	system-cluster-critical   2000000000   false            36m     PreemptLowerPriority
+	system-node-critical      2000001000   false            36m     PreemptLowerPriority
+
+	
+	terminal --> kubectl get priorityclass low-priority
+
+	result:
+	NAME           VALUE   GLOBAL-DEFAULT   AGE   PREEMPTIONPOLICY
+	low-priority   1000    false            32s   PreemptLowerPriority
+
+
+Click 'Check' button
+
+
+
+6. In the default namespace, create a pod named low-prio-pod that runs an nginx image and uses the low-priority PriorityClass.
+------------------------------------------------------------------------------------------------------------------------------
+
+
+- Create pod definition file low-prio-pod.yaml
+	terminal --> vi low-prio-pod.yaml
+
+low-prio-pod.yaml
+------------------------------------------------
+# low-prio-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: low-prio-pod
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+  priorityClassName: low-priority
+------------------------------------------------
+save changes: escape, :wq!, enter
+
+
+- Create the pod using the definition file
+	terminal --> kubectl apply -f low-prio-pod.yaml
+
+	result: pod/low-prio-pod created
+
+Click 'Check' button
+
+
+
+7. Now, create another pod in the default namespace named high-prio-pod that runs an nginx image and uses the high-priority PriorityClass.
+-----------------------------------------------------------------------------------------
+
+- Create pod definition file low-prio-pod.yaml
+	terminal --> vi high-prio-pod.yaml
+
+high-prio-pod.yaml
+------------------------------------------------
+# high-prio-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: high-prio-pod
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+  priorityClassName: high-priority
+------------------------------------------------
+save changes: escape, :wq!, enter
+
+
+- Create the pod using the definition file
+	terminal --> kubectl apply -f high-prio-pod.yaml
+
+	result: pod/high-prio-pod created
+
+Click 'Check' button
+
+
+
+8. You can compare the priority classes on both pods using the following command:
+---------------------------------------------------------------------------------
+
+Compare the classes
+	terminal --> kubectl get pods -o custom-columns="NAME:.metadata.name,PRIORITY:.spec.priorityClassName"
+
+	result:
+	NAME            PRIORITY
+	high-prio-pod   high-priority
+	low-prio-pod    low-priority
+
+Click 'Ok' button
+
+
+
+
+9. The following assets have been provisioned on the environment:
+
+    A pod named low-app
+    A pod named critical-app
+
+View the pod status using the following command:
+	terminal --> kubectl get pods
+
+	result:
+	NAME            READY   STATUS    RESTARTS   AGE
+	critical-app    0/1     Pending   0          42s
+	high-prio-pod   1/1     Running   0          107s
+	low-app         1/1     Running   0          42s
+	low-prio-pod    1/1     Running   0          4m20s
+
+
+Which of the following is true?
+
+1. All pods are evicted
+2. Both pods are in CrashLoopBackOff
+3. critical-app pod pending and low-app pod running
+4. critical-app pod running and low-app pod pending
+5. Both pods are running
+
+Choose '3. critical-app pod pending and low-app pod running'
+
+
+
+10. The pod critical-app is stuck in Pending state due to the low-app pod getting scheduled and requesting high resources.
+---------------------------------------------------------------------------------------------------------------------------
+Check the status of the critical-app pod using the following command:
+	terminal --> kubectl describe pod critical-app
+
+You should see a similar message in the Events section:
+Events:
+  Type     Reason            Age   From               Message
+  ----     ------            ----  ----               -------
+  Warning  FailedScheduling  21s   default-scheduler  0/1 nodes are available ...
+
+Click 'Ok' button
+
+
+11. To resolve this situation and get the critical-app to a running state, you should:
+--------------------------------------------------------------------------------------
+    Assign the high-priority class to the critical-app
+    Delete and recreate the pod with the new priority
+
+Make sure the pod is in running state after applying the actions.
+
+- Create replica of the critical-app pod definition file
+	terminal --> kubectl get pod critical-app -o yaml > critical-app.yaml
+
+- Edit the file
+	terminal --> vi critical-app.yaml
+
+critical-app.yaml
+------------------------------------------------
+# critical-app.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  ...
+  name: critical-app
+  ...
+spec:
+  containers:
+  - image: nginx
+    imagePullPolicy: Always
+    name: critical-container
+    ...
+  dnsPolicy: ClusterFirst
+  priorityClassName: high-priority   # Add the high-priority class
+  enableServiceLinks: true
+  preemptionPolicy: PreemptLowerPriority
+  priority: 0  # Remove this line as this is the old default priority
+  ...
+------------------------------------------------
+save changes: escape, :wq!, enter
+
+
+- Delete the existing critical-app pod
+	terminal --> kubectl delete pod critical-app
+
+	result: pod "critical-app" deleted
+
+- Create new app with the eddited pod definition file
+	terminal --> kubectl apply -f critical-app.yaml
+
+	result: pod/critical-app created
+
+- Confirmt that the created pod is running
+	rerminal --> kubectl get pod critical-app
+
+	result:
+	NAME           READY   STATUS    RESTARTS   AGE
+	critical-app   1/1     Running   0          36s
+
+
+Click 'Check' button
+
 
 
 =================================
