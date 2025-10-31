@@ -34,6 +34,7 @@ Section 7 184. Developing Network Policies
 Section 7 186. Kubectx and Kubens – Command line Utilities
 Section 7 187. Practice Test - Network Policies
 Section 7 188. 2025 Custom Resource Definitions (CRD)
+Section 7 188.1 (2025 Updates) Lab - Custom Resource Definition
 Section 7 189. 2025 Custom Controllers
 Section 7 190. 2025 Operator Framework
 
@@ -5817,6 +5818,235 @@ Now we can create, list or delete an entity of this type of resource
 To make additional actions with these custom resources we need a controller. This controllers watch when this resources are created, and perform actions based on resource specifications.
 
 
+
+
+===============================================================
+Section 7 188.1 (2025 Updates) Lab - Custom Resource Definition
+===============================================================
+
+
+1. CRD Object can be either namespaced or cluster scoped.
+---------------------------------------------------------
+Is this statement true or false?
+
+Choose 'true' as answer
+
+
+
+2. What is a custom resource?
+-----------------------------
+It is an extension of the Kubernetes API that is not necessarily available in a default Kubernetes installation.
+
+Click 'Ok' button
+
+
+
+3. We have provided an incomplete Custom Resource Definition (CRD) manifest located at /root/crd.yaml.
+------------------------------------------------------------------------------------------------------
+
+Your task is to complete this file to define a namespaced CRD named internals.datasets.kodekloud.com.
+
+Please ensure you adhere to the following specifications:
+
+    The CRD must belong to the group datasets.kodekloud.com.
+    The scope of the CRD should be set to Namespaced.
+    The version must be v1, and it should be marked as both served: true and storage: true.
+
+Additionally, include a basic OpenAPI v3 schema for the CRD under the spec section with the following fields:
+
+    internalLoad (string)
+    range (integer)
+    percentage (string)
+
+Once you have created the CRD, utilize the provided /root/custom.yaml file to create a corresponding custom resource.
+
+
+
+
+- Edit the crd.yam file
+	terminal --> vi crd.yml
+
+result:
+-------------------------------------------------
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: internals.datasets.kodekloud.com 
+spec:
+  group: datasets.kodekloud.com
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                internalLoad:
+                  type: string
+                range:
+                  type: integer
+                percentage:
+                  type: string
+  scope: Namespaced 
+  names:
+    plural: internals
+    singular: internal
+    kind: Internal
+    shortNames:
+    - int
+-------------------------------------------------
+save changes: escape, :wq!, enter
+
+
+- Create the resource
+	terminal --> kubectl create -f crd.yaml
+
+	result: customresourcedefinition.apiextensions.k8s.io/internals.datasets.kodekloud.com created
+
+- Create corresponding custom resource
+	terminal --> kubectl create -f custom.yaml
+
+	result: internal.datasets.kodekloud.com/internal-space created
+
+
+
+
+
+4. What are the properties given to the CRD’s called collectors.monitoring.controller?
+--------------------------------------------------------------------------------------
+
+Print CRD's description
+	terminal --> kubectl describe crd collectors.monitoring.controller
+
+result:
+---
+          Spec:
+            Properties:
+              Image:
+                Type:  string
+              Name:
+                Type:  string
+              Replicas:
+                Type:  integer
+---
+
+Choose 'image,replicas,name' as answer
+
+
+
+5. Please create a custom resource instance named datacenter utilizing the existing Custom Resource Definition (CRD) with the following specifications:
+------------------------------------------------------------------------------------------------------------
+
+    apiVersion: traffic.controller/v1
+
+    kind: Global
+
+Set the following fields under spec:
+
+    dataField: 2
+
+    access: true
+
+
+- Create custom resource definition file
+	terminal --> vi res.yml
+
+res.yml
+-------------------------------------------------
+kind: Global
+apiVersion: traffic.controller/v1
+metadata:
+  name: datacenter
+spec:
+  dataField: 2
+  access: true
+-------------------------------------------------
+save changes: escape, :wq!, enter
+
+- Create the resource
+	terminal --> kubectl create -f res.yml
+
+	result: global.traffic.controller/datacenter created
+
+Click 'Check' button
+
+
+6. What is the short name given to the CRD globals.traffic.controller ?
+-----------------------------------------------------------------------
+
+Print the custom resource data
+	terminal --> kubectl describe crd globals.traffic.controller
+
+result:
+-------------------------------------------------
+Name:         globals.traffic.controller
+Namespace:    
+Labels:       <none>
+Annotations:  <none>
+API Version:  apiextensions.k8s.io/v1
+Kind:         CustomResourceDefinition
+Metadata:
+  Creation Timestamp:  2025-10-31T12:34:12Z
+  Generation:          1
+  Resource Version:    1045
+  UID:                 91789dbb-dac7-4252-9976-c38ecb1e9eb2
+Spec:
+  Conversion:
+    Strategy:  None
+  Group:       traffic.controller
+  Names:
+    Kind:       Global
+    List Kind:  GlobalList
+    Plural:     globals
+    Short Names:				# short name - gb
+      gb
+    Singular:  global
+  Scope:       Namespaced
+  Versions:
+    Name:  v1
+    Schema:
+      openAPIV3Schema:
+        Properties:
+          Spec:
+            Properties:
+              Access:
+                Type:  boolean
+              Data Field:
+                Type:  integer
+            Type:      object
+        Type:          object
+    Served:            true
+    Storage:           true
+Status:
+  Accepted Names:
+    Kind:       Global
+    List Kind:  GlobalList
+    Plural:     globals
+    Short Names:
+      gb
+    Singular:  global
+  Conditions:
+    Last Transition Time:  2025-10-31T12:34:12Z
+    Message:               no conflicts found
+    Reason:                NoConflicts
+    Status:                True
+    Type:                  NamesAccepted
+    Last Transition Time:  2025-10-31T12:34:12Z
+    Message:               the initial names have been accepted
+    Reason:                InitialNamesAccepted
+    Status:                True
+    Type:                  Established
+  Stored Versions:
+    v1
+Events:  <none>
+-------------------------------------------------
+
+Choose 'gb' as answer
 
 
 
