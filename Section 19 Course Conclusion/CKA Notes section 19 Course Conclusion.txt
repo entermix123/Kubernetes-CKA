@@ -3,6 +3,7 @@ CONTENT
 Section 18 317. Frequently Asked Questions
 Section 18 318. More Certification Tips
 Section 18 319. Bonus Lecture Conclusion
+Section 18 319.1. What's Next
 Section 18 320. Kubernetes Update and Project Videos - Your Essential Guide
 
 
@@ -71,6 +72,50 @@ Section 18 319. Bonus Lecture Conclusion
 Recommendations and Commercials
 
 If subsribe to KodeKloud use code UDEMY10 for extra discount
+
+
+=============================
+Section 18 319.1. What's Next
+=============================
+
+QICK DEMOSTRATION OF THE CKA MOCK EXAM SERIES
+
+
+Example Mock Exam
+=================
+
+Question 1
+----------
+Set the context to cluster3 by running
+	terminal --> kubectl config use-context cluster3
+
+Decode the existing secret called 'beta-sec-cka14-arch' created in the 'beta-ns-cka14-arch' namespace and store the content inside the file /opt/beta-sec-cka14-arch on the student node.
+
+
+- Show current cluster
+	terminal --> kubectl get nodes
+
+	result - before every node we should see the cluster name
+
+- Check existing namespaces
+	terminal --> kubectl get ns
+
+- List existing secrets in the beta-ns-cka14-arch namespace
+	terminal --> kubectl get secret -n beta-ns-cka14-arch
+
+- Print the secret in the YML format
+	terminal --> kubectl get secret -n beta-ns-cka14-arch -o yaml
+
+- Copy the encoded string from the secret
+
+- On the Student Node decode the secret and save the it in therequired file
+	terminal --> echo 'VGhpcyBpcyB0aGUgc2VjcmV0IQo=' | base64 -d > /opt/beta-sec-cka14-arch
+
+
+
+ALL QUESTIONS ARE FROM DIFFERENT AREA OF THE MAETRIAL. ALSO IF WE RESTART THE EXAM IT WILL BE DIFFERENT WITH RANDOM QUESTIONS.
+AFTER WE END THE EXAM, IF SOME QUESTIONS ARE NOT CORRECT, WE WILL BE PROVIDED WITH THE SOLUTIONS. GO OVER THE SOLUTIONS AND TAKE THE EXAM AGAIN.
+
 
 
 ===========================================================================
