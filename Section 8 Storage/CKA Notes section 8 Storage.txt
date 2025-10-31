@@ -22,7 +22,7 @@ We have 2 concepts
 	- Volume Drivers
 
 
-When Docker is installed, it creates storage folder 
+When Docker is installed, it creates storage folders 
 	- /var/lib/docker
 		- aufs
 		- containers
@@ -48,11 +48,11 @@ Create image with Dockerfile above
 	terminal --> docker build Dockerfile -t mmumshad/my-custom-app
 
 Lyaers:
-	1. Base Ubuntu Layr		~ 120 MB
+	1. Base Ubuntu Layer		~ 120 MB
 	2. Change in apt packages	~ 306 MB
-	3. change in pip packages	~ 6.3 MB
-	4. Source Code			~ 229 MB
-	5. Update Entrypoint		~ 0 B
+	3. Change in pip packages	~ 6.3 MB
+	4. Source Code			~ 229 B
+	5. Update Entrypoint		~ 0   B
 
 Every next layer sotres the changes from previous layer
 
@@ -79,7 +79,7 @@ Lyaers:
 	1. Base Ubuntu Layr		~ 0 MB		- uses already created layers 1. from Dockerfile in the cache 
 	2. Change in apt packages	~ 0 MB		- uses already created layers 2. from Dockerfile in the cache
 	3. change in pip packages	~ 0 MB		- uses already created layers 3. from Dockerfile in the cache
-	4. Source Code			~ 229 MB	- only last 2 layers are created new beacuse they have some differences
+	4. Source Code			~ 229 	B	- only last 2 layers are created new beacuse they have some differences
 	5. Update Entrypoint		~ 0 B		- only last 2 layers are created new beacuse they have some differences
 
 This process happening also when application is updated/upgraded. Docker uses already created layers and build only changes. This save a lot of time and space. These layers are READ ONLY. They cannot be changed unless we have a new image build.
@@ -132,7 +132,7 @@ Also we can mount specific folder on the docker host instead of volume (bind mou
 	terminal --> docker run -v /data/mysql:/var/lib/mysql mysql
 
 We can start container with mount command with different syntax	
-	terminal --> docker run --mount type=bind,source=/data/mysql.target=/ver/lib/mysql mysql
+	terminal --> docker run --mount type=bind,source=/data/mysql,target=/ver/lib/mysql mysql
 
 Responsible for sorage actions are docker storage drivers
 	- AUFS
@@ -144,7 +144,7 @@ Responsible for sorage actions are docker storage drivers
 
 We can use different storage drivers for different OS. Docker automatically choose the best storage driver for us.
 
-Volumes are not handled by storage drivers.
+Volumes are not handled by storage drivers. Volumes are handled by volume driver plugins.
 
 
 
@@ -177,7 +177,7 @@ We can specify volume driver when we create the container
 	# run							- start container
 	# -it							- interactive mode
 	# --name mysql						- name the container
-	# --volume-driver rexray/ebs				- specify the volume driver
+	# --volume-driver rexray/ebs				- specify the volume driver (for AWS)
 	# -v data_volume					- volume name
 	# --mount src=ebs-vol,target=/var/lib/mysql mysql	- mount folder in the AWS cloud provider
 	# mysql							- image used for the container
