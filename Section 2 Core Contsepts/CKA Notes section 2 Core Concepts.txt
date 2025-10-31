@@ -28,6 +28,7 @@ section 2 - 43. Practice Test - Namespaces
 section 2 - 44. Imperative vs. Declarative
 section 2 - 45. Certification Tips - Imperative Commands with Kubectl
 section 2 - 47. Practice Test - Imperative commands
+section 2 - 47.1 Kubectl Explain Command 
 section 2 - 48. Kubectl Apply Command
 
 
@@ -2836,6 +2837,48 @@ Check if service is created
 
 Show httpd service details
 	terminal --> kubectl describe svc httpd
+
+
+
+========================================
+section 2 - 47.1 Kubectl Explain Command
+========================================
+
+We can list all resources types in ther console:
+
+List resources command
+	terminal --> kubectl api-resources
+
+result:
+-----------------------------------------------------------------------------------------------------
+NAME				SHORTNAME	APIVERSION		NAMESPACED	KIND
+bindings					v1			true		Binding
+componentstatuses		cs		v1			false		Componentstatus
+configmaps			cm		v1			true		ConfigMap
+ednpoints			ep		v1			true		Endpoints
+events				ev		v1			true		Event
+limitranges			limits		v1			true		LimitRange
+namespace			ns		v1			false		Namespace
+nodes				no		v1			false		Node
+controllerrevision				apps/v1			true		Controllerrevision
+daemonset			ds		apps/v1			true		DaemonSet
+deployments			deploy		apps/v1			true		Deployment
+ReplicaSetreplicationcontrollers rc		v1			true		ReplicationController
+resourcequotas			quota		v1			true		ResourceQuota
+-----------------------------------------------------------------------------------------------------
+
+
+We can list any kind of resource top level items
+	terminal --> kubectl explain pods
+
+
+We can list information about specific resource property/specification
+	terminal --> kubectl explain pods.spec
+
+
+We can list all fields in a resource with this command
+	terminal --> kubectl explain pods --recursive
+
 
 
 
