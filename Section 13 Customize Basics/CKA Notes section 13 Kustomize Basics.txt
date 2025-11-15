@@ -3839,9 +3839,9 @@ Apply changes
 Section 13 289. Components
 ==========================
 
-We will look over Kustomize feature called Components. Components are reusable black of Kubernetes configs.
+We will look over Kustomize feature called Components. Components are reusable blocks of Kubernetes configs.
 
-Components are reusable block of Kubernetes configs - All resources for specific feature: Patches, ConfigMaps, Secrets adn any other Kubernetes related configs associated with the feature are going onto a Component and we can enable it in multiple overlays. Components are scalable solution to add features in specific (multiple) overlays without editing all kustomizations in the overlays!
+Components are reusable block of Kubernetes configs - All resources for specific feature: Patches, ConfigMaps, Secrets and any other Kubernetes related configs associated with the feature are going onto a Component and we can enable it in multiple overlays. Components are scalable solution to add features in specific (multiple) overlays without editing all kustomizations in the overlays!
 
 - Component provide the ability to define reusable pieces of configuration logic (resources + patches) that can be included in multiple ovelays
 
@@ -3869,7 +3869,7 @@ We need to implement 'External DB' feature in
 	- dev
 	- Premium
 
-We can add caching efatures in both directories (Premium and Self hosted) and they will work just fine, but if we want to change something we need NOT to forget to change file configs in both directories. To solve that issue we create 'caching' component and deploy it in the invironment we want to use it.
+We can add caching features in both directories (Premium and Self hosted) and they will work just fine, but if we want to change something we need NOT to forget to change file configs in both directories. To solve that issue we create 'caching' component and deploy it in the invironment we want to use it.
 
 folder structure
 ----------------
