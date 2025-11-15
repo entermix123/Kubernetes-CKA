@@ -1,0 +1,591 @@
+====================================================
+Clean Kubernetes Cluster (1.32.x) Setup with kubeadm
+====================================================
+
+
+1. Prepare VMs
+==============
+	- Master Node (controlplane)
+	- Worker Nodes (node01, node02)
+
+Ensure all VMs are running (vagrant up) and accessible (vagrant ssh <node>).
+
+Software Used
+	- VirtualBox		- managing Virtual Machines
+	- Vagrant		- automate configuration of VMs
+
+Download and Install VirtualBox:
+	- https://www.virtualbox.org/wiki/Downloads
+
+Download and install Vegrant
+	- https://developer.hashicorp.com/vagrant/install
+	- verify vagrant instalation	
+		terminal --> vagrant -v
+
+Clone the repo
+	- create folder on the desktop and open it in VSCode
+	terminal --> git clone https://github.com/kodekloudhub/certified-kubernetes-administrator-course.git
+
+Open Vengartfile file in folder and look over it
+	terminal --> cd certified-kubernetes-administrator-course\kubeadm-clusters\virtualbox\
+	terminal --> ls
+	# don't worry if the file looks different from this on the video
+
+
+*** In Vagrantfile change it to BUILD_MODE = "NAT". This is safer and prevent conflicts with existing IPs in the home (router) network. NAT is putting the node's IPs behind the VMs.
+
+
+Initialize Vagrant by asking for status
+	terminal --> vagrant status
+
+# result:
+-------------------------------------------------------------------------
+Current machine states:
+
+controlplane              not created (virtualbox)
+node01                    not created (virtualbox)
+node02                    not created (virtualbox)
+
+This environment represents multiple VMs. The VMs are all listed
+above with their current state. For more information about a specific
+VM, run `vagrant status NAME`.
+-------------------------------------------------------------------------
+
+Start VMs 
+	terminal --> vagrant up
+
+	# this will take some time to create and boot the VMs
+
+Verify start of the VMs
+	terminal --> vagrant status
+
+# result:
+-------------------------------------------------------------------------
+Current machine states:
+
+controlplane              running (virtualbox)
+node01                    running (virtualbox)
+node02                    running (virtualbox)
+
+This environment represents multiple VMs. The VMs are all listed
+above with their current state. For more information about a specific
+VM, run `vagrant status NAME`.
+-------------------------------------------------------------------------
+
+Open 3 terminals for each node
+	- controlplane
+		terminal --> vagrant ssh controlplane
+	- node01
+		terminal --> vagrant ssh node01
+	- node02
+		terminal --> vagrant ssh node02
+
+
+
+
+
+2. Install Container Runtime (containerd)
+=========================================
+On all nodes (master + workers):
+
+terminal --> 
+sudo apt update
+sudo apt install -y containerd
+sudo mkdir -p /etc/containerd
+containerd config default | sed 's/SystemdCgroup = false/SystemdCgroup = true/' | sudo tee /etc/containerd/config.toml
+sudo systemctl restart containerd
+
+
+Check driver is systemd:
+------------------------
+terminal --> ps -p 1
+# PID TTY          TIME CMD
+# 1 ?        00:00:04 systemd
+
+
+
+
+3. Install kubeadm, kubelet, kubectl
+====================================
+On all nodes (master + workers):
+
+terminal --> 
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+sudo apt-get update
+sudo apt-get install -y kubelet kubeadm kubectl
+sudo apt-mark hold kubelet kubeadm kubectl
+kubeadm version
+
+
+
+
+4. Enable required kernel modules on all nodes
+==============================================
+On all nodes (master + workers):
+
+terminal --> 
+sudo modprobe br_netfilter
+echo "br_netfilter" | sudo tee /etc/modules-load.d/k8s.conf
+
+sudo tee /etc/sysctl.d/k8s.conf <<EOF
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+net.ipv4.ip_forward = 1
+EOF
+
+sudo sysctl --system
+
+
+
+
+
+5. Initialize the Master Node
+=============================
+On master (controlplane):
+
+5.1.Find the master node IP for the API server:
+-----------------------------------------------
+master node terminal --> ip addr show enp0s8
+	
+# example result: 192.168.56.11------------------------------------------
+									|
+									|
+5.2. Initialize kubeadm:						|
+------------------------					       HERE
+* Use the IP address of the API server					|
+									V
+master terminal --> sudo kubeadm init --apiserver-advertise-address 192.168.56.11 --pod-network-cidr=10.244.0.0/16 --upload-certs
+
+# result:
+----------------------------------------------------------------------------------
+...
+Your Kubernetes control-plane has initialized successfully!
+
+To start using your cluster, you need to run the following as a regular user:
+
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+Alternatively, if you are the root user, you can run:
+
+  export KUBECONFIG=/etc/kubernetes/admin.conf
+
+You should now deploy a pod network to the cluster.
+Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
+  https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+Then you can join any number of worker nodes by running the following on each as root:
+
+kubeadm join 192.168.56.11:6443 --token 33lyra.2hbh2yszcelkqazj \
+        --discovery-token-ca-cert-hash sha256:2df384dd6b9c7e735e86a80825b96f7fdc9485a4819175a858c2c4bb9bb77ea4
+----------------------------------------------------------------------------------
+
+Use this command to join the nodes:
+node terminal --> sudo kubeadm join 192.168.56.11:6443 --token 33lyra.2hbh2yszcelkqazj --discovery-token-ca-cert-hash sha256:2df384dd6b9c7e735e86a80825b96f7fdc9485a4819175a858c2c4bb9bb77ea4
+
+
+
+5.3. Set kubeconfig for the vagrant user:
+-----------------------------------------
+mster terminal --> 
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+
+
+5.4. Install the Pod Network (Flannel)
+--------------------------------------
+master terminal --> kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+
+# result:
+---------------------------------------------------------------
+namespace/kube-flannel created
+serviceaccount/flannel created
+clusterrole.rbac.authorization.k8s.io/flannel created
+clusterrolebinding.rbac.authorization.k8s.io/flannel created
+configmap/kube-flannel-cfg created
+daemonset.apps/kube-flannel-ds created
+---------------------------------------------------------------
+
+If Flannel pods are in CrashLoopBackOff, ensure br_netfilter is loaded (already done in Step 4).
+	* Restart pods if needed:
+	-------------------------
+	master termiinal --> kubectl delete pods -n kube-flannel --all
+
+	* Verify Flannel pods:
+	----------------------
+	master terminal --> kubectl get pods -n kube-flannel -o wide
+
+
+Master node should now show Ready:
+----------------------------------
+master terminal --> kubectl get nodes
+
+
+
+
+
+
+6. Join Worker Nodes
+====================
+
+Use the join command provided by kubeadm init on the master:
+------------------------------------------------------------
+
+node01, node02 terminal --> sudo kubeadm join 192.168.56.11:6443 --token <token> --discovery-token-ca-cert-hash sha256:<hash>
+
+Example: sudo kubeadm join 192.168.56.11:6443 --token tgiquh.7w0z9nuiij9lipou \
+  --discovery-token-ca-cert-hash sha256:01c5aa900dc35627295a932ebd21ada5b74cfe5b77d28428f9669024afcbbf84
+
+## Use the command from the controlplane node after initializing kubeadm.
+
+
+
+7. Verify if nodes are joined on master node:
+=============================================
+Wait few minutes for the nodes to join the master network and check for their status:
+	master terminal --> kubectl get nodes
+
+# result:
+NAME           STATUS   ROLES           AGE     VERSION
+controlplane   Ready    control-plane   3m49s   v1.32.10
+node01         Ready    <none>          36s     v1.32.10
+node02         Ready    <none>          31s     v1.32.10
+
+
+
+
+
+
+
+
+
+
+====================================================
+Clean Kubernetes Cluster (1.34.x) Setup with kubeadm
+====================================================
+
+For this version we need to change the repository in step 3 (first 2 commands only)
+
+
+1. Prepare VMs
+==============
+	- Master Node (controlplane)
+	- Worker Nodes (node01, node02)
+
+Ensure all VMs are running (vagrant up) and accessible (vagrant ssh <node>).
+
+Software Used
+	- VirtualBox		- managing Virtual Machines
+	- Vagrant		- automate configuration of VMs
+
+Download and Install VirtualBox:
+	- https://www.virtualbox.org/wiki/Downloads
+
+Download and install Vegrant
+	- https://developer.hashicorp.com/vagrant/install
+	- verify vagrant instalation	
+		terminal --> vagrant -v
+
+Clone the repo
+	- create folder on the desktop and open it in VSCode
+	terminal --> git clone https://github.com/kodekloudhub/certified-kubernetes-administrator-course.git
+
+Open Vengartfile file in folder and look over it
+	terminal --> cd certified-kubernetes-administrator-course\kubeadm-clusters\virtualbox\
+	terminal --> ls
+	# don't worry if the file looks different from this on the video
+
+
+*** In Vagrantfile change it to BUILD_MODE = "NAT". This is safer and prevent conflicts with existing IPs in the home (router) network. NAT is putting the node's IPs behind the VMs.
+
+
+Initialize Vagrant by asking for status
+	terminal --> vagrant status
+
+# result:
+-------------------------------------------------------------------------
+Current machine states:
+
+controlplane              not created (virtualbox)
+node01                    not created (virtualbox)
+node02                    not created (virtualbox)
+
+This environment represents multiple VMs. The VMs are all listed
+above with their current state. For more information about a specific
+VM, run `vagrant status NAME`.
+-------------------------------------------------------------------------
+
+Start VMs 
+	terminal --> vagrant up
+
+	# this will take some time to create and boot the VMs
+
+Verify start of the VMs
+	terminal --> vagrant status
+
+# result:
+-------------------------------------------------------------------------
+Current machine states:
+
+controlplane              running (virtualbox)
+node01                    running (virtualbox)
+node02                    running (virtualbox)
+
+This environment represents multiple VMs. The VMs are all listed
+above with their current state. For more information about a specific
+VM, run `vagrant status NAME`.
+-------------------------------------------------------------------------
+
+Open 3 terminals for each node
+	- controlplane
+		terminal --> vagrant ssh controlplane
+	- node01
+		terminal --> vagrant ssh node01
+	- node02
+		terminal --> vagrant ssh node02
+
+
+
+
+
+2. Install Container Runtime (containerd)
+=========================================
+On all nodes (master + workers):
+
+terminal --> 
+sudo apt update
+sudo apt install -y containerd
+sudo mkdir -p /etc/containerd
+containerd config default | sed 's/SystemdCgroup = false/SystemdCgroup = true/' | sudo tee /etc/containerd/config.toml
+sudo systemctl restart containerd
+
+
+Check driver is systemd:
+------------------------
+On all nodes (master + workers):
+
+terminal --> ps -p 1
+
+# PID TTY          TIME CMD
+# 1 ?        00:00:04 systemd
+
+
+
+
+3. Install kubeadm, kubelet, kubectl
+====================================
+On all nodes (master + workers):
+
+terminal --> 
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.34/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.34/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+sudo apt-get update
+sudo apt-get install -y kubelet kubeadm kubectl
+sudo apt-mark hold kubelet kubeadm kubectl
+kubeadm version
+
+
+
+
+4. Enable required kernel modules on all nodes
+==============================================
+On all nodes (master + workers):
+
+terminal --> 
+sudo modprobe br_netfilter
+echo "br_netfilter" | sudo tee /etc/modules-load.d/k8s.conf
+
+sudo tee /etc/sysctl.d/k8s.conf <<EOF
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+net.ipv4.ip_forward = 1
+EOF
+
+sudo sysctl --system
+
+
+
+
+
+5. Initialize the Master Node
+=============================
+On master (controlplane):
+
+5.1.Find the master node IP for the API server:
+-----------------------------------------------
+master node terminal --> ip addr show enp0s8
+	
+# example result: 192.168.56.11------------------------------------------
+									|
+									|
+5.2. Initialize kubeadm:						|
+------------------------					       HERE
+* Use the IP address of the API server					|
+									V
+master terminal --> sudo kubeadm init --apiserver-advertise-address 192.168.56.11 --pod-network-cidr=10.244.0.0/16 --upload-certs
+
+We can specify the exact kubeadm version we want to install, Example:
+sudo kubeadm init --apiserver-advertise-address <IP> --pod-network-cidr=10.244.0.0/16 --kubernetes-version=v1.34.2  
+
+
+# result:
+----------------------------------------------------------------------------------
+...
+Your Kubernetes control-plane has initialized successfully!
+
+To start using your cluster, you need to run the following as a regular user:
+
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+Alternatively, if you are the root user, you can run:
+
+  export KUBECONFIG=/etc/kubernetes/admin.conf
+
+You should now deploy a pod network to the cluster.
+Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
+  https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+Then you can join any number of worker nodes by running the following on each as root:
+
+kubeadm join 192.168.56.11:6443 --token 33lyra.2hbh2yszcelkqazj \
+        --discovery-token-ca-cert-hash sha256:2df384dd6b9c7e735e86a80825b96f7fdc9485a4819175a858c2c4bb9bb77ea4
+----------------------------------------------------------------------------------
+
+Use this command to join the nodes:
+node terminal --> sudo kubeadm join 192.168.56.11:6443 --token 33lyra.2hbh2yszcelkqazj --discovery-token-ca-cert-hash sha256:2df384dd6b9c7e735e86a80825b96f7fdc9485a4819175a858c2c4bb9bb77ea4
+
+
+
+5.3. Set kubeconfig for the vagrant user:
+-----------------------------------------
+mster terminal --> 
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+
+
+5.4. Install the Pod Network (Flannel)
+--------------------------------------
+master terminal --> kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+
+# result:
+---------------------------------------------------------------
+namespace/kube-flannel created
+serviceaccount/flannel created
+clusterrole.rbac.authorization.k8s.io/flannel created
+clusterrolebinding.rbac.authorization.k8s.io/flannel created
+configmap/kube-flannel-cfg created
+daemonset.apps/kube-flannel-ds created
+---------------------------------------------------------------
+
+If Flannel pods are in CrashLoopBackOff, ensure br_netfilter is loaded (already done in Step 4).
+	* Restart pods if needed:
+	-------------------------
+	master termiinal --> kubectl delete pods -n kube-flannel --all
+
+	* Verify Flannel pods:
+	----------------------
+	master terminal --> kubectl get pods -n kube-flannel -o wide
+
+
+Master node should now show Ready:
+----------------------------------
+master terminal --> kubectl get nodes
+
+
+
+
+
+
+6. Join Worker Nodes
+====================
+
+Use the join command provided by kubeadm init on the master:
+------------------------------------------------------------
+
+node01, node02 terminal --> sudo kubeadm join 192.168.56.11:6443 --token <token> --discovery-token-ca-cert-hash sha256:<hash>
+
+Example: sudo kubeadm join 192.168.56.11:6443 --token tgiquh.7w0z9nuiij9lipou \
+  --discovery-token-ca-cert-hash sha256:01c5aa900dc35627295a932ebd21ada5b74cfe5b77d28428f9669024afcbbf84
+
+## Use the command from the controlplane node after kubeadm initialization.
+
+
+
+
+7. Verify if nodes are joined on master node:
+=============================================
+
+Wait few minutes and list flannel pods on the master node:
+----------------------------------------------------------
+vagrant@controlplane:~$ kubectl get pod -n kube-flannel -o wide
+
+# result:
+NAME                    READY   STATUS    RESTARTS   AGE     IP              NODE           NOMINATED NODE   READINESS GATES
+kube-flannel-ds-52mp8   1/1     Running   0          2m18s   192.168.56.22   node02         <none>           <none>
+kube-flannel-ds-6wq58   1/1     Running   0          2m22s   192.168.56.21   node01         <none>           <none>
+kube-flannel-ds-sh2zj   1/1     Running   0          2m44s   192.168.56.11   controlplane   <none>           <none>
+
+
+Wait few minutes for the nodes to join the master network and check for their status:
+-------------------------------------------------------------------------------------
+	master terminal --> kubectl get nodes
+
+# result:
+NAME           STATUS   ROLES           AGE     VERSION
+controlplane   Ready    control-plane   3m49s   v1.32.10
+node01         Ready    <none>          36s     v1.32.10
+node02         Ready    <none>          31s     v1.32.10
+
+
+
+
+
+
+
+
+
+===============================
+how to manage VMs using vagrant
+===============================
+
+Check the state of the vagrantfile
+	terminal --> vagrant status 
+
+Suspend/Pause VMs
+	terminal --> vagrant suspend
+
+Suspend/Pause specific VM
+	terminal --> vagrant suspend <node_name>		# node01, node02 ect.
+
+Stop/Shut Down existing VMs
+	terminal --> vagrant halt
+
+Stop/Shout Down specific VM
+	terminal --> vagrant halt <node_name>			# node01, node02 ect.
+
+Start existing or not existing VMs of vagrant configuration
+	terminal --> vagrant up
+
+Start specific existing or not existing VM
+	terminal --> vagrant up <node_name>			# node01, node02 ect.
+
+
+
+
+
+
+
+
+
+
+
+
+
