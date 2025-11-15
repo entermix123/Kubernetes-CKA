@@ -179,11 +179,11 @@ Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
 Then you can join any number of worker nodes by running the following on each as root:
 
 kubeadm join 192.168.56.11:6443 --token 33lyra.2hbh2yszcelkqazj \
-        --discovery-token-ca-cert-hash sha256:2df384dd6b9c7e735e86a80825b96f7fdc9485a4819175a858c2c4bb9bb77ea4
+        --discovery-token-ca-cert-hash sha256:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ----------------------------------------------------------------------------------
 
 Use this command to join the nodes:
-node terminal --> sudo kubeadm join 192.168.56.11:6443 --token 33lyra.2hbh2yszcelkqazj --discovery-token-ca-cert-hash sha256:2df384dd6b9c7e735e86a80825b96f7fdc9485a4819175a858c2c4bb9bb77ea4
+node terminal --> sudo kubeadm join 192.168.56.11:6443 --token 33lyra.2hbh2yszcelkqazj --discovery-token-ca-cert-hash sha256:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 
 
@@ -238,7 +238,7 @@ Use the join command provided by kubeadm init on the master:
 node01, node02 terminal --> sudo kubeadm join 192.168.56.11:6443 --token <token> --discovery-token-ca-cert-hash sha256:<hash>
 
 Example: sudo kubeadm join 192.168.56.11:6443 --token tgiquh.7w0z9nuiij9lipou \
-  --discovery-token-ca-cert-hash sha256:01c5aa900dc35627295a932ebd21ada5b74cfe5b77d28428f9669024afcbbf84
+  --discovery-token-ca-cert-hash sha256:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 ## Use the command from the controlplane node after initializing kubeadm.
 
@@ -454,11 +454,11 @@ Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
 Then you can join any number of worker nodes by running the following on each as root:
 
 kubeadm join 192.168.56.11:6443 --token 33lyra.2hbh2yszcelkqazj \
-        --discovery-token-ca-cert-hash sha256:2df384dd6b9c7e735e86a80825b96f7fdc9485a4819175a858c2c4bb9bb77ea4
+        --discovery-token-ca-cert-hash sha256:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ----------------------------------------------------------------------------------
 
 Use this command to join the nodes:
-node terminal --> sudo kubeadm join 192.168.56.11:6443 --token 33lyra.2hbh2yszcelkqazj --discovery-token-ca-cert-hash sha256:2df384dd6b9c7e735e86a80825b96f7fdc9485a4819175a858c2c4bb9bb77ea4
+node terminal --> sudo kubeadm join 192.168.56.11:6443 --token 33lyra.2hbh2yszcelkqazj --discovery-token-ca-cert-hash sha256:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 
 
@@ -513,7 +513,7 @@ Use the join command provided by kubeadm init on the master:
 node01, node02 terminal --> sudo kubeadm join 192.168.56.11:6443 --token <token> --discovery-token-ca-cert-hash sha256:<hash>
 
 Example: sudo kubeadm join 192.168.56.11:6443 --token tgiquh.7w0z9nuiij9lipou \
-  --discovery-token-ca-cert-hash sha256:01c5aa900dc35627295a932ebd21ada5b74cfe5b77d28428f9669024afcbbf84
+  --discovery-token-ca-cert-hash sha256:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 ## Use the command from the controlplane node after kubeadm initialization.
 
