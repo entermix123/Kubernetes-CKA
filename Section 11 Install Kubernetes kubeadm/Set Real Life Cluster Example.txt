@@ -1,0 +1,209 @@
+To use this instruction We should have running Kubernetes cluster with 2 worker nodes connected to the controlplane (master node) newtwork. We can use 'Install Kubernetes Cluster Instruction v1.32.x and 1.34.x.txt' for this purposes.
+
+Now we will set Real Life example cluster consfiguration with 2 worker nodes.
+
+We have requirements as follow:
+-------------------------------
+Create a deployment named 'webserver-deployment' with container named 'webserver', image 'httpd:2.4'. Set pod cpu limit to 500m and cpurequest to 200m.
+
+Expose the deployment 'webserver-deployment' so it's reachable from the outside of the cluster (use port 30007). Configure horizontal autoscaling when cpu load > 50% it scales up deom min 1 to max 10 replicas.
+
+
+Prerequisites:
+--------------
+Set kubectl auto completion feature
+	terminal --> source <(kubectl completion bash)
+
+Set alias for short syntax of kubectl
+	terminal --> alias k=kubectl
+	terminal --> complete -F __start_kubectl k
+
+Set the specific context (default namespace)
+	terminal --> kubectl config set-context --current --namespace=default
+
+
+Steps:
+------
+
+1. Prevents any new regular pods from scheduling on controlplane (exactly like AWS EKS, GKE, AKS, etc.)
+	controlplane --> k taint nodes controlplane node-role.kubernetes.io/control-plane:NoSchedule --overwrite
+
+	# result: 
+	node/controlplane modified
+
+2. (Optional but realistic) Mark worker nodes as workers - Just for beauty – many clusters have this label
+	controlplane -->  k label nodes node01 node02 node-role.kubernetes.io/worker=worker --overwrite
+
+	# result:
+	node/node01 labeled
+	node/node02 labeled
+
+We will use declarative apprach. We will create definition files for all required objects for this task.
+
+3. Create deployment manifest directory and navigate into it
+	controlplane --> mkdir ~/webserver-task 
+	controlplane --> cd webserver-task 
+
+4. Create deployment manifest file
+	controlplane:~/webserver-task$ --> vi deployment.yaml
+
+deployment.yaml
+----------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webserver-deployment
+  namespace: default
+  labels:
+    app: webserver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webserver
+  template:
+    metadata:
+      labels:
+        app: webserver
+    spec:
+      containers:
+      - name: webserver
+        image: httpd:2.4
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 200m
+            memory: 64Mi
+          limits:
+            cpu: 500m
+            memory: 128Mi
+----------------------------------------------------------
+save changes: escape, :wq!, enter
+
+
+
+5. Create service for the deployment
+	controlplane:~/webserver-task$ --> vi service.yaml
+
+service.yaml
+----------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: webserver-deployment
+  namespace: default
+spec:
+  type: NodePort
+  selector:
+    app: webserver
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30007
+----------------------------------------------------------
+save changes: escape, :wq!, enter
+
+
+
+6. Create Horizontal Pod Autoscaler (HPA) manifest file
+	controlplane:~/webserver-task$ --> vi hpa.yaml
+
+hpa.yaml
+----------------------------------------------------------
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: webserver-deployment
+  namespace: default
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: webserver-deployment
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 50
+----------------------------------------------------------
+save changes: escape, :wq!, enter
+
+
+7. Apply everything in the correct order (or just apply the whole folder)
+	controlplane:~/webserver-task$ --> kubectl apply -f deployment.yaml
+
+	# result:
+	deployment.apps/webserver-deployment created
+
+	controlplane:~/webserver-task$ --> kubectl apply -f service.yaml
+
+	# result:
+	service/webserver-deployment created
+
+	controlplane:~/webserver-task$ --> kubectl apply -f hpa.yaml
+
+	# result:
+	horizontalpodautoscaler.autoscaling/webserver-deployment created
+
+
+	# Or apply the entire directory at once (my favorite)
+	controlplane:~/webserver-task$ --> kubectl apply -f .
+	
+	# result:
+	deployment.apps/webserver-deployment created
+	service/webserver-deployment created
+	horizontalpodautoscaler.autoscaling/webserver-deployment created
+
+
+
+8. Confirm the creationg of the objects
+	
+8.1. List pods
+	controlplane:~/webserver-task$ --> k get pods -o wide
+
+# result:
+NAME                                   READY   STATUS    RESTARTS   AGE    IP           NODE     NOMINATED NODE   READINESS GATES
+webserver-deployment-d8ffc8694-t4dkx   1/1     Running   0          3m4s   10.244.2.2   node02   <none>           <none>
+
+8.2. List services
+	controlplane:~/webserver-task$ --> k get svc
+
+# result:
+NAME                   TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+kubernetes             ClusterIP   10.96.0.1      <none>        443/TCP        4d4h
+webserver-deployment   NodePort    10.96.252.64   <none>        80:30007/TCP   3m19s
+
+8.3. List Horizontal Pod Autoscaler (HPA)
+	controlplane:~/webserver-task$ --> k get hpa
+
+# result:
+NAME                   REFERENCE                         TARGETS              MINPODS   MAXPODS   REPLICAS   AGE
+webserver-deployment   Deployment/webserver-deployment   cpu: <unknown>/50%   1         10        1          3m30s
+
+
+8.4. Show taints
+	controlplane:~/webserver-task$ --> k describe node controlplane | grep -i taint
+
+# result:
+Taints:             node-role.kubernetes.io/control-plane:NoSchedule
+
+
+9. Delete all objects
+	controlplane:~/webserver-task$ --> k delete -f .
+
+# result:
+deployment.apps "webserver-deployment" deleted from default namespace
+horizontalpodautoscaler.autoscaling "webserver-deployment" deleted from default namespace
+service "webserver-deployment" deleted from default namespace
+
+
+10. Stop/Shut Down existing VMs
+	terminal --> vagrant halt
+
+
+
