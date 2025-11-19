@@ -1,0 +1,89 @@
+1. Install kubectl on windows PC
+--------------------------------
+Kubernetes documentation for installing kubectl
+	- https://kubernetes.io/docs/tasks/tools/
+
+Install kubectl on Windows
+	- https://kubernetes.io/docs/tasks/tools/install-kubectl-windows/
+
+Install kubectl using curl
+	terminal --> curl.exe -LO "https://dl.k8s.io/release/v1.34.0/bin/windows/amd64/kubectl.exe"
+
+Verify installation using power shell
+	power shell --> $(Get-FileHash -Algorithm SHA256 .\kubectl.exe).Hash -eq $(Get-Content .\kubectl.exe.sha256)
+	# result: true
+
+Find the location of the kubectl.exe file - usually in C:/Users/your_user and copy the path from the windows explorer navigation bar.
+
+Append or prepend the kubectl binary folder to your PATH environment variable.
+	- WinKey, type 'environment' and click on 'Edit the system variables', click 'Environment Variables' button at the bottom
+	- In the System variables list, find 'Path', mark it and click 'Edit...' button. Click 'New' and paste the path to the kubectl.exe file in the field. Click 'Ok' button. 
+	# If we have more than one kubectl installed we need to 'move up' the path of the specific installation so Windows will use the first found installation as default.
+	- Restart the PC
+
+Open CMD and check if the kubectl location and installation are successful
+	terminal --> where kubectl		# this should list all kubectl installations and their locations
+	terminal --> kubectl version --client	# this should list all client and their versions (kubectl, kustomize etc.)
+
+	# example result:
+	Client Version: v1.34.0
+	Kustomize Version: v5.7.1
+
+
+
+2. Set Kubernetes Cluster Kubeconfig file
+-----------------------------------------
+
+Steps to Set Up Your Kubeconfig File
+
+Download the Kubeconfig:
+	Get the file from your test instructions (it's usually a YAML file, e.g., named kubeconfig.yaml or similar). If it's not provided directly, it might be downloadable from your cluster provider's dashboard (e.g., AWS EKS, GKE, or a custom cluster).
+
+Create the Config File:
+	Open File Explorer and navigate to C:\Users\balab\.kube (you can paste that path into the address bar).
+	If the config file doesn't exist yet (which it doesn't, based on your screenshot), right-click in the empty space > New > Text Document.
+	Rename it from New Text Document.txt to config (make sure to enable "File name extensions" in View > Show > File name extensions if you don't see the .txt).
+	Important: Delete the .txt extension if it appears— the final name should be just config (no extension).
+
+Add the Downloaded Content:
+	Right-click the new config file > Open with > Notepad (or any text editor like VS Code).
+	Copy-paste the entire contents of your downloaded kubeconfig YAML into the file.
+	Save and close (File > Save).
+
+Example Kubeconfig file look like this:
+
+Kubeconfig
+----------------------------------------------------------
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: LS0tLS1CRUdJTi...
+    server: https://your-cluster-api-server:6443
+  name: your-cluster
+contexts:
+- context:
+    cluster: your-cluster
+    user: your-user
+  name: your-context
+current-context: your-context
+kind: Config
+users:
+- name: your-user
+  user:
+    token: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+----------------------------------------------------------
+
+
+
+3. Test the Connection:
+-----------------------
+
+Open a fresh CMD/PowerShell.
+	terminal -->  kubectl config view 	# Should print the config details (redact sensitive bits if sharing).
+	terminal -->  kubectl cluster-info 	# If successful, it shows the API server URL and services (e.g., "Kubernetes control plane is running at https://your-cluster:6443").
+	terminal -->  kubectl get nodes 	# Lists your cluster's nodes (or an empty list if none; errors here mean auth/network issues).
+
+For your test: Commands like kubectl apply -f manifest.yaml, kubectl get pods, etc., should work once connected.
+
+
+
