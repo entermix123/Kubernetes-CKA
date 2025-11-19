@@ -1863,7 +1863,7 @@ weave-net-jtl5m 		2/2 		Running 		1 		1h
 
 
 
-If controlplane components are deployed as services we need to check them
+4. If controlplane components are deployed as services we need to check them
 
 4.1 Show service for api server
 	terminal --> service kube-apiserver status
@@ -2145,7 +2145,7 @@ etcd-controlplane                      1/1     Running            0             
 kube-apiserver-controlplane            1/1     Running            0               21m
 kube-controller-manager-controlplane   1/1     Running            0               21m
 kube-proxy-ldgk2                       1/1     Running            0               20m
-kube-scheduler-controlplane            0/1     CrashLoopBackOff   8 (4m33s ago)   20m		# scheduler is not running
+kube-scheduler-controlplane            0/1     CrashLoopBackOff   8 (4m33s ago)   20m	# scheduler is not running
 
 
 Show details for the scheduler
@@ -2510,7 +2510,7 @@ Edit the controller manager manifests file and fix the path
 save changes - escape, :wq!, enter
 
 
-wqit few minutes for changes to take effect
+Wait few minutes for changes to take effect
 
 List pods in the default namespace (all controlplane components)
 	terminal --> k get pods -n kube-system
@@ -4133,7 +4133,7 @@ Set the specific context (default namespace)
 
 	# Context "default" modified.
 
-When we ope nthe app we receive error message: 502 Bad Gateway
+When we open the app we receive error message: 502 Bad Gateway
 
 Check all controlplane components
 Show controlplane pods (all controlplane components)
@@ -4342,7 +4342,7 @@ NAME                                                   DATA   AGE
 coredns                                                1      39m
 extension-apiserver-authentication                     6      40m
 kube-apiserver-legacy-service-account-token-tracking   1      40m
-kube-proxy                                             2      39m		# this is the target configmap
+kube-proxy                                             2      39m	# this is the target configmap
 kube-root-ca.crt                                       1      39m
 kubeadm-config                                         1      39m
 kubelet-config                                         1      39m
@@ -4372,7 +4372,7 @@ clientConnection:
   contentType: ""
   kubeconfig: /var/lib/kube-proxy/kubeconfig.conf
   qps: 0		
-clusterCIDR: 10.244.0.0/16					# this is the range for WEAVE - 10.244.0.0/16
+clusterCIDR: 10.244.0.0/16			# this is the range for WEAVE - 10.244.0.0/16
 configSyncPeriod: 0s
 conntrack:
   maxPerCore: null
